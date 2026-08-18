@@ -2057,11 +2057,11 @@
       ' <span class="semente-estado semente-estado-' + grupoDaSemente(s) + '">' +
         esc(ROTULO_ESTADO_SEMENTE[s.estado]) + '</span></p>';
 
-    var campos = '<div class="grade">' +
-      campoTexto('semente', s.id, 'nome', 'Nome', s.nome, { largo: true, travado: virou }) +
-      campoTexto('semente', s.id, 'frase', 'A ideia', s.frase, { largo: true, travado: virou }) +
-      campoTexto('semente', s.id, 'porque', 'Por quê', s.porque, { largo: true, travado: virou }) +
-      '</div>';
+    // um texto só: a ideia como foi despejada. O nome sai sozinho da primeira
+    // frase (é o que as listas e a muda usam); o porquê é trabalho da muda.
+    var campos = '<div class="semente-ideia">' +
+      '<textarea rows="3" id="c_' + s.id + '_frase" data-alvo="semente" data-id="' + s.id + '" data-campo="frase"' +
+      (virou ? ' readonly' : ' placeholder="a ideia, como veio"') + '>' + esc(s.frase) + '</textarea></div>';
 
     var rodape;
     if (virou) {
@@ -2345,6 +2345,14 @@
       return escreverQuando(obj, chave, valor, el);
     }
 
+    // semente: a ideia é o texto todo; o nome é a primeira frase dele
+    if (el.getAttribute('data-alvo') === 'semente' && chave === 'frase') {
+      obj.frase = valor;
+      obj.nome = M.apelido(valor, 60);
+      obj.ultimoToque = M.agora();
+      M.salvar();
+      return;
+    }
     if (chave === 'ganhos' || chave === 'ferramentas' || chave === 'materiais') {
       obj[chave] = String(valor).split('\n').map(function (x) { return x.trim(); })
         .filter(function (x) { return x; });

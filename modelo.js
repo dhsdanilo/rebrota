@@ -2069,6 +2069,7 @@ var Modelo = (function () {
     desfazerSeparacao: desfazerSeparacao, reordenarSeparadas: reordenarSeparadas,
     definirDiaDiarista: definirDiaDiarista, fecharDiarista: fecharDiarista, minutosSeparados: minutosSeparados,
     semear: semear, absorverSementes: absorverSementes, sementesDe: sementesDe,
+    apelido: apelido,
     nomeDe: nomeDe,
 
     // diário
