@@ -1,0 +1,14 @@
+<!-- Ícone "maskable": o Android recorta as bordas em círculo, losango ou
+     quadrado arredondado conforme o aparelho. Por isso o fundo sangra até a
+     borda e o desenho fica dentro dos 80% centrais, a zona segura. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" fill="#0F1A17"/>
+  <g transform="translate(140 130) scale(9.6)">
+    <path d="M4.6 25V13.4a3.6 3.6 0 0 1 7.2 0V25" fill="none"
+          stroke="#C08A66" stroke-width="2.1" stroke-linecap="round"/>
+    <path d="M11.9 16.4c.8-3.9 1.9-6.1 3.5-8.2" fill="none"
+          stroke="#BFD44A" stroke-width="2" stroke-linecap="round"/>
+    <path d="M15.5 8.4c-2.7-.5-4.1-2.2-4.2-5 2.7.2 4.1 1.9 4.2 5z" fill="#BFD44A"/>
+    <path d="M15.5 8.4c.4-3.1 2.1-4.8 5-5.1.1 3-1.6 4.7-5 5.1z" fill="#BFD44A"/>
+  </g>
+</svg>

@@ -1,0 +1,16 @@
+{
+  "name": "Rebrota",
+  "short_name": "Rebrota",
+  "description": "O que eu faço agora, no sítio.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0F1A17",
+  "theme_color": "#0F1A17",
+  "lang": "pt-BR",
+  "icons": [
+    { "src": "./icone.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "./icone-mascara.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

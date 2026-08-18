@@ -1,0 +1,9 @@
+# O repositório é PÚBLICO (GitHub Pages grátis exige). Só o app sobe.
+# Documentos de desenho, o prompt de continuação e arquivos soltos ficam aqui,
+# na pasta, e não vão para o ar.
+design/
+continuar.md
+files.zip
+.claude/
+Thumbs.db
+desktop.ini

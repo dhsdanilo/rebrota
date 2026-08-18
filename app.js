@@ -1,0 +1,2440 @@
+/* App do sítio — frente de análise (PC).
+ *
+ * Postura de mesa: densa, duas mãos, formulário longo. A frente de campo
+ * (a consulta) é outro app sobre o mesmo catálogo e vem depois.
+ *
+ * Redesenho: o palco só é reconstruído em mudança estrutural (abrir, criar,
+ * remover, arrastar). Digitação escreve direto no modelo e retoca apenas o
+ * que mudou, para o cursor nunca saltar do campo.
+ */
+
+(function () {
+  'use strict';
+
+  var M = Modelo;
+
+  var tela = { tipo: null, id: null };
+
+  /* Três estados por tarefa, não dois: fechada, aberta trancada, aberta solta.
+     Ler o que está cadastrado é o uso comum; editar é raro. O que muda todo
+     dia — concluir, reabrir, arrastar — nunca fica atrás do cadeado. */
+  var passoAberto = null;          // id da tarefa com a ficha aberta
+  var passoEditando = null;        // id da tarefa com os campos soltos
+
+  var projetoEditando = null;      // id do projeto com os campos soltos
+  var acaoProjeto = null;          // { pid, tipo } esperando confirmação
+  var cancelandoTarefa = null;     // id da tarefa com o cancelar destravado
+  var avisoCascata = '';           // o que a última ação moveu de vaga
+  var planejamentoAberto = null;   // pid com o planejamento concluído reaberto
+  var filtroProjetos = '';         // grupo aberto na página de projetos
+  var filtroAvulsas = '';          // grupo aberto na página das avulsas
+  var voltarPara = null;           // de onde se veio, para poder folhear
+
+  var perigo = { aberto: null };   // projeto com o apagar destravado
+  var proposta = null;
+
+  var $lista    = document.getElementById('listaProjetos');
+  var $avulsas  = document.getElementById('listaAvulsas');
+  var $palco    = document.getElementById('palco');
+
+  // ── utilidades de marcação ────────────────────────────────────────
+
+  function esc(s) {
+    return String(s === null || s === undefined ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;');
+  }
+
+  function opcoes(lista, atual) {
+    return lista.map(function (o) {
+      return '<option value="' + esc(o.v) + '"' + (o.v === atual ? ' selected' : '') +
+        '>' + esc(o.t) + '</option>';
+    }).join('');
+  }
+
+  /* Trancado não muda a apresentação: é o mesmo campo, no mesmo lugar, só que
+     duro. Duas telas diferentes para a mesma coisa fariam procurar onde ficou
+     cada dado toda vez. Texto e área ficam `readonly` para continuarem
+     selecionáveis; o resto fica `disabled`, que é o único jeito de segurar
+     select, caixa de marca e campo de data. */
+  /* Explicação não ocupa linha: vira `title`, e aparece ao parar o mouse em
+     cima. O rótulo fica curto — quem já sabe o que é o campo não precisa ler a
+     regra dele toda vez, e quem esqueceu passa o mouse. */
+  function rotuloDe(id, chave, texto, ajuda) {
+    if (!texto) return '';
+    return '<label for="c_' + id + '_' + chave + '"' +
+      (ajuda ? ' title="' + esc(ajuda) + '" class="tem-ajuda"' : '') + '>' + esc(texto) + '</label>';
+  }
+
+  function campoTexto(alvo, id, chave, rotulo, valor, extra) {
+    extra = extra || {};
+    var vazio = valor === null || valor === undefined || valor === '';
+    return '<div class="campo' + (extra.largo ? ' campo-largo' : '') + '">' +
+      rotuloDe(id, chave, rotulo, extra.ajuda) +
+      '<input type="' + (extra.numero ? 'number' : 'text') + '" id="c_' + id + '_' + chave + '"' +
+      // trancado e vazio mostra um traço: campo em branco sem moldura parece defeito
+      (extra.travado ? ' readonly placeholder="—"'
+                     : (extra.dica ? ' placeholder="' + esc(extra.dica) + '"' : '')) +
+      (extra.min !== undefined ? ' min="' + extra.min + '"' : '') +
+      ' data-alvo="' + alvo + '" data-id="' + id + '" data-campo="' + chave + '"' +
+      ' value="' + esc(vazio ? '' : valor) + '">' +
+      '</div>';
+  }
+
+  function campoSelect(alvo, id, chave, rotulo, lista, atual, travado, ajuda) {
+    return '<div class="campo">' +
+      rotuloDe(id, chave, rotulo, ajuda) +
+      '<select id="c_' + id + '_' + chave + '" data-alvo="' + alvo + '" data-id="' + id +
+      '" data-campo="' + chave + '"' + (travado ? ' disabled' : '') + '>' +
+      opcoes(lista, atual) + '</select></div>';
+  }
+
+  function campoMarca(alvo, id, chave, rotulo, ligado, travado, ajuda) {
+    return '<div class="campo campo-marca' + (ligado ? ' campo-marca-on' : '') + '">' +
+      '<input type="checkbox" id="c_' + id + '_' + chave + '"' +
+      ' data-alvo="' + alvo + '" data-id="' + id + '" data-campo="' + chave + '"' +
+      (ligado ? ' checked' : '') + (travado ? ' disabled' : '') + '>' +
+      rotuloDe(id, chave, rotulo, ajuda) + '</div>';
+  }
+
+  // ── coluna da esquerda ────────────────────────────────────────────
+
+  function desenharLista() {
+    try { montarLista(); } catch (e) {
+      // a coluna é a navegação: sem ela o usuário fica sem saída nenhuma
+      console.error('falhou ao montar a coluna', e);
+      $lista.innerHTML = '<li class="aviso" style="padding:0 10px">' +
+        'Não consegui montar a lista.<br><button type="button" class="bt-fraco" ' +
+        'data-acao="voltar-inicio" style="margin-top:8px">recomeçar</button></li>';
+    }
+  }
+
+  /* A coluna mostra CINCO: as três vagas, sempre, mesmo vazias — vaga vazia é
+     informação —, e depois os dois mais recentes, por conveniência. O resto vive
+     na página de projetos. Coluna que cresce com o cadastro vira lista infinita,
+     e lista infinita é volume de obrigação à vista. */
+  var VAGAS_COLUNA = [
+    { papel: 'titular', t: 'titular' },
+    { papel: 'reserva', t: 'reserva' },
+    { papel: 'planejamento', t: 'em planejamento' }
+  ];
+
+  function montarLista() {
+    var linhas = VAGAS_COLUNA.map(function (v) {
+      var p = M.projetoPorPapel(v.papel);
+      return p ? itemProjeto(p) : itemVagaAberta(v);
+    });
+
+    var jaEstao = {};
+    M.cat().projetos.forEach(function (p) { if (p.papel) jaEstao[p.id] = true; });
+
+    M.cat().projetos
+      .filter(function (p) {
+        return !jaEstao[p.id] && p.estado !== 'concluido' && p.estado !== 'encerrado';
+      })
+      .sort(function (a, b) { return a.ultimoToque < b.ultimoToque ? 1 : -1; })
+      .slice(0, 5 - VAGAS_COLUNA.length)
+      .forEach(function (p) { linhas.push(itemProjeto(p)); });
+
+    linhas.push('<li><button type="button" class="item-projeto item-vermais" data-abrir="projetos"' +
+      (tela.tipo === 'projetos' ? ' aria-current="true"' : '') + '>ver todos</button></li>');
+
+    $lista.innerHTML = linhas.join('');
+
+    var av = M.avulsas();
+    $avulsas.innerHTML = itemSimples('avulsas', 'Tarefas sem projeto',
+      av.length + ' cadastrada' + (av.length === 1 ? '' : 's'));
+
+    var abertas = M.pendenciasAbertas();
+    var pior = abertas.length ? M.nivelPendencia(abertas[0]) : null;
+    document.getElementById('listaPendencias').innerHTML = itemSimples(
+      'pendencias', 'Aguardando',
+      abertas.length ? abertas.length + ' em aberto' : 'nada esperando',
+      pior);
+
+    var se = M.cat().sementes.length;
+    document.getElementById('listaRoadmap').innerHTML = itemSimples('sementes', 'Sementes',
+      se + ' guardada' + (se === 1 ? '' : 's'));
+  }
+
+  function itemProjeto(p) {
+    var atual = tela.tipo === 'projeto' && tela.id === p.id;
+    var r = M.etiquetaDe(p);
+    var nota = M.motivoTrancado(p) ||
+      (p.estado === 'preparo' ? M.oQueFaltaParaSubir(p) : '');
+
+    return '<li><button type="button" class="item-projeto vaga-' + r.chave + '"' +
+      ' data-abrir="projeto" data-id="' + p.id + '"' + (atual ? ' aria-current="true"' : '') + '>' +
+      '<span class="item-etiqueta"><i class="pino"></i>' + esc(r.texto) + '</span>' +
+      '<span class="item-nome">' + esc(p.nome || 'sem nome') + '</span>' +
+      (p.custoEstimado !== null && p.custoEstimado !== undefined && p.estado !== 'ativo'
+        ? barraEnvelope(p) : '') +
+      (nota ? '<span class="item-nota">' + esc(nota) + '</span>' : '') +
+      '</button></li>';
+  }
+
+  /* Vaga vazia é convite, não buraco: leva direto para a escolha. */
+  function itemVagaAberta(v) {
+    var prontas = M.planejadas().filter(M.aptaParaExecucao).length;
+    var chamada = v.papel === 'planejamento'
+      ? 'escolher um pré-projeto'
+      : prontas ? 'escolher entre ' + prontas + (prontas === 1 ? ' pronta' : ' prontas') : 'nada pronto ainda';
+
+    return '<li><button type="button" class="item-projeto item-vaga vaga-' + v.papel + '"' +
+      ' data-abrir="projetos" data-filtro="' + (v.papel === 'planejamento' ? 'fila' : 'planejada') + '">' +
+      '<span class="item-etiqueta"><i class="pino"></i>' + esc(v.t) + '</span>' +
+      '<span class="item-livre">vaga aberta · ' + esc(chamada) + '</span>' +
+      '</button></li>';
+  }
+
+  function itemSimples(chave, nome, nota, nivel) {
+    return '<li><button type="button" class="item-projeto" data-abrir="' + chave + '"' +
+      (tela.tipo === chave ? ' aria-current="true"' : '') + '>' +
+      '<span class="item-nome">' +
+        (nivel ? '<span class="ponto ponto-' + nivel + '"></span>' : '') + esc(nome) +
+      '</span>' +
+      '<span class="item-nota">' + esc(nota) + '</span></button></li>';
+  }
+
+  /* Barra do envelope: "X de X", nunca porcentagem. O valor tem lastro —
+     quando enche, uma porta abre. A porcentagem não teria. */
+  function barraEnvelope(p) {
+    var meta = Number(p.custoEstimado) || 0;
+    var tem = Number(p.guardado) || 0;
+    var fatia = meta > 0 ? Math.min(100, (tem / meta) * 100) : 100;
+    return '<span class="envelope">' +
+      '<span class="envelope-valor">' + esc(M.moeda(tem)) + ' de ' + esc(M.moeda(meta)) + '</span>' +
+      '<span class="envelope-barra"><span class="envelope-cheia" style="width:' +
+        fatia.toFixed(1) + '%"></span></span></span>';
+  }
+
+  // ── palco ─────────────────────────────────────────────────────────
+
+  var TELAS = {
+    projetos:   marcacaoProjetos,
+    projeto:    function () {
+      var p = M.projeto(tela.id);
+      return p ? marcacaoProjeto(p) : null;
+    },
+    avulsas:    marcacaoAvulsas,
+    pendencias: marcacaoPendencias,
+    sementes:   marcacaoSementes,
+    proposta:   marcacaoProposta
+  };
+
+  /* Nunca deixar o usuário preso numa tela sem saída: se algo estourar ao
+     montar o palco, ele mostra o erro e um caminho de volta em vez de meia
+     tela quebrada. Ação dentro do app tem que ser barata de desfazer. */
+  function desenharPalco() {
+    var html;
+    try {
+      var construtor = TELAS[tela.tipo];
+      html = construtor ? construtor() : null;
+    } catch (e) {
+      console.error('falhou ao montar', tela, e);
+      html = '<h2>Deu ruim aqui</h2>' +
+        '<p class="palco-sub">Nada foi perdido — o que está gravado continua gravado.</p>' +
+        '<pre class="aviso" style="white-space:pre-wrap">' + esc(e.message) + '</pre>' +
+        '<div class="rodape-acoes">' +
+          '<button type="button" class="bt-forte" data-acao="voltar-inicio">voltar</button>' +
+          '<button type="button" class="bt-fraco" id="btSocorroExportar">exportar tudo</button>' +
+        '</div>';
+    }
+    if (html === null) {
+      tela = { tipo: null, id: null };
+      html = marcacaoAbertura();
+    }
+    // a cascata é automática, mas nunca calada: ela diz o que moveu, uma vez
+    $palco.innerHTML = (avisoCascata
+      ? '<p class="aviso-cascata">' + esc(avisoCascata) + '</p>' : '') + html;
+
+    var socorro = document.getElementById('btSocorroExportar');
+    if (socorro) socorro.addEventListener('click', exportar);
+  }
+
+  /* O cadastro do projeto se escreve uma vez e se lê muitas: fica trancado por
+     padrão. Escapam do cadeado a SITUAÇÃO — a única coisa ali que muda toda
+     semana, e que por isso pergunta antes — e o GUARDADO, que muda a cada
+     aporte. Custo estimado não: orçamento se refaz na mesa, não de passagem. */
+  // ── abertura ──────────────────────────────────────────────────────
+  /* A tela de entrada mandava criar o primeiro projeto mesmo com quatro
+     cadastrados. No lugar, uma frase que muda com a hora e as três vagas —
+     que é o estado que governa tudo o que o app vai oferecer. Não é o painel
+     ainda: aqui não entra tarefa nenhuma. */
+
+  /* Voz seca da §16: sem exclamação, sem elogio, sem incentivo. A frase não
+     empurra nem cobra — ela só reconhece que hora é e que dia é. */
+  /* Voz seca da §16 — sem exclamação, sem elogio, sem incentivo — mas seca não
+     é sem graça. A frase reconhece a hora com um canto de boca; ela nunca
+     empurra, nunca cobra e nunca comenta o seu desempenho. */
+  var SAUDACOES = {
+    madrugada: [
+      'Ainda de pé.',
+      'A esta hora, só a casa e você.',
+      'O sítio dorme. Nem tudo em você concorda.',
+      'Cedo demais ou tarde demais, depende de como você conta.',
+      'Ninguém nunca começou uma obra à meia-noite e se orgulhou disso.',
+      'A serra ainda está preta.',
+      'Nada lá fora precisa de você agora.',
+      'Boa hora para pensar. Péssima para cavar.',
+      'O galo ainda está se preparando.',
+      'Se está aqui a esta hora, é ideia, não trabalho.'
+    ],
+    manha: [
+      'Bom dia.',
+      'O dia está inteiro na sua frente.',
+      'A neblina levanta lá pelas nove. Você, não sei.',
+      'Primeira hora, a que rende.',
+      'Hora boa para o que precisa de tempo firme.',
+      'O barro de ontem já decidiu se secou.',
+      'Antes do calor, tudo parece mais fácil.',
+      'As cabras já tomaram o café delas.',
+      'O galo desistiu de te acordar faz tempo.',
+      'Manhã: a única parte do dia que ninguém ainda estragou.',
+      'Cedo. Dá para fingir que o dia vai render tudo isso.'
+    ],
+    tarde: [
+      'Boa tarde.',
+      'Meio do dia já foi embora.',
+      'A tarde dá conta de uma coisa. De três, não.',
+      'O sol virou. O trabalho, não.',
+      'Depois do almoço tudo pesa dez quilos a mais.',
+      'Ainda cabe alguma coisa hoje.',
+      'Metade do dia foi. A outra metade também vai.',
+      'Boa hora para o que não exige empolgação.',
+      'Antes de escurecer, ainda dá.',
+      'Tarde é quando as ideias da manhã prestam contas.'
+    ],
+    noite: [
+      'Boa noite.',
+      'Hora de mesa, não de bota.',
+      'O dia acabou lá fora. Aqui dentro, você decide.',
+      'Escureceu. A enxada descansa; o plano, não.',
+      'A noite é boa para decidir e péssima para se convencer.',
+      'Lá fora já não dá para enxergar o próprio pé.',
+      'O que ficou para amanhã já ficou.',
+      'Toda ferramenta está exatamente onde você deixou.',
+      'De noite todo projeto parece mais fácil do que é.',
+      'Fim do dia. As cabras não estão nem aí.'
+    ]
+  };
+
+  // temperos que entram no sorteio só quando são verdade
+  var FIM_DE_SEMANA = [
+    'Fim de semana. O sítio não foi avisado.',
+    'Dia sem hora marcada.',
+    'Hoje o relógio é seu — e ele some rápido.',
+    'Sábado e domingo rendem o dobro e passam na metade do tempo.'
+  ];
+
+  var SEGUNDA = [
+    'Segunda. A grama cresceu o fim de semana inteiro.',
+    'Semana nova. O mato não soube disso.',
+    'Segunda-feira, que para o sítio é terça, quarta e domingo também.'
+  ];
+
+  // sorteada uma vez por abertura: redesenhar a tela não pode trocar a frase
+  var saudacao = (function () {
+    var agora = new Date();
+    var h = agora.getHours(), d = agora.getDay();
+    var pool = SAUDACOES[h < 5 ? 'madrugada' : h < 12 ? 'manha' : h < 18 ? 'tarde' : 'noite'];
+    if (d === 0 || d === 6) pool = pool.concat(FIM_DE_SEMANA);
+    if (d === 1) pool = pool.concat(SEGUNDA);
+    return pool[Math.floor(Math.random() * pool.length)];
+  })();
+
+  var VAGAS = [
+    { v: 'titular', t: 'titular' },
+    { v: 'reserva', t: 'reserva' },
+    { v: 'planejamento', t: 'planejamento' }
+  ];
+
+  /* Se a tarefa atravessou a caminhada do sítio até o PC sem ser recusada, ela
+     é uma declaração de vontade — e tudo que não for ela vira concorrência.
+     Por isso ela ocupa a entrada inteira, e o catálogo entra em modo consulta:
+     só o projeto DELA aceita escrita, porque orçar acaba em registrar preço e
+     conferir acaba em abrir pendência. */
+  function caixaTarefaAtiva(t) {
+    var proj = t.projetoId ? M.projeto(t.projetoId) : null;
+    var recado = M.recadoDe(t.id);
+
+    return '<div class="ativa-caixa">' +
+      '<span class="ativa-etiqueta">em andamento</span>' +
+      '<p class="ativa-texto">' + esc(t.texto || 'tarefa sem texto') + '</p>' +
+      (recado ? '<p class="ativa-recado">' + esc(recado) + '</p>' : '') +
+      '<p class="ativa-meta">' +
+        (proj ? esc(proj.nome || 'projeto sem nome') + ' · ' : '') +
+        'faltam ~' + esc(M.duracao(M.restanteDe(t.id))) +
+      '</p>' +
+      /* Na MESA a segunda porta precisa existir: você veio ao PC no meio da
+         tarefa justamente para consultar alguma coisa, e sem ela o modo consulta
+         vira uma sala sem porta. Na BOTA não — lá o que se consulta é a trilha,
+         dentro da própria tarefa. */
+      '<div class="ativa-saidas">' +
+        '<button type="button" class="bt-forte" data-acao="ir-executar">abrir a tarefa</button>' +
+        (naMesa()
+          ? '<button type="button" class="bt-fraco" data-acao="ir-organizar">consultar os projetos</button>'
+          : '') +
+      '</div>' +
+      (naMesa()
+        ? '<p class="ativa-nota">Enquanto ela estiver aberta, só o projeto dela aceita mudança. ' +
+          'O resto do app fica para leitura.</p>'
+        : '') + '</div>';
+  }
+
+  /* Enquanto há tarefa ativa, só o "projeto dela" aceita escrita — e para uma
+     avulsa, o projeto dela são as avulsas. `null` aqui é a lista das avulsas,
+     não "nenhum lugar"; o que é geral (criar projeto, promover, importar)
+     pergunta a `emConsultaGeral`. */
+  function emConsulta(projetoId) {
+    var t = M.tarefaAtivaDe('pe_eu');
+    if (!t) return false;
+    return (t.projetoId || null) !== (projetoId || null);
+  }
+
+  function emConsultaGeral() { return !!M.tarefaAtivaDe('pe_eu'); }
+
+  /* A entrada pergunta ANTES de mostrar os projetos, e o motivo é o que você
+     nomeou: planejar é gostoso, executar não é, e o app feito para quem trava
+     pode virar o lugar onde se trava. A pergunta protege o instante exato em
+     que a deriva começa. */
+  function marcacaoAbertura() {
+    var frase = '<p class="abertura-frase">' + esc(saudacao) + '</p>';
+    var ativa = M.tarefaAtivaDe('pe_eu');
+
+    if (ativa) return '<div class="abertura">' + frase + caixaTarefaAtiva(ativa) + avisoDeCopia() + '</div>';
+
+    if (M.estaVazio()) {
+      // na bota não há porta para o catálogo, nem vazio: cadastrar é da mesa
+      if (!naMesa()) {
+        return '<div class="abertura">' + frase +
+          '<p class="abertura-nota">Nada cadastrado ainda. Os projetos se cadastram na mesa.</p></div>';
+      }
+      return '<div class="abertura">' + frase +
+        '<p class="abertura-nota">Nada cadastrado ainda. Comece por um projeto.</p>' +
+        '<div class="portas"><button type="button" class="porta" data-acao="ir-organizar">' +
+        '<span class="porta-nome">organizar</span>' +
+        '<span class="porta-sub">cadastrar o primeiro projeto</span></button></div></div>';
+    }
+
+    /* NO CELULAR NÃO HÁ DUAS PORTAS. Ali o app é a consulta — "uma pergunta e
+       uma resposta", como diz a §1. Não há porta nenhuma para o catálogo: folhear
+       projetos de pé no pasto não resolve nenhuma situação real, e o que a bota
+       precisa mesmo consultar — o que já foi decidido neste projeto — mora
+       dentro da própria tarefa, na trilha. */
+    if (!naMesa()) {
+      return '<div class="abertura">' + frase +
+        '<button type="button" class="c-acao porta-unica" data-acao="ir-executar">encontrar tarefa</button>' +
+        vagasDaAbertura() +
+        '</div>';
+    }
+
+    return '<div class="abertura">' + frase +
+      '<div class="portas">' +
+        /* Na mesa as duas portas são iguais: o app não tem opinião sobre qual
+           delas você deveria escolher agora. Destacar executar fazia organizar
+           parecer o caminho errado, e organizar é trabalho legítimo. */
+        '<button type="button" class="porta" data-acao="ir-executar">' +
+          '<span class="porta-nome">executar</span>' +
+          '<span class="porta-sub">o app escolhe o que cabe agora</span>' +
+        '</button>' +
+        '<button type="button" class="porta" data-acao="ir-organizar">' +
+          '<span class="porta-nome">organizar</span>' +
+          '<span class="porta-sub">mexer nos projetos e no plano</span>' +
+        '</button>' +
+      '</div>' + vagasDaAbertura() + avisoDeCopia() + '</div>';
+  }
+
+  function vagasDaAbertura() {
+    return '<dl class="abertura-vagas">' + VAGAS.map(function (vaga) {
+      var p = M.cat().projetos.filter(function (q) { return q.papel === vaga.v; })[0];
+      return '<div class="abertura-vaga vaga-' + vaga.v + '">' +
+        '<dt><i class="pino"></i>' + vaga.t + '</dt>' +
+        '<dd' + (p ? '' : ' class="abertura-livre"') + '>' +
+          esc(p ? (p.nome || 'sem nome') : 'vaga aberta') + '</dd></div>';
+    }).join('') + '</dl>';
+  }
+
+  /* "Próximo passo" era uma promessa que o app não pode cumprir: quem escolhe a
+     próxima é o motor, na hora, pela situação do dia — pode ser a da sequência
+     ou qualquer outra que caiba melhor. O que o app sabe de verdade é onde você
+     parou. */
+  function ondeParou(pid) {
+    var ultima = null, quando = '';
+    M.passosDe(pid).forEach(function (t) {
+      if (M.estadoDe(t.id) !== 'feita') return;
+      var dia = M.ultimaVezDe(t.id) || '';
+      if (!ultima || dia >= quando) { ultima = t; quando = dia; }
+    });
+    if (!ultima) return 'Ainda não começou.';
+    return 'Onde parou: ' + (ultima.texto || 'tarefa sem texto') +
+      (quando ? ' · ' + M.formatarData(quando) : '');
+  }
+
+  function marcacaoProjeto(p) {
+    var outros = M.cat().projetos.filter(function (q) { return q.id !== p.id; });
+    var consulta = emConsulta(p.id);
+    var solto = projetoEditando === p.id && !consulta;
+    var trancado = M.motivoTrancado(p);
+
+    /* O título É o campo. Antes o nome e o resultado apareciam duas vezes — uma
+       grandes no alto, outra como campo de formulário logo abaixo. Um elemento
+       por dado, sempre no mesmo lugar e do mesmo tamanho: solto ele aceita
+       digitação, trancado só se lê. */
+    return [
+      /* Folhear projetos é ir e vir: sem a volta, ler o terceiro da lista custa
+         voltar pela porta da frente e reencontrar onde você estava. */
+      voltarPara
+        ? '<button type="button" class="voltar-lista" data-acao="voltar-lista">← todos os projetos</button>'
+        : '',
+      '<div class="palco-cabeca">',
+        '<div class="palco-cabeca-texto">',
+          '<h2><input type="text" class="titulo-obra" placeholder="Projeto sem nome"' +
+            ' aria-label="Nome da obra"' + (solto ? '' : ' readonly') +
+            ' data-alvo="projeto" data-id="' + p.id + '" data-campo="nome"' +
+            ' value="' + esc(p.nome) + '"></h2>',
+          (solto || p.resultado
+            ? '<input type="text" class="titulo-resultado"' +
+              ' placeholder="Resultado — o que muda quando ficar pronto"' +
+              ' aria-label="Resultado"' + (solto ? '' : ' readonly') +
+              ' data-alvo="projeto" data-id="' + p.id + '" data-campo="resultado"' +
+              ' value="' + esc(p.resultado) + '">'
+            : ''),
+          '<p class="palco-sub">' + esc(trancado || ondeParou(p.id)) +
+            /* Num projeto rodando o envelope já disparou e some — mas quanto a
+               obra custou continua sendo curiosidade legítima. Fica aqui, numa
+               linha só, sem barra e sem campo. */
+            ((p.papel === 'titular' || p.papel === 'reserva' ||
+              p.estado === 'concluido' || p.estado === 'encerrado') &&
+             p.custoEstimado !== null && p.custoEstimado !== undefined && Number(p.custoEstimado) > 0
+              ? '<span class="palco-custo">orçado em ' + esc(M.moeda(p.custoEstimado)) + '</span>'
+              : '') +
+          '</p>',
+          barraAcoes(p),
+        '</div>',
+        consulta ? '<span class="selo-consulta">consulta</span>'
+          : solto
+          ? '<button type="button" class="bt-forte" data-acao="salvar-projeto">salvar</button>'
+          : '<button type="button" class="bt-fraco" data-acao="editar-projeto" data-id="' + p.id + '">editar</button>',
+      '</div>',
+
+      /* A motivação é o argumento do projeto, não um campo de cadastro: fica
+         numa caixa citada, em itálico, para se ler como lembrete e não como
+         mais uma linha de formulário. */
+      grupo('Motivação', '',
+        '<div class="caixa-motivacao">' +
+          '<textarea class="area-motivacao" rows="' + Math.max(2, (p.ganhos || []).length) + '"' +
+          ' id="c_' + p.id + '_ganhos" data-alvo="projeto" data-id="' + p.id + '" data-campo="ganhos"' +
+          (solto ? ' placeholder="um ganho por linha"' : ' readonly placeholder="—"') + '>' +
+          esc((p.ganhos || []).join('\n')) + '</textarea>' +
+        '</div>',
+        'Um ganho por linha: o que esta obra compra para você em troca do trabalho. É o que se ' +
+        'lê meses depois, quando a vontade acabou e você precisa lembrar por que começou.'),
+
+      caixaAcao(p),
+
+      /* O envelope é gatilho de entrada: dispara uma vez e some. Num projeto já
+         rodando ele não decide mais nada, e ficar mostrando dinheiro no meio da
+         obra é convidar a virar controle financeiro, que ele não é. */
+      (p.papel === 'titular' || p.papel === 'reserva' ||
+       p.estado === 'concluido' || p.estado === 'encerrado')
+        ? ''
+        : grupo('Envelope', '',
+            // a barra é a leitura; os campos são só o jeito de mexer nela
+            (p.custoEstimado === null || p.custoEstimado === undefined
+              ? '' : '<div class="envelope-largo">' + barraEnvelope(p) + '</div>') +
+            '<div class="grade">' +
+            campoTexto('projeto', p.id, 'custoEstimado', 'Custo estimado', p.custoEstimado,
+              { numero: true, min: 0, travado: !solto,
+                ajuda: 'Deixe vazio enquanto não houver orçamento levantado — é o vazio que mantém ' +
+                       'o projeto como pré-projeto. Preenchido, ele passa a juntar dinheiro.' }) +
+            // escapa do cadeado normal (aporte é rotina), mas não do modo consulta
+            campoTexto('projeto', p.id, 'guardado', 'Guardado', p.guardado, { numero: true, min: 0,
+              travado: consulta,
+              ajuda: 'Quanto já está separado para esta obra. Onde você aporta é a sua declaração de ' +
+                     'qual projeto vem primeiro — decisão fria, tomada meses antes de começar.' }) +
+            '</div>',
+            'Quanto custa e quanto já foi juntado. É gatilho para começar, não controle financeiro: ' +
+            'quando enche, a porta abre uma vez e o app para de olhar para dinheiro. A barra mostra ' +
+            'valores, nunca porcentagem: o valor tem lastro, e quando enche uma porta abre.'),
+
+      /* Projeto que já está executando passou por todas as portas: listar o que
+         um dia o segurou é história, não restrição. */
+      (p.papel === 'titular' || p.papel === 'reserva' ||
+       p.estado === 'concluido' || p.estado === 'encerrado')
+        ? ''
+        : grupo('Depende', '', fichasPrerequisitos(p, outros, !solto),
+            'Projetos que precisam estar concluídos antes deste. Enquanto faltar um, este fica ' +
+            'com a porta trancada e o motivo aparece em texto seco na coluna da esquerda.'),
+
+      secaoEtapa(p, 'planejamento', 'Planejamento',
+        'Decidir como vai ser feito, medir, conferir o que já existe, orçar e comprar. ' +
+        'Enquanto sobrar uma tarefa aberta aqui, a execução fica segura — planejar é o prazer ' +
+        'e executar é o gargalo, então vale gastar o tempo aqui antes de mexer na terra.'),
+      // o estado fica na tela; a explicação da regra vai para o hover
+      secaoEtapa(p, 'execucao', 'Execução',
+        'O trabalho em si. Nenhuma destas é oferecida enquanto houver uma tarefa de ' +
+        'planejamento aberta neste projeto.',
+        pendentePlanejamento(p.id) ? 'espera o planejamento' : ''),
+
+      /* Projeto que morreu vira `cancelado` e fica no registro. Apagar existe
+         só para o que foi cadastrado errado — por isso é pequeno e fica no
+         canto, e não no meio do caminho como uma saída natural. */
+      // as saídas ficam aqui embaixo, pequenas: existem, mas não convidam
+      consulta ? '' : peDoProjeto(p)
+    ].join('');
+  }
+
+  /* Suspender e cancelar com uma tarefa em andamento dentro deixava a bota
+     mostrando tarefa de projeto suspenso. A tarefa ativa é vontade declarada:
+     primeiro ela fecha, depois o projeto sai da vaga. */
+  function peDoProjeto(p) {
+    var corpo;
+    if (perigo.aberto === p.id) {
+      corpo = '<span class="dica">Apaga o projeto e todas as tarefas dele, sem desfazer. Para guardar o registro, use <em>cancelar</em>.</span>' +
+        '<button type="button" class="bt-linha bt-mini" data-acao="remover-projeto" data-id="' + p.id + '">sim, apagar tudo</button>' +
+        '<button type="button" class="bt-fraco bt-mini" data-acao="cancelar-perigo">deixa quieto</button>';
+    } else if (M.temTarefaAtiva(p.id)) {
+      corpo = '<span class="dica">Há uma tarefa em andamento aqui. Termine ou pare ela antes de suspender, cancelar ou apagar.</span>';
+    } else {
+      corpo = saidasDe(p).map(function (k) {
+        return '<button type="button" class="bt-linha bt-mini" data-acao="projeto-' + k +
+          '" data-id="' + p.id + '">' + ACOES[k].rotulo + ' este projeto</button>';
+      }).join('') +
+      '<button type="button" class="bt-linha bt-mini" data-acao="abrir-perigo" data-id="' + p.id + '">apagar</button>';
+    }
+    return '<div class="pe-projeto">' + corpo + '</div>';
+  }
+
+  // ── todos os projetos ─────────────────────────────────────────────
+  /* Esta página não é uma lista com filtros: é a TELA DA DECISÃO de qual vem
+     depois. Por isso vem agrupada na ordem do funil — a ordem é a informação,
+     você vê o cano inteiro e onde ele está entupido — e cada linha carrega só
+     o que serve para escolher: o destino, o que falta, o envelope, a idade.
+     NENHUMA TAREFA aparece aqui: no instante em que aparecesse, isto viraria a
+     tela de "todas as tarefas" que o teto de três frentes proíbe. */
+
+  var GRUPOS = [
+    { chave: 'vagas',      t: 'em andamento',
+      cabe: function (p) { return p.papel === 'titular' || p.papel === 'reserva' || p.papel === 'planejamento'; } },
+    { chave: 'planejada',  t: 'planejadas',
+      cabe: function (p) { return p.estado === 'preparo' && !p.papel; } },
+    { chave: 'fila',       t: 'pré-projetos',
+      cabe: function (p) { return p.estado === 'fila'; } },
+    { chave: 'suspenso',   t: 'suspensos',
+      cabe: function (p) { return p.estado === 'parado'; } },
+    { chave: 'encerrado',  t: 'concluídos e cancelados',
+      cabe: function (p) { return p.estado === 'concluido' || p.estado === 'encerrado'; } }
+  ];
+
+  function marcacaoProjetos() {
+    var todos = M.cat().projetos;
+
+    var blocos = GRUPOS.filter(function (g) {
+      return !filtroProjetos || filtroProjetos === g.chave;
+    }).map(function (g) {
+      var lista = todos.filter(g.cabe);
+      if (g.chave === 'planejada') lista = M.planejadas();
+      if (g.chave === 'vagas') {
+        var peso = { titular: 0, reserva: 1, planejamento: 2 };
+        lista = lista.slice().sort(function (a, b) { return peso[a.papel] - peso[b.papel]; });
+      }
+      if (!lista.length) return '';
+      return '<div class="secao"><div class="secao-titulo">' + esc(g.t) + '</div>' +
+        '<ul class="fichario">' + lista.map(linhaProjeto).join('') + '</ul></div>';
+    }).join('');
+
+    return [
+      '<h2>Projetos</h2>',
+      '<p class="palco-sub">' + esc(estadoDoFunil()) + '</p>',
+      '<div class="filtros">',
+        botaoFiltro('', 'todos'),
+        GRUPOS.map(function (g) { return botaoFiltro(g.chave, g.t); }).join(''),
+      '</div>',
+      blocos || '<p class="aviso" style="margin-top:24px">Nada aqui.</p>',
+      emConsultaGeral() ? '' :
+      '<div class="rodape-acoes">' +
+        '<button type="button" class="bt-forte" data-acao="novo-projeto">novo projeto</button>' +
+      '</div>'
+    ].join('');
+  }
+
+  /* Responde "dá para promover alguma coisa agora?" sem ler a lista. */
+  function estadoDoFunil() {
+    var vazias = VAGAS_COLUNA.filter(function (v) { return !M.projetoPorPapel(v.papel); });
+    var prontas = M.planejadas().filter(M.aptaParaExecucao);
+
+    if (!vazias.length) {
+      return 'As três vagas estão ocupadas. ' + (prontas.length
+        ? prontas.length + (prontas.length === 1 ? ' planejada espera' : ' planejadas esperam') + ' a próxima abrir.'
+        : 'Nada esperando na fila.');
+    }
+
+    var nomes = vazias.map(function (v) { return v.t; }).join(' e ');
+    var querPlanejamento = vazias.some(function (v) { return v.papel === 'planejamento'; });
+    var querExecucao = vazias.some(function (v) { return v.papel !== 'planejamento'; });
+
+    var frases = ['Vaga aberta em ' + nomes + '.'];
+    if (querExecucao) {
+      frases.push(prontas.length
+        ? (prontas.length === 1 ? '1 planejada está pronta para entrar.' : prontas.length + ' planejadas estão prontas para entrar.')
+        : 'Nenhuma planejada está pronta ainda.');
+    }
+    if (querPlanejamento) {
+      var fila = M.cat().projetos.filter(function (p) { return p.estado === 'fila'; }).length;
+      frases.push(fila
+        ? 'Há ' + fila + (fila === 1 ? ' pré-projeto' : ' pré-projetos') + ' para escolher.'
+        : 'Nenhum pré-projeto cadastrado.');
+    }
+    return frases.join(' ');
+  }
+
+  function botaoFiltro(chave, texto) {
+    return '<button type="button" class="filtro' + (filtroProjetos === chave ? ' filtro-on' : '') +
+      '" data-acao="filtrar" data-valor="' + chave + '">' + esc(texto) + '</button>';
+  }
+
+  function botaoFiltroAvulsas(chave, texto) {
+    return '<button type="button" class="filtro' + (filtroAvulsas === chave ? ' filtro-on' : '') +
+      '" data-acao="filtrar-avulsas" data-valor="' + chave + '">' + esc(texto) + '</button>';
+  }
+
+  function linhaProjeto(p) {
+    var r = M.etiquetaDe(p);
+    var falta = M.motivoTrancado(p) || (p.estado === 'preparo' ? M.oQueFaltaParaSubir(p) : '');
+    var idade = M.diasDesde(p.ultimoToque);
+
+    return '<li class="ficha-projeto vaga-' + r.chave + '">' +
+      '<button type="button" class="ficha-abrir" data-abrir="projeto" data-id="' + p.id + '">' +
+        '<span class="item-etiqueta"><i class="pino"></i>' + esc(r.texto) + '</span>' +
+        // o resultado, não o nome da obra: porta trancada só puxa se atrás dela
+        // houver um fim pretendido, não um serviço
+        '<span class="ficha-nome">' + esc(p.resultado || p.nome || 'sem nome') + '</span>' +
+        (p.resultado && p.nome ? '<span class="ficha-obra">' + esc(p.nome) + '</span>' : '') +
+        (falta ? '<span class="item-nota">' + esc(falta) + '</span>' : '') +
+        (p.custoEstimado !== null && p.custoEstimado !== undefined && p.estado !== 'ativo'
+          ? barraEnvelope(p) : '') +
+        (idade >= 60 && p.estado !== 'ativo'
+          ? '<span class="ficha-idade">parado há ' + idade + ' dias</span>' : '') +
+      '</button>' +
+      (emConsultaGeral() ? '' :
+       M.aptaParaExecucao(p) && !M.projetoPorPapel('reserva')
+        ? '<button type="button" class="bt-forte bt-mini" data-acao="projeto-promover" data-id="' +
+          p.id + '">pôr em execução</button>'
+        : '') +
+      (emConsultaGeral() ? '' :
+       p.estado === 'fila' && !M.projetoPorPapel('planejamento')
+        ? '<button type="button" class="bt-fraco bt-mini" data-acao="projeto-promover" data-id="' +
+          p.id + '">planejar</button>'
+        : '') +
+      '</li>';
+  }
+
+  // ── ações do projeto ──────────────────────────────────────────────
+  /* O select de sete situações morreu. Ele permitia qualquer salto, inclusive
+     os absurdos — titular voltando a planejamento —, e tratava como campo de
+     cadastro o que é decisão. O caminho é um só: pré-projeto → planejamento →
+     execução → concluído, com suspender e cancelar como saídas laterais.
+     A ÚNICA promoção que é escolha é a entrada no planejamento, porque é a
+     única em que existe mais de um candidato. */
+
+  var CADEADO = '<svg class="cadeado" viewBox="0 0 12 14" aria-hidden="true">' +
+    '<path d="M3.2 6V4.1a2.8 2.8 0 0 1 5.6 0V6" fill="none" stroke="currentColor" stroke-width="1.3"/>' +
+    '<rect x="1.5" y="6" width="9" height="7" rx="1.3" fill="currentColor"/></svg>';
+
+  var ACOES = {
+    promover:  { rotulo: 'promover',  forte: true },
+    concluir:  { rotulo: 'concluir',  forte: true },
+    retomar:   { rotulo: 'retomar',   forte: true },
+    suspender: { rotulo: 'suspender' },
+    cancelar:  { rotulo: 'cancelar' }
+  };
+
+  /* O topo tem só o que AVANÇA. Suspender e cancelar desceram para o pé, em
+     letra pequena, junto do apagar: com o concluir trancado e as duas saídas
+     em botão normal ao lado, a tela estava sugerindo desistir — e um app para
+     quem trava não pode oferecer a desistência com mais clareza que a
+     conclusão. */
+  function acaoQueAvanca(p) {
+    if (p.estado === 'parado') return 'retomar';
+    if (p.estado === 'concluido' || p.estado === 'encerrado') return 'retomar';
+    if (p.papel === 'titular' || p.papel === 'reserva') return 'concluir';
+    if (p.papel === 'planejamento') return null;
+    return 'promover';
+  }
+
+  // pré-projeto sobe para planejamento; planejada sobe para reserva
+  function destinoDaPromocao(p) {
+    return p.estado === 'preparo' ? 'reserva' : 'planejamento';
+  }
+
+  function saidasDe(p) {
+    if (p.estado === 'concluido' || p.estado === 'encerrado') return [];
+    if (p.estado === 'parado') return ['cancelar'];
+    return ['suspender', 'cancelar'];
+  }
+
+  /* Concluir fica visível e trancado, com o que falta ao lado: escondido, o
+     botão não puxa ninguém; trancado, ele vira o motivo para fechar a última
+     tarefa. E o que destranca é decisão sua — terminar ou cancelar. */
+  function barraAcoes(p) {
+    if (emConsulta(p.id)) return '';
+    var abertas = M.tarefasAbertasDe(p.id).length;
+    var k = acaoQueAvanca(p);
+    var botoes = '';
+
+    if (k) {
+      // o teto de três frentes é parede, não conselho: sem vaga, não promove
+      var ocupada = k === 'promover' && (destinoDaPromocao(p) === 'reserva'
+        ? !!M.projetoPorPapel('reserva') && !!M.projetoPorPapel('titular')
+        : !!M.projetoPorPapel('planejamento'));
+
+      var trava = (k === 'concluir' && abertas > 0) || ocupada ||
+                  (k === 'promover' && destinoDaPromocao(p) === 'reserva' && !M.aptaParaExecucao(p));
+      var rotulo = k === 'promover'
+        ? (destinoDaPromocao(p) === 'reserva' ? 'pôr em execução' : 'promover a planejamento')
+        : ACOES[k].rotulo;
+      botoes = '<button type="button" class="' + (ACOES[k].forte ? 'bt-forte' : 'bt-fraco') + ' bt-acao' +
+        (trava ? ' bt-travado' : '') + '"' + (trava ? ' disabled' : '') +
+        ' data-acao="projeto-' + k + '" data-id="' + p.id + '">' +
+        (trava ? CADEADO : '') + rotulo + '</button>';
+    }
+
+    /* Planejada volta para o planejamento quando você quiser: o mundo muda, o
+       preço muda, e um plano pronto pode precisar ser refeito. Só depende de a
+       vaga estar livre — é um por vez. */
+    if (p.estado === 'preparo' && !p.papel) {
+      var vagaOcupada = M.projetoPorPapel('planejamento');
+      botoes += '<button type="button" class="bt-fraco bt-acao' + (vagaOcupada ? ' bt-travado' : '') + '"' +
+        (vagaOcupada ? ' disabled' : '') +
+        ' data-acao="projeto-revisar" data-id="' + p.id + '">' +
+        (vagaOcupada ? CADEADO : '') + 'voltar a planejamento</button>';
+    }
+
+    var nota = '';
+    if (ocupada) {
+      var dono = M.projetoPorPapel(destinoDaPromocao(p) === 'reserva' ? 'reserva' : 'planejamento');
+      nota = 'A vaga está com ' + (dono.nome || 'outro projeto') +
+        '. Conclua, suspenda ou cancele um dos que estão andando primeiro.';
+    } else if ((p.papel === 'titular' || p.papel === 'reserva') && abertas) {
+      nota = abertas === 1 ? 'Falta 1 tarefa aberta.' : 'Faltam ' + abertas + ' tarefas abertas.';
+    } else if (p.papel === 'planejamento' || (p.estado === 'preparo' && !p.papel)) {
+      nota = M.oQueFaltaParaSubir(p);
+      var idade = M.diasDesde(p.ultimoToque);
+      if (p.estado === 'preparo' && !p.papel && idade >= 60) {
+        nota += ' Planejado há ' + idade + ' dias.';
+      }
+    } else if (p.fecho && p.fecho.texto) {
+      nota = p.fecho.texto;
+    }
+
+    return '<div class="barra-acoes">' + botoes +
+      (nota ? '<span class="barra-nota">' + esc(nota) + '</span>' : '') + '</div>';
+  }
+
+  var TEXTOS_ACAO = {
+    promover:  { frase: 'Entra em planejamento e ganha o esqueleto: decidir, medir, conferir, orçar, comprar.',
+                 ok: 'promover' },
+    revisar:   { frase: 'Volta para a vaga de planejamento e entra uma tarefa: revisar preços, medidas ' +
+                        'e disponibilidade. Enquanto houver tarefa de planejamento aberta aqui, ele fica ' +
+                        'nessa vaga — é o momento de reclassificar o que estiver na etapa errada. Quando ' +
+                        'a última fechar, ele volta sozinho para as planejadas.',
+                 ok: 'voltar a planejamento' },
+    concluir:  { frase: 'Concluir. Nenhuma tarefa aberta ficou para trás.',
+                 campo: 'Quer anotar alguma coisa? O que ficou pronto, o que você faria diferente.',
+                 opcional: true, ok: 'concluir' },
+    suspender: { frase: 'Suspender. O projeto sai da vaga e guarda tudo como está, para voltar depois.',
+                 campo: 'Por quê?', ok: 'suspender' },
+    cancelar:  { frase: 'Cancelar. O projeto e as tarefas continuam no registro, mas saem do caminho.',
+                 campo: 'Por quê?', ok: 'cancelar' },
+    retomar:   { frase: 'Retomar. Volta para onde estava antes de parar — planejada ou pré-projeto — ' +
+                        'sem vaga: a vaga você dá de novo, pela mesma porta de todos.',
+                 ok: 'retomar' }
+  };
+
+  function caixaAcao(p) {
+    if (!acaoProjeto || acaoProjeto.pid !== p.id) return '';
+    var cfg = TEXTOS_ACAO[acaoProjeto.tipo];
+    if (!cfg) return '';
+
+    var frases = [cfg.frase];
+
+    if (acaoProjeto.tipo === 'promover') {
+      if (destinoDaPromocao(p) === 'reserva') {
+        frases = [M.projetoPorPapel('titular')
+          ? 'Entra como reserva e passa a receber trabalho quando a titular travar.'
+          : 'A vaga de titular está aberta: este projeto assume o comando do dia.'];
+        var idade = M.diasDesde(p.ultimoToque);
+        if (idade >= 60) {
+          frases.push('Planejado há ' + idade + ' dias — os preços do orçamento são desta época.');
+        }
+      } else {
+        var anterior = M.projetoPorPapel('planejamento');
+        if (anterior && anterior.id !== p.id) {
+          frases.push((anterior.nome || 'O projeto que estava em planejamento') + ' volta para a fila.');
+        }
+        if (M.passosDe(p.id).length) frases[0] = 'Entra em planejamento.';
+      }
+    }
+    // dizer antes quem sobe: a cascata não pode ser surpresa
+    if (['concluir', 'suspender', 'cancelar'].indexOf(acaoProjeto.tipo) !== -1 &&
+        (p.papel === 'titular' || p.papel === 'reserva')) {
+      var sobe = quemSobe(p);
+      if (sobe) frases.push(sobe);
+    }
+
+    return '<div class="confirma">' +
+      '<p class="confirma-texto">' + esc(frases.join(' ')) + '</p>' +
+      (cfg.campo
+        ? '<textarea class="confirma-campo" id="campoAcao" rows="2" placeholder="' +
+          esc(cfg.campo) + '"></textarea>'
+        : '') +
+      '<div class="confirma-acoes">' +
+        '<button type="button" class="bt-forte" data-acao="confirmar-acao">' + esc(cfg.ok) + '</button>' +
+        '<button type="button" class="bt-fraco" data-acao="cancelar-acao">deixa quieto</button>' +
+      '</div></div>';
+  }
+
+  /* Simula a cascata sem executá-la, só para dizer o que vai acontecer. Só a
+     subida de reserva para titular é automática — a vaga que sobra fica aberta
+     esperando a sua escolha, e isso é dito na cara. */
+  function quemSobe(p) {
+    var reserva = M.projetoPorPapel('reserva');
+    var prontas = M.planejadas().filter(M.aptaParaExecucao).length;
+
+    var frase = p.papel === 'titular' && reserva
+      ? (reserva.nome || 'A reserva') + ' assume a vaga de titular. A de reserva fica aberta.'
+      : 'A vaga de ' + (p.papel || 'execução') + ' fica aberta.';
+
+    return frase + ' ' + (prontas
+      ? (prontas === 1 ? 'Há 1 planejada pronta para entrar.' : 'Há ' + prontas + ' planejadas prontas para entrar.')
+      : 'Nenhuma planejada está pronta ainda.');
+  }
+
+  function pendentePlanejamento(pid) {
+    return M.passosDe(pid).some(function (t) {
+      return t.etapa === 'planejamento' && M.estadoDe(t.id) === 'aberta';
+    });
+  }
+
+  /* Duas seções, não uma lista só: a divisão entre decidir e fazer precisa
+     estar visível, senão a regra que segura a execução parece arbitrária. */
+  function secaoEtapa(p, etapa, titulo, explicacao, estado) {
+    var tarefas = M.passosDe(p.id).filter(function (t) { return t.etapa === etapa; });
+    var travada = etapa === 'execucao' && pendentePlanejamento(p.id);
+
+    /* Planejamento cumprido não precisa se mostrar toda vez que você entra:
+       ele já fez o que tinha de fazer. Recolhe para uma linha, e continua a um
+       clique de distância — nada é escondido, só sai da frente. */
+    var cumprido = etapa === 'planejamento' && tarefas.length &&
+                   !M.tarefasAbertasDe(p.id, 'planejamento').length;
+    var recolhido = cumprido && planejamentoAberto !== p.id;
+
+    return '<div class="secao secao-etapa' + (travada ? ' secao-travada' : '') +
+      (recolhido ? ' secao-recolhida' : '') + '">' +
+      '<div class="secao-cabeca">' +
+        '<div class="secao-titulo tem-ajuda" title="' + esc(explicacao) + '">' + esc(titulo) + '</div>' +
+        (estado ? '<span class="secao-nota">' + esc(estado) + '</span>' : '') +
+        (cumprido
+          ? '<button type="button" class="bt-linha bt-mini" data-id="' + p.id + '" data-acao="' +
+            (recolhido ? 'mostrar-planejamento' : 'esconder-planejamento') + '">' +
+            (recolhido ? tarefas.length + ' tarefas, todas resolvidas · mostrar' : 'esconder') +
+            '</button>'
+          : '') +
+      '</div>' +
+      (recolhido ? '' :
+        listaPassos(tarefas, etapa) +
+        /* Detalhar é trabalho da vaga de planejamento — é o vazamento por onde
+           o teto de três frentes escapava: dava para passar a tarde cadastrando
+           tarefas de uma obra que não está em vaga nenhuma. */
+        (emConsulta(p.id) ? ''
+          : p.estado === 'fila'
+          ? '<p class="aviso" style="margin-top:14px">Detalhar é trabalho da vaga de planejamento.</p>'
+          : '<div class="rodape-acoes">' +
+            '<button type="button" class="bt-fraco" data-acao="nova-tarefa" data-id="' + p.id +
+            '" data-etapa="' + etapa + '">adicionar tarefa</button>' +
+          '</div>')) +
+      '</div>';
+  }
+
+  function fichasPrerequisitos(p, outros, travado) {
+    var fichas = (p.prerequisitos || []).map(function (qid) {
+      var q = M.projeto(qid);
+      return '<span class="ficha">' + esc(q ? q.nome || 'sem nome' : '(removido)') +
+        (travado ? '' :
+          '<button type="button" data-acao="tirar-prereq" data-id="' + p.id +
+          '" data-valor="' + qid + '" aria-label="tirar">×</button>') + '</span>';
+    }).join('');
+
+    var livres = outros.filter(function (q) {
+      return (p.prerequisitos || []).indexOf(q.id) === -1;
+    });
+
+    if (travado) {
+      return '<div class="fichas">' + (fichas || '<span class="aviso">Nada segurando.</span>') + '</div>';
+    }
+
+    var seletor = livres.length
+      ? '<div class="junta"><select id="selPrereq"><option value="">escolher projeto…</option>' +
+          livres.map(function (q) {
+            return '<option value="' + esc(q.id) + '">' + esc(q.nome || 'sem nome') + '</option>';
+          }).join('') + '</select>' +
+          '<button type="button" class="bt-fraco" data-acao="por-prereq" data-id="' + p.id + '">vincular</button></div>'
+      : '<p class="aviso">Nenhum outro projeto cadastrado.</p>';
+
+    return '<div class="fichas">' + (fichas || '<span class="aviso">Nada segurando.</span>') +
+      '</div>' + seletor;
+  }
+
+  /* Filtros como na página de projetos: a lista das avulsas junta rotina,
+     destrave e obra pequena, e sem filtro o que se procura fica no meio do
+     resto. Rotina é a que tem cadência; feitas e canceladas vêm do diário. */
+  var FILTROS_AVULSAS = [
+    { chave: 'abertas',    t: 'abertas',    cabe: function (t) { return !fechada(t) && !M.periodica(t); } },
+    { chave: 'rotina',     t: 'rotina',     cabe: function (t) { return M.periodica(t); } },
+    { chave: 'feitas',     t: 'feitas',     cabe: function (t) { return M.estadoDe(t.id) === 'feita'; } },
+    { chave: 'canceladas', t: 'canceladas', cabe: function (t) { return M.estadoDe(t.id) === 'encerrada'; } }
+  ];
+
+  function marcacaoAvulsas() {
+    var todas = M.avulsas();
+    var grupo = FILTROS_AVULSAS.filter(function (g) { return g.chave === filtroAvulsas; })[0];
+    var lista = grupo ? todas.filter(grupo.cabe) : todas;
+
+    return [
+      '<h2>Tarefas sem projeto</h2>',
+      '<p class="palco-sub">O lastro do app: o que responde quando os projetos estão travados.</p>',
+      '<div class="filtros">',
+        botaoFiltroAvulsas('', 'todas'),
+        FILTROS_AVULSAS.map(function (g) { return botaoFiltroAvulsas(g.chave, g.t); }).join(''),
+      '</div>',
+      listaPassos(lista),
+      emConsulta(null) ? '' :
+      '<div class="rodape-acoes">' +
+        '<button type="button" class="bt-forte" data-acao="novo-passo" data-id="">adicionar tarefa</button>' +
+      '</div>'
+    ].join('');
+  }
+
+  // ── passos ────────────────────────────────────────────────────────
+
+  var AJUDA_ETAPA =
+    'Planejamento é decidir como vai ser feito. Execução é fazer. Enquanto sobrar uma tarefa ' +
+    'de planejamento aberta neste projeto, nenhuma de execução é oferecida — é o que impede ' +
+    'cavar trinta buracos antes de saber se o poste cabe no orçamento.';
+
+  var AJUDA_DURACAO =
+    'Quanto tempo a coisa leva, em minutos. Estimativa grossa serve: errar aqui é normal, e ao ' +
+    'parar no meio você diz quanto andou em vez de cronometrar nada.';
+
+  function fechada(t) {
+    var e = M.estadoDe(t.id);
+    return e === 'feita' || e === 'encerrada';
+  }
+
+  /* O que interessa ler é o que vem pela frente: o que já foi desce para o pé
+     da seção, sem a tira de marcas, e as abertas numeram de 1. */
+  /* A lista existe mesmo vazia: é ela que recebe a tarefa arrastada da outra
+     etapa. Sem isso, mover para um planejamento vazio seria impossível. */
+  function listaPassos(passos, etapa) {
+    if (!passos.length) {
+      return '<ul class="passos passos-vazia" data-etapa="' + esc(etapa || '') + '">' +
+        '<li class="passos-nada">Nenhuma tarefa aqui' +
+        (etapa ? ' — arraste uma da outra seção, ou adicione' : '') + '.</li></ul>';
+    }
+
+    var abertas = passos.filter(function (t) { return !fechada(t); });
+    var prontas = passos.filter(fechada);
+
+    // o número que a tarefa mostra na tela é o endereço dela: as dependências
+    // apontam para ele em vez de repetir a frase inteira da outra tarefa
+    var numeros = {};
+    abertas.forEach(function (t, i) { numeros[t.id] = i + 1; });
+
+    var html = abertas.map(function (t, i) { return marcacaoPasso(t, i + 1, numeros, etapa); }).join('');
+    if (prontas.length) {
+      var temFeita = prontas.some(function (t) { return M.estadoDe(t.id) === 'feita'; });
+      var temCancelada = prontas.some(function (t) { return M.estadoDe(t.id) === 'encerrada'; });
+      html += '<li class="passos-divisor">' +
+        (temFeita && temCancelada ? 'feitas e canceladas' : temCancelada ? 'canceladas' : 'feitas') +
+        '</li>' +
+        prontas.map(function (t) { return marcacaoPasso(t, 0, numeros, etapa); }).join('');
+    }
+    return '<ul class="passos" data-etapa="' + esc(etapa || '') + '">' + html + '</ul>';
+  }
+
+  function marcacaoPasso(t, n, numeros, etapaDaSecao) {
+    var aberto = passoAberto === t.id;
+    var solto = passoEditando === t.id;
+    var situacao = M.estadoDe(t.id);   // vem do diário, não do catálogo
+    var feita = situacao === 'feita';
+    var pronta = fechada(t);
+    var avisos = M.avisosDe(t);
+
+    // com a ficha aberta não arrasta: os campos dentro precisam de seleção.
+    // Em consulta também não: arrastar reordena e muda etapa, e isso é escrita.
+    var arrasta = !aberto && !emConsulta(t.projetoId);
+    return '<li class="passo passo-' + situacao + (pronta ? ' passo-pronta' : '') +
+      (aberto ? ' passo-aberto' : '') +
+      '" draggable="' + (arrasta ? 'true' : 'false') + '" data-tarefa="' + t.id + '">' +
+      '<div class="passo-linha">' +
+        '<span class="passo-alca" aria-hidden="true">⋮⋮</span>' +
+        // só o endereço da tarefa: o número não é botão, e fingir que era só
+        // funcionava para quem já sabia
+        '<span class="passo-ordem' + (pronta ? ' passo-ordem-fim' : '') + '">' +
+          (feita ? '✓' : situacao === 'encerrada' ? '×' : (n || '·')) + '</span>' +
+        /* O título é o campo — como no projeto. Duro, ele abre e fecha a ficha;
+           solto, aceita digitação no mesmo lugar. A duração idem: formatada
+           enquanto se lê, em minutos enquanto se edita. */
+        '<input type="text" class="passo-texto" placeholder="tarefa sem texto"' +
+          (solto ? '' : ' readonly data-acao="abrir-ficha"') +
+          ' data-alvo="tarefa" data-id="' + t.id + '" data-campo="texto"' +
+          ' value="' + esc(t.texto) + '">' +
+        /* Etapa e duração na barra do título: é o que se lê de relance antes de
+           decidir se vale abrir a ficha. Soltas, viram os próprios controles —
+           por isso nenhuma das duas tem seção lá dentro. */
+        /* A etiqueta só aparece quando diz algo novo: dentro da seção EXECUÇÃO,
+           sete etiquetas "execução" empilhadas não informam nada e só pesam.
+           Nas avulsas, que não têm seção, ela sempre aparece. */
+        (solto
+          ? '<select class="passo-etapa passo-etapa-edita"' +
+            ' data-alvo="tarefa" data-id="' + t.id + '" data-campo="etapa">' +
+            opcoes(M.ETAPAS, t.etapa) + '</select>'
+          : t.etapa === etapaDaSecao ? ''
+          : '<span class="passo-etapa" title="' + esc(AJUDA_ETAPA) + '">' +
+            esc(t.etapa === 'planejamento' ? 'planejamento' : 'execução') + '</span>') +
+        (solto
+          ? '<input type="number" class="passo-tempo passo-tempo-edita" min="5"' +
+            ' title="' + esc(AJUDA_DURACAO) + '"' +
+            ' data-alvo="tarefa" data-id="' + t.id + '" data-campo="duracaoTotal"' +
+            ' value="' + esc(t.duracaoTotal) + '">'
+          : '<span class="passo-tempo" title="' + esc(AJUDA_DURACAO) + '">' +
+            '<i aria-hidden="true">⏱</i>' + esc(M.duracao(t.duracaoTotal)) + '</span>') +
+        // as duas ações da linha, com nome: concluir de um lado do editar
+        (emConsulta(t.projetoId) ? ''
+          : pronta
+          ? '<button type="button" class="bt-linha bt-mini" data-acao="reabrir-tarefa" data-id="' + t.id + '">reabrir</button>'
+          : '<button type="button" class="bt-linha bt-mini bt-concluir" data-acao="concluir-tarefa" data-id="' + t.id + '">concluir</button>') +
+        (emConsulta(t.projetoId) ? ''
+          : solto
+          ? '<button type="button" class="bt-forte bt-mini" data-acao="salvar-passo">salvar</button>'
+          : '<button type="button" class="bt-linha bt-mini" data-acao="editar-passo" data-id="' + t.id + '">editar</button>') +
+      '</div>' +
+      (avisos.length && !aberto
+        ? '<div class="passo-avisos">' + avisos.map(function (a) {
+            return '<span class="aviso-linha">' + esc(a) + '</span>'; }).join('') + '</div>'
+        : '') +
+      (aberto
+        ? '<div class="passo-corpo">' + formularioPasso(t, null, !solto) + '</div>'
+        /* Feita ou cancelada, as condições já não importam — mas o que foi
+           levado importa: no meio da tarefa de hoje, saber com que ferramenta e
+           quanto material a anterior foi feita é consulta de verdade. */
+        : pronta ? (marcasDoLevado(t) ? '<div class="passo-marcas">' + marcasDoLevado(t) + '</div>' : '')
+        : '<div class="passo-marcas">' + marcasDe(t, numeros) + '</div>' +
+          (t.recado ? '<p class="passo-recado">' + esc(t.recado) + '</p>' : '')) +
+      '</li>';
+  }
+
+  function marcasDe(t, numeros) {
+    var m = [];
+    var local = M.LOCAIS.filter(function (l) { return l.v === t.ondePrecisaEstar; })[0];
+
+    m.push(['⚑', (local ? local.t : '') + (t.onde ? ' · ' + t.onde : '')]);
+    // só o que é notável: "pode parar" é o caso comum e não merece etiqueta
+    if (!t.podeParar) m.push(['⏱', 'não pode parar']);
+
+    var cond = [];
+    if (t.exigeClima !== 'indiferente') cond.push(t.exigeClima === 'firme' ? 'tempo firme' : 'tolera chuva fina');
+    if (t.exigeSoloFirme) cond.push('solo firme');
+    if (t.guardadaParaChuva) cond.push('guardada para a chuva');
+    cond.push(t.esforco === 'pesado' ? 'pesado' : 'leve');
+    m.push(['☁', cond.join(' · ')]);
+
+    var gente = [];
+    if (t.precisaAjuda) gente.push('precisa ajuda');
+    if (t.boaComCriancas) gente.push('boa com crianças');
+    if (t.perigosaComCriancas) gente.push('perigosa com crianças');
+    if (gente.length) m.push(['☻', gente.join(' · ')]);
+
+    if ((t.ferramentas || []).length) m.push(['⚒', t.ferramentas.join(', ')]);
+    if ((t.materiais || []).length) m.push(['▤', t.materiais.join(', ')]);
+
+    var q = resumoQuando(t);
+    if (q) m.push(['◷', q]);
+    if (t.prazo) {
+      m.push(['⏳', t.prazo.tipo === 'data'
+        ? 'até ' + M.formatarData(t.prazo.em)
+        : 'a cada ' + t.prazo.cadenciaDias + ' dias']);
+    }
+
+    /* Só as dependências que ainda seguram: cumprida deixou de ser restrição e
+       vira ruído. E aponta para o NÚMERO da outra tarefa — repetir a frase
+       inteira dela era o que mais entupia a linha. */
+    var presas = (t.dependeDe || []).filter(function (d) { return M.estadoDe(d) !== 'feita'; });
+    if (presas.length) {
+      m.push(['⇢', 'depois de ' + presas.map(function (d) {
+        var alvo = M.tarefa(d);
+        if (numeros && numeros[d]) return numeros[d];
+        return alvo ? (alvo.texto || 'sem texto') : '?';
+      }).join(' e ')]);
+    }
+
+    return m.filter(function (x) { return x[1]; }).map(function (x) {
+      return '<span class="marca"><i>' + x[0] + '</i>' + esc(x[1]) + '</span>';
+    }).join('');
+  }
+
+  // só o que foi levado: ferramentas e materiais da tarefa já fechada
+  function marcasDoLevado(t) {
+    var m = [];
+    if ((t.ferramentas || []).length) m.push(['⚒', t.ferramentas.join(', ')]);
+    if ((t.materiais || []).length) m.push(['▤', t.materiais.join(', ')]);
+    return m.map(function (x) {
+      return '<span class="marca"><i>' + x[0] + '</i>' + esc(x[1]) + '</span>';
+    }).join('');
+  }
+
+  function resumoQuando(t) {
+    var q = t.quando || {};
+    var partes = [];
+    if (q.horario && q.horario !== 'qualquer') {
+      var h = M.HORARIOS.filter(function (x) { return x.v === q.horario; })[0];
+      partes.push(q.horario === 'personalizado' ? q.de + '–' + q.ate : (h ? h.t : ''));
+    }
+    if (q.dias && q.dias !== 'qualquer') {
+      if (q.dias === 'personalizado') {
+        partes.push((q.diasEscolhidos || []).map(function (d) { return M.NOMES_DIA[d]; }).join(' '));
+      } else {
+        var d2 = M.DIAS_SEMANA.filter(function (x) { return x.v === q.dias; })[0];
+        partes.push(d2 ? d2.t : '');
+      }
+    }
+    if (q.meses && q.meses.length && q.meses.length < 12) {
+      partes.push('só ' + q.meses.map(function (mm) { return M.NOMES_MES[mm - 1]; }).join(' '));
+    }
+    return partes.filter(Boolean).join(' · ');
+  }
+
+  /* Tudo visível, sem "mais/menos": ele olharia sempre mesmo, por medo de
+     estar esquecendo campo. A ordem segue a pergunta natural — o que é, quanto
+     tempo, onde, em que condições, com quem, o que levar, quando, depois de
+     que, recado. */
+  /* Uma linha por assunto, com o nome curto à esquerda e a explicação inteira
+     no hover. O texto e a duração saíram daqui: eles já estão na linha de cima
+     e agora são editáveis lá mesmo — campo que existe só para repetir o que
+     está três centímetros acima é campo para apagar. */
+  function formularioPasso(t, irmaos, travado) {
+    var avisos = M.avisosDe(t);
+
+    return [
+      grupo('Onde', 'grade',
+        campoSelect('tarefa', t.id, 'ondePrecisaEstar', 'Precisa estar', M.LOCAIS, t.ondePrecisaEstar, travado,
+          'No sítio, no computador ou fora. Telefonema e encomenda cabem nos vinte minutos ' +
+          'da sala de espera do dentista, e por isso não disputam o dia seco com o trabalho de fora.') +
+        campoTexto('tarefa', t.id, 'onde', 'Lugar', t.onde,
+          { dica: 'trecho rente à estrada', travado: travado,
+            ajuda: 'O ponto exato. Vem junto da tarefa na hora de sair, para você não ' +
+                   'atravessar o sítio e descobrir lá que era do outro lado.' }),
+        'A primeira pergunta da consulta, e a que poda todas as outras: quando você responde ' +
+        '"fora" ou "computador", o app nem pergunta clima, chão, companhia e energia.'),
+
+      grupo('Condições', '',
+        linhaCond('Clima',
+          'Como o tempo precisa estar. "Só com tempo firme" desaparece em qualquer chuva. ' +
+          '"Tolera chuva fina" fica guardada para a segunda chamada, quando não sobrou nada limpo, ' +
+          'e aí o app avisa que você vai se molhar. Aqui chove metade do ano, então isto pesa.',
+          campoSelect('tarefa', t.id, 'exigeClima', '', M.CLIMAS, t.exigeClima, travado)) +
+
+        /* Estas duas eram caixas de marca empilhadas embaixo do valor do clima,
+           e liam-se como uma lista em que o primeiro item tinha perdido a
+           caixinha. Viraram pergunta com resposta, como todas as outras. */
+        linhaCond('Precisa de chão firme?',
+          'Para o que exige pisar sem atolar ou rodar carrinho de mão. Some nos dias em que você ' +
+          'responde "barro" na consulta — e chuva forte já responde barro sozinha.',
+          campoBooleano('tarefa', t.id, 'exigeSoloFirme', t.exigeSoloFirme, travado)) +
+
+        linhaCond('Guardar para a chuva?',
+          'Trabalho que dá para fazer em qualquer dia, mas que vale a pena reservar para um dia ' +
+          'de chuva. Fica fora do páreo enquanto o tempo está firme — a não ser que não haja mais ' +
+          'nada, e aí o app oferece assim mesmo em vez de te deixar parado.',
+          campoBooleano('tarefa', t.id, 'guardadaParaChuva', t.guardadaParaChuva, travado)) +
+
+        linhaCond('Esforço',
+          'Quanto o corpo vai sentir. Nos dias em que você responder "pouca energia", só as leves ' +
+          'chegam até você — as pesadas nem são cogitadas.',
+          campoSelect('tarefa', t.id, 'esforco', '', M.ESFORCOS, t.esforco, travado)) +
+
+        linhaCond('Companhia',
+          'Quem precisa estar junto e quem não pode. As três marcas são independentes: uma tarefa ' +
+          'pode precisar de ajuda e ainda assim ser boa com as crianças por perto.',
+          linhaMarcas(
+          campoMarca('tarefa', t.id, 'precisaAjuda', 'precisa de ajuda', t.precisaAjuda, travado,
+            'Trabalho de duas pessoas. Só é oferecida nos dias em que você marca "ajuda", e nesses ' +
+            'dias ela sobe na fila: gente disponível é situação escassa e não se desperdiça.') +
+          campoMarca('tarefa', t.id, 'boaComCriancas', 'boa com crianças', t.boaComCriancas, travado,
+            'Trabalho que fica melhor com elas junto. Nos dias em que você marca "crianças", esta ' +
+            'ganha peso e vem na frente — aproveita o tempo com eles em vez de disputar com eles.') +
+          campoMarca('tarefa', t.id, 'perigosaComCriancas', 'perigosa com crianças', t.perigosaComCriancas, travado,
+            'Motosserra, altura, ferramenta cortante, elétrica. Nos dias em que você marca ' +
+            '"crianças", esta simplesmente não existe para o app.'))) +
+
+        linhaCond('Pode interromper?',
+          'Sim: a tarefa aparece mesmo numa janela curta, e o app diz quanto cabe hoje e quanto ' +
+          'sobra depois. Não: ela só aparece quando o tempo disponível cobre a coisa inteira — ' +
+          'concreto não aceita ser deixado pela metade.',
+          campoBooleano('tarefa', t.id, 'podeParar', t.podeParar, travado)),
+
+        'Tudo que precisa ser verdade no dia para esta tarefa aparecer. Se uma só destas linhas ' +
+        'não bater com a situação que você informou, ela não é oferecida — e você nem fica sabendo ' +
+        'que ela existia, que é justamente o alívio.'),
+
+      grupo('Levar', 'grade',
+        campoLista('tarefa', t.id, 'ferramentas', 'Ferramentas', t.ferramentas, 'cavadeira\nmarreta\nEPI', travado,
+          'Uma por linha. O que precisa estar na mão para começar, incluindo o EPI — que é ' +
+          'a coisa que mais se esquece e a que mais custa esquecer.') +
+        campoLista('tarefa', t.id, 'materiais', 'Materiais', t.materiais, '38 postes de eucalipto\n90 m de tela', travado,
+          'Um por linha, com a quantidade quando ela importa. "90 m de tela" evita a segunda viagem; ' +
+          '"tela" não evita nada.'),
+        'A folha que você confere antes de sair. Não é inventário do sítio nem controle de estoque: ' +
+        'é só o que precisa ir junto nesta tarefa.'),
+
+      blocoQuando(t, travado),
+
+      grupo('Depende', '', fichasDependencia(t, travado),
+        'Tarefas que precisam terminar antes desta. A ordem da lista é preferência sua e muda ' +
+        'arrastando; isto aqui é lei, e o app segura a tarefa até as outras ficarem prontas. ' +
+        'Usar demais engessa o projeto — vincule só o que é impossível fora de ordem.'),
+
+      grupo('Nota', 'grade',
+        campoArea('tarefa', t.id, 'recado', '', t.recado, travado,
+          'anotação que aparece junto da tarefa'),
+        'Viaja com a tarefa e aparece na tela na hora de trabalhar. É onde vai o que você ' +
+        'descobriu da última vez e não quer descobrir de novo: a medida, o jeito certo, ' +
+        'onde ficou guardada a peça.'),
+
+      // o contêiner existe sempre, vazio: é ele que recebe o aviso enquanto
+      // você mexe nos campos, sem precisar redesenhar o formulário inteiro
+      '<div class="secao"><div class="avisos">' + avisos.map(function (a) {
+        return '<p class="aviso-linha">' + esc(a) + '</p>'; }).join('') + '</div></div>',
+
+      // remover só aparece com os campos soltos: apagar é decisão de edição
+      travado ? '' :
+      cancelandoTarefa === t.id
+        ? '<div class="confirma">' +
+            '<p class="confirma-texto">Cancelar a tarefa. Ela sai do caminho, deixa de segurar ' +
+            'as que vinham depois e para de travar a conclusão do projeto — mas continua no ' +
+            'registro, com o motivo.</p>' +
+            '<input type="text" class="confirma-campo" id="campoCancelaTarefa" placeholder="por quê?">' +
+            '<div class="confirma-acoes">' +
+              '<button type="button" class="bt-forte" data-acao="confirmar-cancelar-tarefa" data-id="' + t.id + '">cancelar a tarefa</button>' +
+              '<button type="button" class="bt-fraco" data-acao="voltar-cancelar-tarefa">deixa quieto</button>' +
+            '</div></div>'
+        : '<div class="passo-rodape">' +
+            '<button type="button" class="bt-forte" data-acao="salvar-passo">salvar</button>' +
+            '<span class="passo-rodape-fim">' +
+              '<button type="button" class="bt-linha" data-acao="cancelar-tarefa" data-id="' + t.id + '">cancelar tarefa</button>' +
+              '<button type="button" class="bt-linha" data-acao="remover-passo" data-id="' + t.id + '">apagar</button>' +
+            '</span>' +
+          '</div>'
+    ].join('');
+  }
+
+  /* Título à esquerda, campos à direita. Empilhado, cada seção virava uma laje
+     com um traço em cima e muito ar dentro, e o olho não achava onde começar a
+     ler. Em duas colunas os valores ganham uma borda esquerda única, que é o
+     que faz uma ficha ser varrida de relance em vez de lida linha a linha. */
+  function grupo(titulo, classe, corpo, ajuda) {
+    return '<div class="secao secao-campos">' +
+      '<div class="secao-titulo' + (ajuda ? ' tem-ajuda' : '') + '"' +
+      (ajuda ? ' title="' + esc(ajuda) + '"' : '') + '>' + esc(titulo) + '</div>' +
+      '<div class="secao-corpo">' +
+        (classe ? '<div class="' + classe + '">' + corpo + '</div>' : corpo) +
+      '</div></div>';
+  }
+
+  /* Caixa de marca não é campo com rótulo em cima: é uma linha só. Misturada na
+     mesma grade dos campos de texto, ela herdava colunas largas e sobrava
+     órfã na linha de baixo. */
+  function linhaMarcas(corpo) { return '<div class="marcas-linha">' + corpo + '</div>'; }
+
+  /* Uma condição por linha: nome curto à esquerda, controles à direita. A
+     explicação inteira mora no hover do nome — é o tutorial do app, e ele não
+     ocupa tela. */
+  function linhaCond(rotulo, ajuda, corpo) {
+    return '<div class="cond">' +
+      '<span class="cond-rotulo tem-ajuda" title="' + esc(ajuda) + '">' + esc(rotulo) + '</span>' +
+      '<div class="cond-corpo">' + corpo + '</div></div>';
+  }
+
+  /* Sim/não com palavra, não caixa de marca: trancado, "[ ] sim" não diz se a
+     resposta é não ou se ninguém respondeu. */
+  function campoBooleano(alvo, id, chave, ligado, travado) {
+    return '<div class="campo campo-bool">' +
+      '<select data-bool="1" data-alvo="' + alvo + '" data-id="' + id + '" data-campo="' + chave + '"' +
+      (travado ? ' disabled' : '') + '>' +
+      opcoes([{ v: 'sim', t: 'sim' }, { v: 'nao', t: 'não' }], ligado ? 'sim' : 'nao') +
+      '</select></div>';
+  }
+
+  function campoArea(alvo, id, chave, rotulo, valor, travado, dica) {
+    return '<div class="campo campo-largo">' +
+      rotuloDe(id, chave, rotulo) +
+      '<textarea id="c_' + id + '_' + chave + '" rows="2"' +
+      (travado ? ' readonly placeholder="—"' : ' placeholder="' + esc(dica || '') + '"') +
+      ' data-alvo="' + alvo + '" data-id="' + id + '" data-campo="' + chave + '">' +
+      esc(valor || '') + '</textarea></div>';
+  }
+
+  function campoLista(alvo, id, chave, rotulo, valores, dica, travado, ajuda) {
+    return '<div class="campo campo-largo">' +
+      rotuloDe(id, chave, rotulo, ajuda) +
+      '<textarea id="c_' + id + '_' + chave + '" rows="3"' +
+      (travado ? ' readonly placeholder="—"' : ' placeholder="' + esc(dica) + '"') +
+      ' data-alvo="' + alvo + '" data-id="' + id + '" data-campo="' + chave + '">' +
+      esc((valores || []).join('\n')) + '</textarea></div>';
+  }
+
+  /* Cinco campos, duas perguntas: quando PRECISA acontecer (urgência, define a
+     faixa) e quando É POSSÍVEL acontecer (elegibilidade). Juntar tudo num
+     controle só transformaria a tarefa em compromisso de agenda. */
+  /* Trancado, "personalizado" e doze meses marcados não dizem nada — o que se
+     quer ler é "08:00–12:00 · dia útil · todos os meses". É a única parte da
+     ficha em que o modo de leitura não usa os mesmos controles do modo de
+     edição, e o motivo é que grade de caixinha não é frase. */
+  function resumoDoQuando(t) {
+    var q = t.quando || {};
+    var j = M.janelaDe(t);
+
+    var precisa = 'quando der';
+    if (t.prazo && t.prazo.tipo === 'data') {
+      precisa = t.prazo.em ? 'até ' + M.formatarData(t.prazo.em) : 'até uma data ainda não escolhida';
+    } else if (t.prazo && t.prazo.tipo === 'periodico') {
+      var ultima = M.ultimaVezDe(t.id) || t.prazo.ultimaVez;
+      precisa = 'a cada ' + t.prazo.cadenciaDias + ' dias' +
+        (ultima ? ' · última vez ' + M.formatarData(ultima) : ' · nunca feita') +
+        (t.prazo.antecipavelDias ? ' · adianta até ' + t.prazo.antecipavelDias + ' dias' : '');
+    }
+
+    var horario = q.horario === 'personalizado' ? q.de + '–' + q.ate
+      : q.horario === 'qualquer' || !q.horario ? 'qualquer hora'
+      : (M.HORARIOS.filter(function (x) { return x.v === q.horario; })[0] || {}).t;
+
+    var dias = q.dias === 'personalizado'
+      ? (j.dias.length === 7 ? 'todo dia' : j.dias.map(function (d) { return M.NOMES_DIA[d]; }).join(' '))
+      : q.dias === 'qualquer' || !q.dias ? 'todo dia'
+      : (M.DIAS_SEMANA.filter(function (x) { return x.v === q.dias; })[0] || {}).t;
+
+    var meses = j.meses.length === 12 ? 'o ano todo'
+      : j.meses.map(function (m) { return M.NOMES_MES[m - 1]; }).join(' ');
+
+    return '<div class="grade">' +
+      linhaResumo('Precisa acontecer', precisa) +
+      linhaResumo('É possível', horario + ' · ' + dias + ' · ' + meses) +
+      '</div>';
+  }
+
+  function linhaResumo(rotulo, valor) {
+    return '<div class="campo campo-largo"><label>' + esc(rotulo) + '</label>' +
+      '<p class="valor-lido">' + esc(valor) + '</p></div>';
+  }
+
+  function blocoQuando(t, travado) {
+    var q = t.quando || {};
+    var prazoTipo = t.prazo ? t.prazo.tipo : '';
+
+    if (travado) {
+      return grupo('Quando', '', resumoDoQuando(t),
+        'Duas perguntas diferentes no mesmo lugar. Em cima, quando isto precisa acontecer: ' +
+        'é o que decide a urgência, e o que faz uma tarefa passar na frente das outras. ' +
+        'Embaixo, quando isto pode acontecer: é o que decide se ela entra no páreo hoje. ' +
+        'Juntar as duas num controle só transformaria a tarefa em compromisso de agenda.');
+    }
+
+    var precisa = '<div class="grade">' +
+      campoSelect('tarefa', t.id, 'prazoTipo', 'Precisa acontecer', [
+        { v: '', t: 'quando der' },
+        { v: 'data', t: 'até uma data' },
+        { v: 'periodico', t: 'a cada N dias' }
+      ], prazoTipo, travado,
+        '"Quando der" não tem prazo e disputa só pelo peso. "Até uma data" fica quieta até o dia ' +
+        'chegar, e nesse dia passa na frente de tudo. "A cada N dias" é a rotina: quando passa da ' +
+        'hora, o peso vai crescendo com os dias — FAMACHA que passou há vinte dias vem antes ' +
+        'do que passou há três. Feita, ela não fecha: reinicia a contagem daquele dia.');
+
+    if (prazoTipo === 'data') {
+      precisa += campoData('tarefa', t.id, 'prazoEm', 'Data', t.prazo.em, travado);
+    } else if (prazoTipo === 'periodico') {
+      precisa += campoTexto('tarefa', t.id, 'prazoCadencia', 'A cada quantos dias',
+        t.prazo.cadenciaDias, { numero: true, min: 1, travado: travado });
+      precisa += campoData('tarefa', t.id, 'prazoUltima', 'Última vez',
+        M.ultimaVezDe(t.id) || t.prazo.ultimaVez || '', travado);
+      precisa += campoTexto('tarefa', t.id, 'prazoAdianta', 'Adiantar até (dias antes)',
+        t.prazo.antecipavelDias || 0, { numero: true, min: 0, travado: travado,
+          ajuda: 'Quantos dias antes de vencer esta rotina já pode ser feita, pela porta "quero fazer ' +
+                 'mais". Zero: só quando vencer. Quinze: a partir de quinze dias antes — e nunca no ' +
+                 'dia seguinte ao que você acabou de fazer.' });
+    }
+    precisa += '</div>';
+
+    var possivel = '<div class="grade">' +
+      campoSelect('tarefa', t.id, 'qHorario', 'Horário', M.HORARIOS, q.horario, travado,
+        'A que horas isto é possível. O aparelho já sabe que horas são, então isto nunca vira ' +
+        'pergunta na consulta — diferente do clima, que você informa de propósito.') +
+      campoSelect('tarefa', t.id, 'qDias', 'Dia da semana', M.DIAS_SEMANA, q.dias, travado,
+        'Em que dias isto é possível. Serve principalmente para o que depende dos outros: ' +
+        'loja não abre domingo, e pedreiro não atende sábado à noite.') +
+      '</div>';
+
+    if (q.horario === 'personalizado') {
+      possivel += '<div class="grade" style="margin-top:12px">' +
+        campoTexto('tarefa', t.id, 'qDe', 'Das', q.de, { travado: travado }) +
+        campoTexto('tarefa', t.id, 'qAte', 'Até', q.ate, { travado: travado }) + '</div>';
+    }
+    if (q.dias === 'personalizado') {
+      possivel += '<div class="caixinhas">' + M.NOMES_DIA.map(function (nome, i) {
+        return marcaMini('qDia', t.id, i, nome, (q.diasEscolhidos || []).indexOf(i) !== -1, travado);
+      }).join('') + '</div>';
+    }
+
+    possivel += '<label class="rotulo-solto tem-ajuda" title="Em que meses isto é possível. ' +
+      'Serve para janela de estação: derrubar madeira no outono, quando há menos seiva, ou ' +
+      'revisar os desviadores de água antes da estação chuvosa. Todos marcados = o ano todo.">' +
+      'Meses</label><div class="caixinhas">' +
+      M.NOMES_MES.map(function (nome, i) {
+        return marcaMini('qMes', t.id, i + 1, nome, (q.meses || []).indexOf(i + 1) !== -1, travado);
+      }).join('') + '</div>';
+
+    return grupo('Quando', '',
+      precisa + '<div class="separador-fino"></div>' + possivel,
+      'Em cima, quando PRECISA acontecer — define a urgência e a faixa de prioridade. ' +
+      'Embaixo, quando é POSSÍVEL acontecer — define se a tarefa entra no páreo agora.');
+  }
+
+  function campoData(alvo, id, chave, rotulo, valor, travado) {
+    return '<div class="campo"><label for="c_' + id + '_' + chave + '">' + esc(rotulo) + '</label>' +
+      '<input type="date" id="c_' + id + '_' + chave + '" data-alvo="' + alvo + '" data-id="' + id +
+      '" data-campo="' + chave + '"' + (travado ? ' disabled' : '') +
+      ' value="' + esc(valor || '') + '"></div>';
+  }
+
+  function marcaMini(chave, id, valor, rotulo, ligado, travado) {
+    return '<label class="caixinha' + (ligado ? ' caixinha-on' : '') +
+      (travado ? ' caixinha-travada' : '') + '">' +
+      '<input type="checkbox" data-alvo="tarefa" data-id="' + id + '" data-campo="' + chave + '"' +
+      ' data-valor="' + valor + '"' + (ligado ? ' checked' : '') + (travado ? ' disabled' : '') +
+      '>' + esc(rotulo) + '</label>';
+  }
+
+  /* Ordem é preferência; isto aqui é lei. Vale entre as duas etapas — uma
+     tarefa de execução pode depender de uma de planejamento específica. */
+  function fichasDependencia(t, travado) {
+    var fichas = (t.dependeDe || []).map(function (did) {
+      var d = M.tarefa(did);
+      return '<span class="ficha">depois de: ' + esc(d ? d.texto || 'sem texto' : '(removida)') +
+        (travado ? '' :
+          '<button type="button" data-acao="tirar-dep" data-id="' + t.id +
+          '" data-valor="' + did + '" aria-label="tirar">×</button>') + '</span>';
+    }).join('');
+
+    var candidatas = (t.projetoId ? M.passosDe(t.projetoId) : M.avulsas()).filter(function (o) {
+      return o.id !== t.id && (t.dependeDe || []).indexOf(o.id) === -1;
+    });
+
+    if (travado) {
+      return '<div class="fichas">' + (fichas || '<span class="aviso">Sem vínculo duro.</span>') + '</div>';
+    }
+
+    var seletor = candidatas.length
+      ? '<div class="junta"><select data-entrada="dep" data-id="' + t.id + '">' +
+          '<option value="">escolher tarefa…</option>' +
+          candidatas.map(function (o) {
+            return '<option value="' + esc(o.id) + '">' +
+              (o.etapa === 'planejamento' ? '[plan] ' : '') + esc(o.texto || 'sem texto') + '</option>';
+          }).join('') + '</select>' +
+          '<button type="button" class="bt-fraco" data-acao="por-dep" data-id="' + t.id + '">vincular</button></div>'
+      : '<p class="aviso">Nenhuma outra tarefa para vincular.</p>';
+
+    return '<div class="fichas">' + (fichas || '<span class="aviso">Sem vínculo duro.</span>') +
+      '</div>' + seletor;
+  }
+
+  // ── pendências ────────────────────────────────────────────────────
+  /* Única tela do sistema com cor de alarme, e de propósito: bater o olho e ver
+     tudo verde é uma saída de leitura zero. A cobrança aqui é sobre a entrega
+     de terceiro, nunca sobre o trabalho do usuário — por isso a regra 2 não se
+     aplica. E é cercada: não vaza para a consulta nem para projeto ou tarefa. */
+
+  function marcacaoPendencias() {
+    var abertas = M.pendenciasAbertas();
+    var resolvidas = M.cat().pendencias.filter(function (x) { return x.resolvida; });
+
+    return [
+      '<h2>Aguardando</h2>',
+      '<p class="palco-sub">O que depende de outro e tem data. Você vem aqui; isto nunca vai atrás de você.</p>',
+
+      '<div class="junta" style="max-width:900px">',
+        '<input type="text" id="campoPendencia" placeholder="tela fina 1 m — agroloja">',
+        '<button type="button" class="bt-forte" data-acao="nova-pendencia">esperar</button>',
+      '</div>',
+
+      abertas.length
+        ? '<ul class="pendencias">' + abertas.map(linhaPendencia).join('') + '</ul>'
+        : '<p class="aviso" style="margin-top:24px">Nada esperando.</p>',
+
+      resolvidas.length
+        ? '<div class="secao"><div class="secao-titulo">Resolvidas</div>' +
+          resolvidas.map(function (x) {
+            return '<p class="aviso">' + esc(x.descricao) + ' — ' + esc(x.resolvida) + '</p>';
+          }).join('') + '</div>'
+        : ''
+    ].join('');
+  }
+
+  function linhaPendencia(x) {
+    var nivel = M.nivelPendencia(x);
+    return '<li class="pendencia pendencia-' + nivel + '">' +
+      '<span class="ponto ponto-' + nivel + '"></span>' +
+      '<div class="pendencia-corpo">' +
+        '<input type="text" class="pendencia-nome" data-alvo="pendencia" data-id="' + x.id +
+          '" data-campo="descricao" value="' + esc(x.descricao) + '">' +
+        '<span class="pendencia-nota">' + esc(M.textoPendencia(x)) + '</span>' +
+      '</div>' +
+      '<input type="date" class="pendencia-data" data-alvo="pendencia" data-id="' + x.id +
+        '" data-campo="previsto" value="' + esc(x.previsto) + '">' +
+      '<button type="button" class="bt-fraco" data-acao="pendencia-chegou" data-id="' + x.id + '">chegou</button>' +
+      '<button type="button" class="bt-linha" data-acao="pendencia-cancelada" data-id="' + x.id + '">cancelada</button>' +
+      '</li>';
+  }
+
+  // ── sementes ──────────────────────────────────────────────────────
+
+  function marcacaoSementes() {
+    var lista = M.cat().sementes;
+    return [
+      '<h2>Sementes</h2>',
+      '<p class="palco-sub">Ideias soltas. Nenhuma gera tarefa antes de virar pré-projeto.</p>',
+      '<div class="junta" style="max-width:900px">',
+        '<input type="text" id="campoSemente" placeholder="escreva uma ideia">',
+        '<button type="button" class="bt-forte" data-acao="nova-semente">guardar</button>',
+      '</div>',
+      lista.length ? lista.map(function (s) {
+        return '<div class="secao"><div class="grade">' +
+          campoTexto('semente', s.id, 'nome', 'Nome', s.nome, { largo: true }) +
+          campoTexto('semente', s.id, 'frase', 'A ideia', s.frase, { largo: true }) +
+          campoTexto('semente', s.id, 'porque', 'Por quê', s.porque, { largo: true }) +
+          '</div><div class="rodape-acoes">' +
+            '<button type="button" class="bt-forte" data-acao="promover-semente" data-id="' + s.id + '">virar pré-projeto</button>' +
+            '<button type="button" class="bt-linha" data-acao="remover-semente" data-id="' + s.id + '">descartar</button>' +
+          '</div></div>';
+      }).join('') : '<p class="aviso" style="margin-top:24px">Nada na caixa.</p>'
+    ].join('');
+  }
+
+  // ── proposta vinda do dados.js ────────────────────────────────────
+
+  var NOMES_COLECAO = {
+    projetos: 'Projetos', tarefas: 'Tarefas',
+    pendencias: 'Aguardando', sementes: 'Sementes'
+  };
+
+  function marcacaoProposta() {
+    if (!proposta) return '<p class="palco-vazio">Nada para confirmar.</p>';
+
+    var blocos = proposta.resumo.map(function (r) {
+      var linhas = [];
+      if (r.entram.length) linhas.push(grupoMudanca('entram', r.entram));
+      if (r.mudam.length)  linhas.push(grupoMudanca('mudam', r.mudam));
+      if (r.saem.length)   linhas.push(grupoMudanca('saem', r.saem));
+      return '<div class="secao"><div class="secao-titulo">' +
+        esc(NOMES_COLECAO[r.colecao] || r.colecao) + '</div>' + linhas.join('') + '</div>';
+    }).join('');
+
+    return [
+      '<h2>Confirmar importação</h2>',
+      '<p class="palco-sub">' + esc(proposta.arquivo || 'arquivo') +
+        ' · nada é gravado antes de você aceitar.</p>',
+      blocos || '<p class="aviso">Este arquivo é igual ao que já está aqui. Nada mudaria.</p>',
+      '<div class="rodape-acoes">',
+        '<button type="button" class="bt-forte" data-acao="aceitar-proposta">aceitar</button>',
+        '<button type="button" class="bt-fraco" data-acao="descartar-proposta">descartar</button>',
+      '</div>'
+    ].join('');
+  }
+
+  function grupoMudanca(qual, itens) {
+    return '<p style="margin:0 0 10px">' +
+      '<span class="marca">' + itens.length + ' ' + qual + '</span> ' +
+      itens.slice(0, 8).map(function (x) {
+        return '<span style="color:var(--neblina-fraca);font-size:13px">' + esc(x) + '</span>';
+      }).join('<span style="color:var(--musgo)"> · </span>') +
+      (itens.length > 8 ? '<span class="aviso"> e mais ' + (itens.length - 8) + '</span>' : '') + '</p>';
+  }
+
+  /* Com tarefa ativa, o que cria coisa nova some da coluna: o app inteiro entra
+     em consulta, menos o projeto da tarefa. */
+  function desenhar() {
+    var criar = emConsultaGeral();
+    document.getElementById('btNovoProjeto').hidden = criar;
+    document.getElementById('btNovaAvulsa').hidden = criar;
+    document.body.classList.toggle('modo-consulta', criar);
+    // na entrada a coluna sai de cena: ali a pergunta é uma só, e a lista de
+    // projetos ao lado é exatamente a distração que a pergunta existe para evitar
+    document.body.classList.toggle('sem-coluna', tela.tipo === null);
+    // "mesa" e "bota" são as duas posturas que a spec descreve, e o topo diz
+    // qual delas está valendo — nunca o que você vai fazer nela
+    document.body.classList.toggle('na-bota', !naMesa());
+    document.querySelector('.topo-modo').textContent = naMesa() ? 'mesa' : 'bota';
+    desenharLista();
+    desenharPalco();
+  }
+
+  /* A bancada de prova muda de tamanho, e o aparelho gira: quando a largura
+     cruza a fronteira, o app precisa se redesenhar inteiro. */
+  /* Ouve a própria consulta de mídia, não o resize: é ela que decide o modo,
+     e assim a troca acontece exatamente no cruzamento. Ao virar bota com o
+     catálogo aberto, o catálogo fecha — na bota não há caminho para ele. */
+  window.matchMedia('(min-width: 721px)').addEventListener('change', function () {
+    if (!naMesa() && tela.tipo !== null) { tela = { tipo: null, id: null }; fecharFicha(); }
+    desenhar();
+  });
+
+  // ── escrita vinda dos campos ──────────────────────────────────────
+
+  function alvoDe(el) {
+    var alvo = el.getAttribute('data-alvo');
+    var alvoId = el.getAttribute('data-id');
+    if (alvo === 'projeto')   return M.projeto(alvoId);
+    if (alvo === 'tarefa')    return M.tarefa(alvoId);
+    if (alvo === 'pendencia') return M.pendencia(alvoId);
+    if (alvo === 'semente')   return M.cat().sementes.filter(function (s) { return s.id === alvoId; })[0];
+    if (alvo === 'coleta') {
+      var dona = M.tarefa(alvoId);
+      if (!dona) return null;
+      var cid = el.getAttribute('data-cid');
+      return dona.coleta.filter(function (c) { return c.id === cid; })[0];
+    }
+    return null;
+  }
+
+  function escrever(el) {
+    var obj = alvoDe(el);
+    if (!obj) return;
+    var chave = el.getAttribute('data-campo');
+    var valor = el.type === 'checkbox' ? el.checked
+              : el.hasAttribute('data-bool') ? el.value === 'sim'
+              : el.type === 'number' ? (el.value === '' ? null : Number(el.value))
+              : el.value;
+
+    if (chave === 'etapa') {
+      var junto = M.moverEtapa(obj.id, valor).length - 1;
+      avisoCascata = junto > 0
+        ? 'Levei junto ' + junto + (junto === 1 ? ' tarefa da mesma corrente.' : ' tarefas da mesma corrente.')
+        : '';
+      return desenhar();
+    }
+
+    if (chave.indexOf('prazo') === 0) return escreverPrazo(obj, chave, valor);
+    if (chave.charAt(0) === 'q' && chave.length > 1 && chave.charAt(1) === chave.charAt(1).toUpperCase()) {
+      return escreverQuando(obj, chave, valor, el);
+    }
+
+    if (chave === 'ganhos' || chave === 'ferramentas' || chave === 'materiais') {
+      obj[chave] = String(valor).split('\n').map(function (x) { return x.trim(); })
+        .filter(function (x) { return x; });
+    } else if (chave === 'guardado' && valor === null) {
+      obj.guardado = 0;
+    } else {
+      obj[chave] = valor;
+    }
+
+    // duração recém-cadastrada define o restante: a tarefa ainda não começou
+    if (chave === 'duracaoTotal' && obj.estado === 'aberta') obj.restanteEstimado = valor;
+
+    obj.ultimoToque = M.agora();
+    M.salvar();
+    retocar(el, obj, chave);
+  }
+
+  function escreverPrazo(t, chave, valor) {
+    if (chave === 'prazoTipo') {
+      if (!valor) t.prazo = null;
+      else if (valor === 'data') t.prazo = { tipo: 'data', em: '', antecipavel: false };
+      else t.prazo = { tipo: 'periodico', cadenciaDias: 30, ultimaVez: M.hoje(), antecipavelDias: 0 };
+      t.ultimoToque = M.agora();
+      M.salvar();
+      return desenharPalco();
+    }
+    if (!t.prazo) return;
+    if (chave === 'prazoEm') t.prazo.em = valor;
+    if (chave === 'prazoCadencia') t.prazo.cadenciaDias = Math.max(1, Number(valor) || 1);
+    if (chave === 'prazoUltima') t.prazo.ultimaVez = valor;
+    if (chave === 'prazoAdianta') t.prazo.antecipavelDias = Math.max(0, Number(valor) || 0);
+    t.ultimoToque = M.agora();
+    M.salvar();
+    retocarAvisos(t);
+  }
+
+  function escreverQuando(t, chave, valor, el) {
+    if (!t.quando) t.quando = { horario: 'qualquer', de: '06:00', ate: '18:00',
+                                dias: 'qualquer', diasEscolhidos: [1,2,3,4,5],
+                                meses: M.TODOS_MESES.slice() };
+    var q = t.quando;
+    var estrutural = false;
+
+    if (chave === 'qHorario') { q.horario = valor; estrutural = true; }
+    if (chave === 'qDias')    { q.dias = valor; estrutural = true; }
+    if (chave === 'qDe')      q.de = valor;
+    if (chave === 'qAte')     q.ate = valor;
+
+    if (chave === 'qDia' || chave === 'qMes') {
+      var lista = chave === 'qDia' ? (q.diasEscolhidos = q.diasEscolhidos || [])
+                                   : (q.meses = q.meses || []);
+      var n = Number(el.getAttribute('data-valor'));
+      var i = lista.indexOf(n);
+      if (valor && i === -1) lista.push(n);
+      if (!valor && i !== -1) lista.splice(i, 1);
+      lista.sort(function (a, b) { return a - b; });
+      el.closest('.caixinha').classList.toggle('caixinha-on', !!valor);
+    }
+
+    t.ultimoToque = M.agora();
+    M.salvar();
+    if (estrutural) return desenharPalco();
+    retocarAvisos(t);
+  }
+
+  /* Aviso de contradição é o único retorno imediato desta seção — vale
+     redesenhar só ele, para o cursor não sair do campo. */
+  function retocarAvisos(t) {
+    var li = $palco.querySelector('.passo[data-tarefa="' + t.id + '"] .avisos');
+    if (!li) return;
+    li.innerHTML = M.avisosDe(t).map(function (a) {
+      return '<p class="aviso-linha">' + esc(a) + '</p>';
+    }).join('');
+  }
+
+  /* Retoque cirúrgico: só o que o campo mudou, para o cursor não saltar. */
+  function retocar(el, obj, chave) {
+    var alvo = el.getAttribute('data-alvo');
+
+    // o título é o próprio campo: não há segundo lugar para sincronizar
+    if (alvo === 'projeto') return desenharLista();
+    if (alvo === 'pendencia') {
+      if (chave === 'previsto') desenharPalco();
+      else desenharLista();
+      return;
+    }
+    // texto e duração agora SÃO os campos da linha: não há segundo lugar
+    // para sincronizar, e reescrevê-los mataria o cursor
+    if (alvo === 'tarefa' && chave === 'duracaoTotal') retocarAvisos(obj);
+  }
+
+  // ── ações ─────────────────────────────────────────────────────────
+
+  function valorDoCampo(id) {
+    var campo = document.getElementById(id);
+    return campo ? campo.value.trim() : '';
+  }
+
+  function fecharFicha() { passoAberto = null; passoEditando = null; cancelandoTarefa = null; }
+
+  // largura, não user-agent: o que muda o comportamento é o tamanho da tela
+  function naMesa() { return window.matchMedia('(min-width: 721px)').matches; }
+
+  /* Fechar a última tarefa de planejamento libera a vaga sozinho: o projeto
+     vira planejada e o próximo pré-projeto pode entrar. */
+  function apurarVagas() {
+    M.cascatearVagas();
+    colherAvisos();
+    return desenhar();
+  }
+
+  /* O modelo enfileira cada movimento de vaga; a mesa drena a fila e diz.
+     Assim nada que a regra decidiu passa em silêncio — nem na abertura, nem o
+     que aconteceu na bota. */
+  function colherAvisos() {
+    var movidos = M.avisosDeCascata();
+    if (!movidos.length) return;
+    avisoCascata = movidos.map(function (m) {
+      return m.vaga === 'planejadas'
+        ? (m.projeto.nome || 'O projeto') + ' terminou o planejamento e entrou nas planejadas. A vaga de planejamento está livre.'
+        : (m.projeto.nome || 'Um projeto') + ' assume a vaga de ' + m.vaga + '.';
+    }).join(' ');
+  }
+
+  function criarProjeto() {
+    var p = M.inserirProjeto();
+    tela = { tipo: 'projeto', id: p.id };
+    projetoEditando = p.id;
+    desenhar();
+    var campo = $palco.querySelector('.titulo-obra');
+    if (campo) campo.focus();
+  }
+
+  var DESFECHO_DE = { concluir: 'concluido', suspender: 'suspenso', cancelar: 'cancelado' };
+
+  function executarAcao() {
+    if (!acaoProjeto) return;
+    var p = M.projeto(acaoProjeto.pid);
+    var cfg = TEXTOS_ACAO[acaoProjeto.tipo];
+    if (!p || !cfg) { acaoProjeto = null; return desenharPalco(); }
+
+    var campo = document.getElementById('campoAcao');
+    var texto = campo ? campo.value.trim() : '';
+    if (cfg.campo && !cfg.opcional && !texto) return;   // motivo é obrigatório
+
+    if (acaoProjeto.tipo === 'promover' && destinoDaPromocao(p) === 'reserva') {
+      M.promoverParaReserva(p.id);
+      colherAvisos();
+      tela = { tipo: 'projeto', id: p.id };
+    } else if (acaoProjeto.tipo === 'revisar') {
+      var r = M.revisarPlano(p.id);
+      avisoCascata = r && r.bloqueado
+        ? 'A vaga de planejamento está com ' + (r.bloqueado.nome || 'outro projeto') + '. Só cabe um por vez.'
+        : 'Voltou para o planejamento com a tarefa de revisar o plano.';
+    } else if (acaoProjeto.tipo === 'promover') {
+      var saiu = M.promoverParaPlanejamento(p.id);
+      avisoCascata = saiu ? (saiu.nome || 'O projeto anterior') + ' voltou para a fila.' : '';
+      tela = { tipo: 'projeto', id: p.id };
+    } else if (acaoProjeto.tipo === 'retomar') {
+      M.retomarProjeto(p.id);
+      avisoCascata = '';
+    } else {
+      M.fecharProjeto(p.id, DESFECHO_DE[acaoProjeto.tipo], texto);
+      colherAvisos();
+    }
+
+    acaoProjeto = null;
+    return desenhar();
+  }
+
+  function agir(acao, el) {
+    var tid = el.getAttribute('data-id');
+
+    if (acao === 'voltar-inicio') {
+      tela = { tipo: null, id: null };
+      fecharFicha();
+      return desenhar();
+    }
+
+    if (acao === 'editar-projeto')  { projetoEditando = tid; return desenharPalco(); }
+    if (acao === 'salvar-projeto')  { projetoEditando = null; return desenhar(); }
+
+    if (acao.indexOf('projeto-') === 0) {
+      acaoProjeto = { pid: tid, tipo: acao.slice(8) };
+      avisoCascata = '';
+      // decidir pede o contexto inteiro: a motivação, o envelope, o que falta
+      if (tela.tipo !== 'projeto' || tela.id !== tid) {
+        tela = { tipo: 'projeto', id: tid };
+        return desenhar();
+      }
+      return desenharPalco();
+    }
+    if (acao === 'cancelar-acao') { acaoProjeto = null; return desenharPalco(); }
+    if (acao === 'confirmar-acao') return executarAcao();
+
+    if (acao === 'mostrar-planejamento') { planejamentoAberto = tid; return desenharPalco(); }
+    if (acao === 'esconder-planejamento') { planejamentoAberto = null; return desenharPalco(); }
+
+    // cancelar tarefa: o registro fica, a execução não
+    if (acao === 'cancelar-tarefa') { cancelandoTarefa = tid; return desenharPalco(); }
+    if (acao === 'voltar-cancelar-tarefa') { cancelandoTarefa = null; return desenharPalco(); }
+    if (acao === 'confirmar-cancelar-tarefa') {
+      var porque = valorDoCampo('campoCancelaTarefa');
+      if (!porque) return;
+      M.encerrar('pe_eu', tid, porque);
+      cancelandoTarefa = null;
+      fecharFicha();
+      return apurarVagas();
+    }
+
+    if (acao === 'aceitar-proposta') {
+      if (proposta) M.confirmarImportacao(proposta.estado);
+      proposta = null;
+      tela = { tipo: null, id: null };
+      return desenhar();
+    }
+    if (acao === 'descartar-proposta') {
+      // marca esta versão como recusada para ela não voltar a toda abertura
+      if (proposta && proposta.impressao) localStorage.setItem(CHAVE_DESCARTE, proposta.impressao);
+      proposta = null;
+      tela = { tipo: null, id: null };
+      return desenhar();
+    }
+
+    if (acao === 'nova-tarefa' || acao === 'novo-passo') {
+      var pid = tid || null;
+      var etapa = el.getAttribute('data-etapa') || 'execucao';
+      var irmaos = (pid ? M.passosDe(pid) : M.avulsas()).filter(function (x) { return x.etapa === etapa; });
+      var nova = M.inserirPasso(pid, irmaos[irmaos.length - 1]);
+      nova.etapa = etapa;
+      M.salvar();
+      passoAberto = passoEditando = nova.id;   // tarefa nova nasce solta
+      return desenhar();
+    }
+
+    // o título abre e fecha a ficha; o botão da linha solta os campos
+    if (acao === 'abrir-ficha') {
+      if (passoAberto === tid) fecharFicha();
+      else { passoAberto = tid; passoEditando = null; }
+      return desenharPalco();
+    }
+    if (acao === 'editar-passo') { passoAberto = passoEditando = tid; return desenharPalco(); }
+    if (acao === 'salvar-passo') { passoEditando = null; return desenhar(); }
+
+    if (acao === 'ir-executar') {
+      $campo.hidden = false;
+      /* Na mesa o aparelho sabe onde você está e a consulta começa uma pergunta
+         adiante. No celular ele não sabe de nada — ele vai junto para o pasto —,
+         então a primeira pergunta continua sendo "onde você está". */
+      Campo.abrir($campoTela, naMesa() ? { local: 'computador' } : null, sairDoCampo);
+      return;
+    }
+    if (acao === 'ir-organizar') {
+      tela = { tipo: 'projetos', id: null };
+      filtroProjetos = '';
+      return desenhar();
+    }
+
+    if (acao === 'voltar-lista') {
+      filtroProjetos = voltarPara ? voltarPara.filtro : '';
+      voltarPara = null;
+      tela = { tipo: 'projetos', id: null };
+      fecharFicha();
+      return desenhar();
+    }
+    if (acao === 'guardar-copia') { exportar(); return desenhar(); }
+    if (acao === 'filtrar') { filtroProjetos = el.getAttribute('data-valor'); return desenharPalco(); }
+    if (acao === 'filtrar-avulsas') { filtroAvulsas = el.getAttribute('data-valor'); return desenharPalco(); }
+    if (acao === 'novo-projeto') return criarProjeto();
+
+    // concluir e reabrir também pelo PC: nem tudo é feito com o celular na mão
+    if (acao === 'concluir-tarefa') { M.terminar('pe_eu', tid, ''); M.limparKit(tid); return apurarVagas(); }
+    if (acao === 'reabrir-tarefa')  { M.reabrir('pe_eu', tid); return apurarVagas(); }
+
+    if (acao === 'remover-passo') {
+      if (!confirm('Remover esta tarefa?')) return;
+      M.removerTarefa(tid);
+      fecharFicha();
+      return desenhar();
+    }
+
+    // apagar projeto é raro e irreversível: fica atrás de uma confirmação escrita
+    if (acao === 'abrir-perigo')    { perigo.aberto = tid; return desenharPalco(); }
+    if (acao === 'cancelar-perigo') { perigo.aberto = null; return desenharPalco(); }
+    if (acao === 'remover-projeto') {
+      M.removerProjeto(tid);
+      perigo.aberto = null;
+      tela = { tipo: null, id: null };
+      return desenhar();
+    }
+
+    if (acao === 'nova-pendencia') {
+      var desc = valorDoCampo('campoPendencia');
+      if (!desc) return;
+      M.inserirPendencia(desc);
+      return desenhar();
+    }
+    if (acao === 'pendencia-chegou')    { M.resolverPendencia(tid, 'chegou'); return desenhar(); }
+    if (acao === 'pendencia-cancelada') {
+      var gerada = M.resolverPendencia(tid, 'cancelada');
+      if (gerada) alert('Criei a tarefa: ' + gerada.texto);
+      return desenhar();
+    }
+
+    if (acao === 'nova-semente') {
+      var texto = valorDoCampo('campoSemente');
+      if (!texto) return;
+      M.inserirSemente(texto);
+      return desenhar();
+    }
+    if (acao === 'promover-semente') {
+      var novo = M.promoverSemente(tid);
+      if (novo) tela = { tipo: 'projeto', id: novo.id };
+      return desenhar();
+    }
+    if (acao === 'remover-semente') {
+      if (!confirm('Descartar esta semente?')) return;
+      M.removerSemente(tid);
+      return desenhar();
+    }
+
+    if (acao === 'por-prereq') {
+      var sel = document.getElementById('selPrereq');
+      var p = M.projeto(tid);
+      if (sel && sel.value && p && p.prerequisitos.indexOf(sel.value) === -1) {
+        p.prerequisitos.push(sel.value);
+        M.salvar();
+      }
+      return desenhar();
+    }
+    if (acao === 'tirar-prereq') {
+      var pr = M.projeto(tid);
+      var fora = el.getAttribute('data-valor');
+      if (pr) pr.prerequisitos = pr.prerequisitos.filter(function (x) { return x !== fora; });
+      M.salvar();
+      return desenhar();
+    }
+
+    if (acao === 'por-dep') {
+      var selDep = $palco.querySelector('[data-entrada="dep"][data-id="' + tid + '"]');
+      var td = M.tarefa(tid);
+      if (selDep && selDep.value && td && td.dependeDe.indexOf(selDep.value) === -1) {
+        td.dependeDe.push(selDep.value);
+        M.salvar();
+        /* Planejamento que depende de execução trava as duas para sempre. O
+           arraste já puxa a corrente; vincular pelo seletor faz o mesmo. */
+        var alvoDep = M.tarefa(selDep.value);
+        if (td.etapa === 'planejamento' && alvoDep && alvoDep.etapa === 'execucao') {
+          var puxadas = M.moverEtapa(selDep.value, 'planejamento').length;
+          avisoCascata = 'Levei ' + (puxadas === 1 ? '1 tarefa' : puxadas + ' tarefas') +
+            ' para o planejamento: execução só é oferecida depois que ele fecha.';
+        }
+      }
+      return desenharPalco();
+    }
+    if (acao === 'tirar-dep') {
+      var t2 = M.tarefa(tid);
+      var dep = el.getAttribute('data-valor');
+      if (t2) t2.dependeDe = t2.dependeDe.filter(function (x) { return x !== dep; });
+      M.salvar();
+      return desenharPalco();
+    }
+  }
+
+  // ── arrastar para reordenar ───────────────────────────────────────
+
+  var arrastando = null;
+
+  function ligarArraste() {
+    $palco.addEventListener('dragstart', function (e) {
+      var li = e.target.closest('.passo');
+      if (!li) return;
+      arrastando = li;
+      li.classList.add('arrastando');
+      e.dataTransfer.effectAllowed = 'move';
+      try { e.dataTransfer.setData('text/plain', li.dataset.tarefa); } catch (x) {}
+    });
+
+    $palco.addEventListener('dragover', function (e) {
+      if (!arrastando) return;
+
+      var li = e.target.closest('.passo');
+      if (li && li !== arrastando) {
+        e.preventDefault();
+        var meio = li.getBoundingClientRect().top + li.offsetHeight / 2;
+        return li.parentNode.insertBefore(arrastando, e.clientY < meio ? li : li.nextSibling);
+      }
+      // lista vazia da outra etapa: sem isto não dá para mover para um
+      // planejamento que ainda não tem tarefa nenhuma
+      var ul = e.target.closest('.passos');
+      if (ul && !ul.querySelector('.passo')) {
+        e.preventDefault();
+        ul.appendChild(arrastando);
+      }
+    });
+
+    /* Soltar numa seção de outra etapa reclassifica a tarefa. É o caminho de
+       conserto para o que foi cadastrado antes de existir a divisão — muito
+       mais barato que recadastrar tudo. */
+    $palco.addEventListener('dragend', function () {
+      if (!arrastando) return;
+      arrastando.classList.remove('arrastando');
+      var ul = arrastando.closest('.passos');
+      var alvo = arrastando;
+      arrastando = null;
+      if (!ul) return;
+
+      var etapaDestino = ul.getAttribute('data-etapa');
+      var t = M.tarefa(alvo.dataset.tarefa);
+      if (t && etapaDestino && t.etapa !== etapaDestino) {
+        var levadas = M.moverEtapa(t.id, etapaDestino).length - 1;
+        avisoCascata = levadas > 0
+          ? 'Levei junto ' + levadas + (levadas === 1 ? ' tarefa da mesma corrente.' : ' tarefas da mesma corrente.')
+          : '';
+      }
+
+      M.reordenar(Array.prototype.map.call(ul.querySelectorAll('.passo'), function (li) {
+        return li.dataset.tarefa;
+      }));
+      desenhar();
+    });
+  }
+
+  // ── arquivo ───────────────────────────────────────────────────────
+
+  /* O localStorage não é backup: limpar dados do navegador apaga tudo. A cópia
+     de verdade é o arquivo exportado, e o app conta há quanto tempo você não
+     tira uma — em texto seco, sem alarme. É um fato, não uma cobrança. */
+  var CHAVE_COPIA = 'app-sitio-ultima-copia';
+
+  function avisoDeCopia() {
+    var quando = localStorage.getItem(CHAVE_COPIA);
+    var dias = quando ? M.diasDesde(quando) : null;
+    if (dias !== null && dias < 14) return '';
+
+    return '<p class="aviso-copia">' +
+      (quando ? 'Última cópia dos dados há ' + dias + ' dias.' : 'Você ainda não guardou uma cópia dos dados.') +
+      ' <button type="button" class="bt-linha bt-mini" data-acao="guardar-copia">guardar agora</button></p>';
+  }
+
+  function exportar() {
+    localStorage.setItem(CHAVE_COPIA, M.hoje());
+    var blob = new Blob([M.exportar()], { type: 'application/json' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'sitio-' + M.hoje() + '.json';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }
+
+  function importar(arquivo) {
+    var leitor = new FileReader();
+    leitor.onload = function () {
+      try {
+        proposta = M.lerImportacao(leitor.result);
+        proposta.arquivo = arquivo.name;
+        tela = { tipo: 'proposta', id: null };
+        fecharFicha();
+        desenhar();
+      } catch (e) {
+        alert('Não consegui ler esse arquivo: ' + e.message);
+      }
+    };
+    leitor.readAsText(arquivo);
+  }
+
+  // ── proposta que veio no dados.js ─────────────────────────────────
+  /* O Claude escreve o arquivo; o app decide o que fazer com ele. Se ainda não
+     há nada gravado, entra direto — não existe trabalho para proteger. Se já
+     há, vira uma proposta na coluna e espera aceite, como manda a regra 11.
+     Descartada uma vez, aquela versão não volta a incomodar. */
+
+  var CHAVE_DESCARTE = 'app-sitio-proposta-descartada';
+
+  function impressao(texto) {
+    var h = 5381;
+    for (var i = 0; i < texto.length; i++) h = ((h << 5) + h + texto.charCodeAt(i)) | 0;
+    return String(h);
+  }
+
+  function conferirProposta() {
+    if (typeof window.DADOS_CLAUDE === 'undefined') return;
+
+    var texto = JSON.stringify(window.DADOS_CLAUDE);
+    var lida;
+    try { lida = M.lerImportacao(texto); } catch (e) {
+      return console.warn('dados.js ilegível', e);
+    }
+
+    if (M.estaVazio()) return M.confirmarImportacao(lida.estado);
+    if (!lida.resumo.length) return;
+    if (localStorage.getItem(CHAVE_DESCARTE) === impressao(texto)) return;
+
+    lida.arquivo = 'proposta do Claude';
+    lida.impressao = impressao(texto);
+    proposta = lida;
+  }
+
+  function desenharProposta() {
+    var caixa = document.getElementById('listaProposta');
+    if (!proposta) return (caixa.innerHTML = '');
+
+    var quantas = proposta.resumo.reduce(function (n, r) {
+      return n + r.entram.length + r.mudam.length + r.saem.length;
+    }, 0);
+
+    caixa.innerHTML = '<li><button type="button" class="item-projeto" data-abrir="proposta"' +
+      (tela.tipo === 'proposta' ? ' aria-current="true"' : '') + '>' +
+      '<span class="item-etiqueta">proposta</span>' +
+      '<span class="item-nome">Mudanças do Claude</span>' +
+      '<span class="item-nota">' + quantas + (quantas === 1 ? ' item' : ' itens') +
+      ' · nada gravado ainda</span></button></li>';
+  }
+
+  // ── ligações ──────────────────────────────────────────────────────
+
+  document.addEventListener('click', function (e) {
+    var abrir = e.target.closest('[data-abrir]');
+    if (abrir) {
+      var destino = { tipo: abrir.getAttribute('data-abrir'), id: abrir.getAttribute('data-id') || null };
+      // guarda a lista quando se entra num projeto vindo dela; qualquer outro
+      // pulo limpa a volta, para o botão nunca apontar para lugar nenhum
+      voltarPara = (destino.tipo === 'projeto' && tela.tipo === 'projetos')
+        ? { filtro: filtroProjetos } : null;
+      tela = destino;
+      if (tela.tipo === 'projetos') filtroProjetos = abrir.getAttribute('data-filtro') || '';
+      fecharFicha();
+      projetoEditando = null;
+      acaoProjeto = null;
+      avisoCascata = '';
+      planejamentoAberto = null;
+      desenharProposta();
+      return desenhar();
+    }
+    var acao = e.target.closest('[data-acao]');
+    if (acao) {
+      agir(acao.getAttribute('data-acao'), acao);
+      desenharProposta();
+    }
+  });
+
+  document.getElementById('btNovoProjeto').addEventListener('click', criarProjeto);
+
+  document.getElementById('btNovaAvulsa').addEventListener('click', function () {
+    var t = M.inserirPasso(null, null);
+    tela = { tipo: 'avulsas', id: null };
+    passoAberto = passoEditando = t.id;
+    desenhar();
+  });
+
+  // ── frente de campo ───────────────────────────────────────────────
+
+  var $campo = document.getElementById('execucao');
+  var $campoTela = document.getElementById('campoTela');
+  Campo.ligar($campoTela);
+
+  /* Sair do campo é voltar para a tela inicial — e colher o que a bota moveu de
+     vaga, para a mesa dizer. */
+  function sairDoCampo() {
+    $campo.hidden = true;
+    tela = { tipo: null, id: null };
+    fecharFicha();
+    colherAvisos();
+    desenhar();
+  }
+
+  document.getElementById('btSairCampo').addEventListener('click', sairDoCampo);
+
+  // Esc sempre sai — nenhuma tela do app é uma armadilha. Exceto com texto
+  // digitado pela metade: aí Esc só larga o campo, e não joga o texto fora.
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    if (!$campo.hidden) {
+      var digitando = $campoTela.querySelector('textarea');
+      if (digitando && digitando.value.trim()) return digitando.blur();
+      return sairDoCampo();
+    }
+    if (acaoProjeto)     { acaoProjeto = null; return desenharPalco(); }
+    if (cancelandoTarefa) { cancelandoTarefa = null; return desenharPalco(); }
+    if (passoAberto)     { fecharFicha(); return desenharPalco(); }
+    if (projetoEditando) { projetoEditando = null; desenharPalco(); }
+  });
+
+  document.getElementById('btExportar').addEventListener('click', exportar);
+  document.getElementById('btImportar').addEventListener('click', function () {
+    document.getElementById('arquivoImportar').click();
+  });
+  document.getElementById('arquivoImportar').addEventListener('change', function (e) {
+    if (e.target.files && e.target.files[0]) importar(e.target.files[0]);
+    e.target.value = '';
+  });
+
+  $palco.addEventListener('input',  function (e) { if (e.target.hasAttribute('data-campo')) escrever(e.target); });
+  $palco.addEventListener('change', function (e) { if (e.target.hasAttribute('data-campo')) escrever(e.target); });
+
+  // ── bilhete sobre o app ───────────────────────────────────────────
+  /* Fica por cima de tudo, inclusive da tela de execução: o incômodo aparece
+     durante o uso, e anotar depois é anotar pior. */
+
+  var $bilhete = document.getElementById('bilhete');
+  var $bilheteTexto = document.getElementById('bilheteTexto');
+  var $bilheteAviso = document.getElementById('bilheteAviso');
+
+  function abrirBilhete() {
+    $bilheteTexto.value = M.lerBilhete();
+    $bilhete.hidden = false;
+    $bilheteAviso.textContent = '';
+    $bilheteTexto.focus();
+  }
+
+  document.getElementById('btBilhete').addEventListener('click', function () {
+    if ($bilhete.hidden) abrirBilhete(); else $bilhete.hidden = true;
+  });
+
+  document.getElementById('btFecharBilhete').addEventListener('click', function () {
+    $bilhete.hidden = true;
+  });
+
+  $bilheteTexto.addEventListener('input', function () {
+    M.escreverBilhete($bilheteTexto.value);
+    $bilheteAviso.textContent = 'gravado';
+  });
+
+  /* Apagar não pergunta: o desfazer fica na tela por um tempo, e desfazer é
+     mais barato que uma confirmação. Passado o tempo, some sem ruído. */
+  var bilheteApagado = null;
+  var relogioDesfazer = null;
+
+  document.getElementById('btApagarBilhete').addEventListener('click', function () {
+    if (!$bilheteTexto.value.trim()) return ($bilheteAviso.textContent = 'já está vazio');
+
+    bilheteApagado = $bilheteTexto.value;
+    $bilheteTexto.value = '';
+    M.escreverBilhete('');
+
+    $bilheteAviso.innerHTML = 'apagado — <button type="button" class="bt-linha bt-mini" ' +
+      'id="btDesfazerBilhete">desfazer</button>';
+    document.getElementById('btDesfazerBilhete').addEventListener('click', function () {
+      if (bilheteApagado === null) return;
+      $bilheteTexto.value = bilheteApagado;
+      M.escreverBilhete(bilheteApagado);
+      bilheteApagado = null;
+      $bilheteAviso.textContent = 'de volta';
+    });
+
+    clearTimeout(relogioDesfazer);
+    relogioDesfazer = setTimeout(function () {
+      bilheteApagado = null;
+      if (document.getElementById('btDesfazerBilhete')) $bilheteAviso.textContent = '';
+    }, 12000);
+  });
+
+  document.getElementById('btCopiarBilhete').addEventListener('click', function () {
+    var texto = $bilheteTexto.value;
+    if (!texto.trim()) return ($bilheteAviso.textContent = 'nada escrito ainda');
+
+    function avisar() { $bilheteAviso.textContent = 'copiado — pode colar na conversa'; }
+
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(texto).then(avisar, copiarNaMao);
+    } else {
+      copiarNaMao();
+    }
+    function copiarNaMao() {
+      $bilheteTexto.select();
+      try { document.execCommand('copy'); avisar(); }
+      catch (e) { $bilheteAviso.textContent = 'selecionei o texto — copie com Ctrl+C'; }
+    }
+  });
+
+  // ── casco do app ──────────────────────────────────────────────────
+  /* O service worker guarda só o APP para abrir sem internet. Dado do sítio
+     não passa por ele. E o pedido de armazenamento persistente é o que impede
+     o navegador de descartar o localStorage sozinho quando ficar apertado —
+     sem isso, "backup local" é promessa que o navegador não assinou. */
+  if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+    window.addEventListener('load', function () {
+      navigator.serviceWorker.register('sw.js').catch(function (e) {
+        console.warn('service worker não registrou', e);
+      });
+    });
+  }
+
+  if (navigator.storage && navigator.storage.persist) {
+    navigator.storage.persisted().then(function (jaTem) {
+      if (!jaTem) navigator.storage.persist();
+    }).catch(function () {});
+  }
+
+  ligarArraste();
+  M.carregar();
+  M.cascatearVagas();   // o que a regra já decidiu, aplicado antes de desenhar
+  colherAvisos();       // ... e dito, não engolido
+  conferirProposta();
+  desenharProposta();
+  desenhar();
+})();

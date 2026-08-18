@@ -1,0 +1,1925 @@
+/* App do sítio — frente de análise (PC)
+   Paleta e tipografia da §15 da spec. Postura de mesa: densa, duas mãos. */
+
+:root {
+  --breu:          #0F1A17;
+  --mata:          #182823;
+  --musgo:         #26403A;
+  --neblina:       #CDD8D1;
+  --neblina-fraca: #7C9189;
+  --rebrota:       #BFD44A;
+
+  /* A casca do toco, e agora também a cor do TEXTO em destaque. A divisão é
+     clara: verde para contorno, ícone e ação; casca para a palavra que precisa
+     saltar. Duas famílias, dois trabalhos — nenhuma delas disputa com a outra. */
+  --casca:         #C08A66;
+
+  /* Exceção cercada: as únicas cores de alarme do sistema, e elas existem só
+     na tela de Aguardando. A cobrança ali é sobre a entrega de terceiro, não
+     sobre o trabalho do usuário — por isso a regra 2 não se aplica. Tons
+     terrosos para conviver com a paleta, nada de vermelho de incêndio. */
+  --dentro:  #7FA34A;
+  --beirada: #C99A3E;
+  --passou:  #C56B54;
+
+  --display: 'Fraunces', Georgia, 'Times New Roman', serif;
+  --corpo:   'Archivo', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --mono:    'JetBrains Mono', ui-monospace, 'Cascadia Mono', Consolas, monospace;
+
+  --raio: 3px;
+}
+
+* { box-sizing: border-box; }
+
+/* Rolagem normal de página, de propósito. A versão anterior usava altura
+   travada em 100% com flex, grade dentro e colunas rolando sozinhas — arranjo
+   que some com o conteúdo inteiro, sem erro nenhum, quando qualquer peça
+   escorrega. Aqui nada depende de altura calculada. */
+html, body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--breu);
+  color: var(--neblina);
+  font-family: var(--corpo);
+  font-size: 15px;
+  line-height: 1.45;
+  overflow-x: hidden;
+}
+
+h1, h2, h3 { font-weight: 600; margin: 0; }
+
+button, input, select, textarea {
+  font-family: inherit;
+  font-size: inherit;
+  color: inherit;
+}
+
+:focus-visible {
+  outline: 2px solid var(--rebrota);
+  outline-offset: 2px;
+}
+
+/* ── topo ───────────────────────────────────────────── */
+
+.topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--musgo);
+  background: var(--breu);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.topo h1 { font-size: 16px; letter-spacing: .01em; }
+
+/* Alinhados pela LINHA DE BASE, não pelo meio da caixa. Centralizar deixa a
+   marca boiando e joga "ANÁLISE" fora da base do nome — o olho lê texto pela
+   base, e a base da marca é o tronco, que corre até o rodapé do desenho. */
+.topo h1 { display: flex; align-items: baseline; gap: 10px; }
+
+/* Fluxo inline, não flex: em flex a marca não tem linha de base tipográfica e
+   fica boiando. Inline, `vertical-align: baseline` põe a borda de baixo dela
+   exatamente sobre a base do texto — e a base da marca é o pé do tronco. */
+.topo-nome {
+  display: inline-block;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+/* Fluxo inline: para um elemento gráfico, `baseline` põe o pé da caixa sobre a
+   linha de base do texto — e o pé da caixa é o pé do tronco, que corre até o
+   rodapé do desenho. Em flex isso não acontece: lá ele não tem base nenhuma. */
+.marca-rebrota {
+  display: inline-block;
+  vertical-align: baseline;
+  width: 18px; height: 18px;
+  margin-right: 8px;
+  color: var(--rebrota);
+}
+
+.topo-nome:hover { color: var(--casca); }
+
+/* o título da seção também é a porta dela */
+.cabeca-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+}
+
+.cabeca-link:hover { color: var(--casca); }
+
+.topo-modo {
+  font-family: var(--mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .12em;
+  color: var(--neblina-fraca);
+}
+
+.topo-acoes { display: flex; gap: 8px; }
+
+/* ── botões ─────────────────────────────────────────── */
+
+.bt-forte, .bt-fraco, .bt-linha {
+  border-radius: var(--raio);
+  cursor: pointer;
+  padding: 6px 12px;
+  border: 1px solid var(--musgo);
+  background: var(--mata);
+  color: var(--neblina);
+  transition: background .12s ease, border-color .12s ease;
+}
+
+.bt-forte {
+  background: var(--rebrota);
+  border-color: var(--rebrota);
+  color: var(--breu);
+  font-weight: 600;
+}
+
+.bt-forte:hover { filter: brightness(1.08); }
+.bt-fraco:hover, .bt-linha:hover { border-color: var(--neblina-fraca); }
+
+.bt-linha {
+  background: none;
+  border-color: transparent;
+  color: var(--neblina-fraca);
+  padding: 4px 8px;
+}
+
+.bt-linha:hover { color: var(--neblina); }
+
+/* ── quadro em duas colunas ─────────────────────────── */
+
+.quadro {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  align-items: start;
+}
+
+/* Item de grade não encolhe abaixo do próprio conteúdo por padrão: sem isto,
+   qualquer coisa larga dentro do palco incha a coluna e empurra a barra de
+   cima e a lateral para fora da tela. */
+.coluna-projetos, .palco { min-width: 0; }
+
+/* janela estreita: as duas colunas viram uma */
+@media (max-width: 720px) {
+  .quadro { grid-template-columns: 1fr; }
+  .coluna-projetos { border-right: none; border-bottom: 1px solid var(--musgo); }
+}
+
+/* Na entrada a coluna sai de cena e a pergunta fica sozinha no meio: a lista
+   de projetos ao lado é exatamente a distração que a pergunta existe para
+   evitar. Ela volta assim que você escolhe organizar. */
+.sem-coluna .quadro { grid-template-columns: 1fr; }
+.sem-coluna .coluna-projetos { display: none; }
+.sem-coluna .palco { display: flex; justify-content: center; padding-top: 40px; }
+.sem-coluna .abertura { width: 100%; max-width: 620px; }
+
+.coluna-projetos {
+  border-right: 1px solid var(--musgo);
+  padding-bottom: 40px;
+  position: sticky;
+  top: 59px;
+  max-height: calc(100vh - 59px);
+  overflow-y: auto;
+}
+
+.coluna-cabeca {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 8px;
+}
+
+.coluna-cabeca-secao { border-top: 1px solid var(--musgo); margin-top: 12px; }
+
+.coluna-cabeca h2 {
+  font-family: var(--mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .12em;
+  color: var(--neblina-fraca);
+  font-weight: 500;
+}
+
+.lista-projetos { list-style: none; margin: 0; padding: 0 8px; }
+
+.item-projeto {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--raio);
+  padding: 9px 10px;
+  margin-bottom: 2px;
+  cursor: pointer;
+}
+
+.item-projeto:hover { background: var(--mata); }
+.item-projeto[aria-current="true"] { background: var(--mata); border-color: var(--musgo); }
+
+.item-nome { display: block; }
+
+.item-etiqueta {
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  color: var(--neblina-fraca);
+}
+
+.item-nota { display: block; font-size: 12px; color: var(--neblina-fraca); margin-top: 2px; }
+
+/* vaga livre é convite, não buraco — e em letra miúda, na linha de baixo */
+.item-livre {
+  display: block;
+  margin-top: 3px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: .03em;
+  color: var(--casca);
+}
+
+.item-vaga { border-style: dashed; border-color: var(--musgo); }
+.item-vaga:hover { border-color: var(--rebrota); }
+
+/* porta, não item de lista: sem moldura, para não competir com os projetos */
+.item-vermais {
+  margin-top: 12px;
+  text-align: right;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-family: var(--mono);
+  letter-spacing: .04em;
+  color: var(--neblina-fraca);
+  border: none;
+}
+
+.item-vermais:hover { color: var(--casca); background: none; }
+.item-vermais[aria-current="true"] { color: var(--neblina); background: none; }
+
+/* voltar para a lista de onde se veio — folhear projetos é ir e vir */
+.voltar-lista {
+  display: inline-block;
+  background: none;
+  border: none;
+  padding: 0;
+  margin-bottom: 14px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: .06em;
+  color: var(--neblina-fraca);
+  cursor: pointer;
+}
+
+.voltar-lista:hover { color: var(--casca); }
+
+/* ── página de todos os projetos ────────────────────── */
+
+.filtros { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+
+.filtro {
+  background: none;
+  border: 1px solid var(--musgo);
+  border-radius: var(--raio);
+  color: var(--neblina-fraca);
+  font-size: 12px;
+  padding: 4px 11px;
+  cursor: pointer;
+}
+
+.filtro:hover { color: var(--neblina); }
+.filtro-on { border-color: var(--rebrota); color: var(--neblina); }
+
+.fichario { list-style: none; margin: 0; padding: 0; max-width: 820px; }
+
+.ficha-projeto {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid var(--musgo);
+  border-radius: var(--raio);
+  background: var(--mata);
+  margin-bottom: 6px;
+  padding-right: 12px;
+}
+
+.ficha-abrir {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: left;
+  background: none;
+  border: none;
+  color: inherit;
+  cursor: pointer;
+  padding: 10px 12px;
+}
+
+.ficha-abrir:hover .ficha-nome { color: var(--casca); }
+.ficha-nome { display: block; font-size: 15px; }
+.ficha-obra { display: block; font-size: 12px; color: var(--neblina-fraca); }
+
+.ficha-idade {
+  display: block;
+  margin-top: 4px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: .06em;
+  color: var(--neblina-fraca);
+}
+
+.envelope-largo { max-width: 420px; margin-bottom: 16px; }
+
+/* o custo de um projeto rodando é curiosidade, não decisão: uma linha, quieta */
+.palco-custo {
+  display: block;
+  margin-top: 4px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--neblina-fraca);
+}
+
+/* As três vagas e os três degraus da fila, reconhecíveis de relance */
+.pino {
+  display: inline-block;
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  margin-right: 6px;
+  border: 1px solid var(--neblina-fraca);
+  vertical-align: baseline;
+}
+
+.vaga-titulaR .pino { }
+.vaga-titular .pino      { background: var(--rebrota); border-color: var(--rebrota); }
+.vaga-reserva .pino      { background: var(--musgo);   border-color: var(--rebrota); }
+.vaga-planejamento .pino { background: none;           border-color: var(--rebrota); }
+.vaga-pronto .pino       { background: var(--neblina); border-color: var(--neblina); }
+.vaga-juntando .pino     { background: linear-gradient(90deg, var(--neblina-fraca) 50%, transparent 50%); }
+.vaga-pre .pino          { border-style: dotted; }
+.vaga-concluido .pino    { background: var(--musgo); border-color: var(--musgo); }
+
+.vaga-titular .item-nome,
+.vaga-reserva .item-nome { color: var(--neblina); font-weight: 600; }
+.vaga-concluido .item-nome, .vaga-encerrado .item-nome { color: var(--neblina-fraca); }
+
+/* ── barra do envelope ──────────────────────────────── */
+
+.envelope { margin-top: 6px; }
+
+.envelope-valor {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--neblina-fraca);
+}
+
+.envelope-barra {
+  height: 4px;
+  background: var(--musgo);
+  border-radius: 2px;
+  margin-top: 4px;
+  overflow: hidden;
+}
+
+.envelope-cheia { height: 100%; background: var(--rebrota); }
+
+/* ── palco ──────────────────────────────────────────── */
+
+.palco { padding: 24px 28px 80px; }
+
+/* nada dentro do palco pode ser mais largo que ele */
+.palco * { max-width: 100%; }
+
+.palco-vazio {
+  color: var(--neblina-fraca);
+  font-family: var(--display);
+  font-size: 20px;
+  margin-top: 48px;
+}
+
+/* ── abertura ───────────────────────────────────────── */
+
+.abertura { padding-top: 64px; max-width: 620px; }
+
+.abertura-frase {
+  font-family: var(--display);
+  font-size: 34px;
+  font-weight: 500;
+  line-height: 1.15;
+  margin: 0 0 40px;
+}
+
+.abertura-nota { color: var(--neblina-fraca); margin: 0; }
+
+/* ── as duas portas ─────────────────────────────────── */
+/* A pergunta vem ANTES dos projetos: é o instante em que a deriva começa. */
+
+.portas { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 44px; }
+
+.porta {
+  flex: 1 1 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  text-align: left;
+  padding: 16px 18px;
+  background: var(--mata);
+  border: 1px solid var(--musgo);
+  border-radius: var(--raio);
+  color: var(--neblina);
+  cursor: pointer;
+}
+
+/* o destaque é do mouse, não do app: ele não decide por você qual das duas */
+.porta:hover { border-color: var(--rebrota); }
+.porta:hover .porta-nome { color: var(--casca); }
+
+.porta-nome { font-size: 17px; font-weight: 600; }
+.porta-sub { font-size: 12px; color: var(--neblina-fraca); }
+
+/* ── tarefa ativa na entrada ────────────────────────── */
+/* Ela atravessou a caminhada do sítio até aqui sem ser recusada: é vontade
+   declarada, e tudo o mais na tela é concorrência. */
+
+.ativa-caixa {
+  border: 1px solid var(--rebrota);
+  border-radius: var(--raio);
+  background: var(--mata);
+  padding: 18px 20px;
+  margin-bottom: 40px;
+}
+
+.ativa-etiqueta {
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .14em;
+  color: var(--casca);
+}
+
+.ativa-texto {
+  font-family: var(--display);
+  font-size: 22px;
+  line-height: 1.25;
+  margin: 8px 0 0;
+}
+
+.ativa-recado {
+  border-left: 2px solid var(--musgo);
+  padding-left: 12px;
+  margin: 12px 0 0;
+  font-size: 13px;
+  color: var(--neblina-fraca);
+}
+
+.ativa-meta {
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--neblina-fraca);
+  margin: 10px 0 0;
+}
+
+.ativa-saidas { display: flex; align-items: center; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+.ativa-nota { font-size: 12px; color: var(--neblina-fraca); margin: 12px 0 0; }
+
+.selo-consulta {
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .14em;
+  color: var(--neblina-fraca);
+  border: 1px dashed var(--musgo);
+  border-radius: var(--raio);
+  padding: 5px 10px;
+  white-space: nowrap;
+}
+
+.abertura-vagas { margin: 0; }
+
+.abertura-vaga {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  padding: 10px 0;
+  border-top: 1px solid var(--musgo);
+}
+
+.abertura-vaga dt {
+  flex: 0 0 130px;
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .14em;
+  color: var(--neblina-fraca);
+}
+
+.abertura-vaga dd { margin: 0; }
+
+/* vaga livre não é falta: é lugar disponível. Verde e miúda — convite, não
+   buraco. É a única coisa da tela que usa a cor da ação. */
+.abertura-livre {
+  color: var(--casca);
+  font-size: 12px;
+  font-family: var(--mono);
+  letter-spacing: .04em;
+}
+
+.palco h2 {
+  font-family: var(--display);
+  font-size: 26px;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+
+.palco-resultado {
+  font-family: var(--display);
+  font-size: 17px;
+  color: var(--casca);
+  margin: 0 0 6px;
+}
+
+/* Nome e resultado não têm campo em outro lugar: o título é o campo. Sem
+   moldura enquanto trancado, moldura discreta quando solto — o mesmo tratamento
+   do nome da pendência, que já funciona assim. */
+.titulo-obra, .titulo-resultado {
+  display: block;
+  width: 100%;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--raio);
+  font-family: var(--display);
+  padding: 2px 6px;
+  margin-left: -6px;
+}
+
+.titulo-obra { font-size: 26px; font-weight: 500; }
+.titulo-resultado { font-size: 17px; color: var(--casca); margin-bottom: 6px; }
+
+.titulo-obra[readonly], .titulo-resultado[readonly] { cursor: default; }
+
+.titulo-obra:not([readonly]):hover,
+.titulo-resultado:not([readonly]):hover { border-color: var(--musgo); }
+
+.titulo-obra:not([readonly]):focus,
+.titulo-resultado:not([readonly]):focus {
+  border-color: var(--neblina-fraca);
+  background: var(--mata);
+  outline: none;
+}
+
+.titulo-obra::placeholder, .titulo-resultado::placeholder { color: var(--neblina-fraca); opacity: .6; }
+
+.palco-sub { color: var(--neblina-fraca); font-size: 13px; margin-bottom: 24px; }
+
+/* ── formulário ─────────────────────────────────────── */
+
+/* HIERARQUIA. Três planos, e só três: o título da seção diz onde você está, o
+   VALOR é o que se lê, o rótulo é só o endereço do valor. Antes os três tinham
+   quase o mesmo peso e a tela virava um punhado de palavras espalhadas.
+   Separação por espaço e tamanho, não por cor — a paleta tem uma cor de
+   destaque só, e ela é da ação. */
+
+.secao {
+  border-top: 1px solid var(--musgo);
+  padding-top: 18px;
+  margin-top: 34px;
+}
+
+.secao-titulo {
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .16em;
+  color: var(--neblina);
+  margin-bottom: 14px;
+}
+
+/* TÍTULO À ESQUERDA, CAMPOS À DIREITA. Empilhada, cada seção era uma laje com
+   um traço em cima e muito ar dentro; a ficha inteira virava uma coluna de
+   coisas soltas sem começo. Em duas colunas todos os valores compartilham uma
+   única borda esquerda, e é isso que faz uma ficha ser varrida de relance. */
+.secao-campos {
+  display: grid;
+  grid-template-columns: 118px minmax(0, 1fr);
+  gap: 0 22px;
+  align-items: start;
+  border-top: 1px solid var(--musgo);
+  padding-top: 14px;
+  margin-top: 20px;
+}
+
+.secao-campos > .secao-titulo { margin: 3px 0 0; }
+.secao-corpo { min-width: 0; }
+
+@media (max-width: 860px) {
+  .secao-campos { grid-template-columns: 1fr; }
+  .secao-campos > .secao-titulo { margin-bottom: 12px; }
+}
+
+/* explicação vive no title: aparece ao parar o mouse, não ocupa linha */
+.tem-ajuda { cursor: help; }
+
+.grade {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 14px 24px;        /* o rótulo já está colado no valor: 22 px aqui virava ilha */
+  max-width: 620px;
+}
+
+.campo { display: flex; flex-direction: column; gap: 1px; }
+.campo-largo { grid-column: 1 / -1; }
+.campo-largo input, .campo-largo textarea { max-width: 620px; }
+
+.campo label {
+  font-size: 11px;
+  letter-spacing: .02em;
+  color: var(--neblina-fraca);
+}
+
+/* uma linha só, encostadas: caixa de marca não tem rótulo em cima e não deve
+   herdar as colunas largas dos campos de texto */
+.marcas-linha {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 24px;
+  max-width: 620px;
+}
+
+.marcas-linha + .grade, .grade + .marcas-linha { margin-top: 14px; }
+
+/* ── condições: uma linha por assunto ───────────────── */
+
+.cond {
+  display: flex;
+  align-items: baseline;
+  gap: 18px;
+  padding: 7px 0;
+  max-width: 620px;
+}
+
+.cond + .cond { border-top: 1px solid rgba(38, 64, 58, .5); }
+
+.cond-rotulo {
+  flex: 0 0 132px;
+  font-size: 11px;
+  letter-spacing: .02em;
+  color: var(--neblina-fraca);
+}
+
+/* O valor da condição em cima, os qualificadores embaixo. Na mesma linha, o
+   valor do select — que trancado é texto puro — parecia um item de lista que
+   tinha perdido a caixinha. */
+.cond-corpo {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 9px;
+}
+
+.cond-corpo .campo { flex: 0 0 auto; }
+.cond-corpo .campo select { width: auto; min-width: 150px; }
+.campo-bool select { min-width: 78px; }
+
+/* valor derivado, que não é campo: mesmo tamanho e cor do valor de um campo */
+.valor-lido { margin: 0; font-size: 15px; color: var(--neblina); }
+
+/* ── motivação ──────────────────────────────────────── */
+/* Citação, não campo: contorno próprio e itálico, para se ler como o lembrete
+   do porquê e não como mais uma linha do cadastro. */
+
+.caixa-motivacao {
+  border: 1px solid var(--musgo);
+  border-left-width: 2px;
+  border-radius: var(--raio);
+  padding: 10px 14px;
+  max-width: 620px;
+}
+
+.area-motivacao {
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--neblina);
+  font-family: var(--display);
+  font-style: italic;
+  font-size: 15px;
+  line-height: 1.5;
+  resize: vertical;
+}
+
+.area-motivacao:focus { outline: none; }
+.area-motivacao[readonly] { resize: none; -webkit-text-fill-color: var(--neblina); }
+.area-motivacao::placeholder { font-style: normal; color: var(--neblina-fraca); opacity: .6; }
+
+/* o valor é o plano da frente: tamanho e cor cheia, contra o rótulo apagado */
+.campo input[type="text"],
+.campo input[type="number"],
+.campo select,
+.campo textarea {
+  background: var(--mata);
+  border: 1px solid var(--musgo);
+  border-radius: var(--raio);
+  padding: 8px 10px;
+  width: 100%;
+  font-size: 15px;
+  color: var(--neblina);
+}
+
+.campo input:focus, .campo select:focus, .campo textarea:focus {
+  border-color: var(--neblina-fraca);
+  outline: none;
+}
+
+.campo textarea { resize: vertical; min-height: 60px; }
+
+/* número é curto por natureza: campo de 300 px para "0" é buraco na tela */
+.campo input[type="number"], .campo input[type="date"] { max-width: 160px; }
+
+.campo-marca {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+
+.campo-marca label { color: var(--neblina); font-size: 14px; }
+
+/* sem a margem que o navegador põe sozinho: com ela a caixa fica 4 px à
+   direita dos campos de texto, e a coluna inteira parece torta */
+.campo-marca input { accent-color: var(--rebrota); width: 16px; height: 16px; margin: 0; }
+
+.dica { font-size: 12px; color: var(--neblina-fraca); margin-top: -4px; }
+
+/* Campo trancado é o MESMO campo, só duro — mesma posição, mesmo tamanho. Perde
+   toda a decoração: sem moldura, sem linha embaixo, sem setinha de número. A
+   ficha trancada é para LER, e uma escada de quinze traços horizontais é ruído
+   puro. Sem isso o valor fica sozinho na tela, que é o que se quer ler. */
+.campo input[readonly],
+.campo textarea[readonly],
+.campo select:disabled,
+.campo input:disabled {
+  background: none;
+  border-color: transparent;
+  border-radius: 0;
+  padding-left: 0;
+  color: var(--neblina);
+  opacity: 1;
+  cursor: default;
+  -webkit-text-fill-color: var(--neblina);   /* Safari apaga disabled sem isto */
+}
+
+.campo select:disabled { appearance: none; }
+.campo textarea[readonly] { min-height: 0; resize: none; }
+
+/* traço no lugar do vazio: campo em branco sem moldura parece defeito */
+.campo input[readonly]::placeholder,
+.campo textarea[readonly]::placeholder { color: var(--neblina-fraca); opacity: .5; }
+
+input[type="number"][readonly]::-webkit-inner-spin-button,
+input[type="number"][readonly]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+input[type="number"][readonly] { -moz-appearance: textfield; }
+
+/* Trancado, o que interessa é o que está LIGADO — mas o desligado precisa
+   continuar LEGÍVEL. Na primeira tentativa apaguei tanto o desmarcado que ler
+   a ficha ficou pior, não melhor: o contraste separa, não esconde. */
+.campo-marca input:disabled { opacity: .5; }
+.campo-marca input:disabled + label { color: var(--neblina-fraca); }
+.campo-marca-on input:disabled { opacity: 1; }
+.campo-marca-on input:disabled + label { color: var(--neblina); }
+
+.caixinha-travada { cursor: default; border-color: transparent; opacity: .6; }
+.caixinha-travada.caixinha-on { opacity: 1; border-color: var(--musgo); }
+
+/* ── cabeça do palco e confirmação ──────────────────── */
+
+.palco-cabeca {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.palco-cabeca-texto { min-width: 0; }
+
+/* A troca de situação pode expulsar outro projeto da vaga — a pergunta diz
+   isso antes, no lugar onde a mudança foi pedida. */
+.confirma {
+  border: 1px solid var(--musgo);
+  border-left: 3px solid var(--rebrota);
+  border-radius: var(--raio);
+  background: var(--mata);
+  padding: 12px 14px;
+  margin-top: 16px;
+  max-width: 900px;
+}
+
+.confirma-texto { margin: 0 0 12px; font-size: 14px; }
+.confirma-acoes { display: flex; gap: 10px; }
+
+.confirma-campo {
+  width: 100%;
+  max-width: 520px;
+  display: block;
+  margin-bottom: 12px;
+  background: var(--breu);
+  border: 1px solid var(--musgo);
+  border-radius: var(--raio);
+  padding: 8px 10px;
+  resize: vertical;
+}
+
+.confirma-campo:focus { border-color: var(--rebrota); outline: none; }
+
+/* ── barra de ações do projeto ──────────────────────── */
+/* O caminho é um só, então as ações são poucas e ficam junto do título. Sem
+   ícones: este app não tem alfabeto de ícone para ação, e três desenhos novos
+   custariam mais que três palavras. */
+
+.barra-acoes {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.bt-acao { padding: 6px 16px; }
+
+/* Trancado, não escondido: escondido não puxa ninguém para fechar a última
+   tarefa. O cadeado diz o estado, o texto ao lado diz o que destranca — e o
+   que destranca é decisão sua, terminar ou cancelar. */
+.bt-travado {
+  background: none;
+  border: 1px dashed var(--musgo);
+  color: var(--neblina-fraca);
+  cursor: default;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.cadeado { width: 11px; height: 12px; flex: 0 0 auto; }
+
+.barra-nota { font-size: 12px; color: var(--neblina-fraca); }
+
+/* o que a cascata moveu de vaga, dito uma vez */
+.aviso-cascata {
+  border-left: 2px solid var(--rebrota);
+  padding: 8px 0 8px 14px;
+  margin: 0 0 20px;
+  font-size: 14px;
+  color: var(--neblina);
+}
+
+/* Apagar é saída rara: fica pequeno, no canto, fora do caminho. O caminho
+   normal para um projeto que morreu é a situação `cancelado`, que guarda o
+   registro em vez de sumir com ele. */
+.pe-projeto {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 40px;
+  padding-top: 12px;
+  border-top: 1px solid var(--mata);
+}
+
+.pe-projeto .dica { margin: 0; text-align: right; }
+
+/* ── lista de passos ────────────────────────────────── */
+
+.passos { list-style: none; margin: 0; padding: 0; max-width: 900px; }
+
+.passo {
+  border: 1px solid var(--musgo);
+  border-radius: var(--raio);
+  margin-bottom: 6px;
+  background: var(--mata);
+  transition: border-color .12s ease;
+}
+
+/* o contorno acompanha o mouse, e FICA quando a ficha está aberta: aberta no
+   meio de doze irmãs, ela precisa continuar destacada depois do clique */
+.passo:hover { border-color: var(--neblina-fraca); }
+
+.passo.passo-aberto {
+  border-color: var(--rebrota);
+  box-shadow: 0 0 0 1px rgba(191, 212, 74, .18);
+}
+
+.passo-feita .passo-texto,
+.passo-encerrada .passo-texto { color: var(--neblina-fraca); text-decoration: line-through; }
+.passo-feita .passo-ordem { color: var(--casca); }
+.passo-ativa { border-color: var(--rebrota); }
+
+.passo.arrastando { opacity: .35; }
+.passo.alvo { border-color: var(--rebrota); }
+
+.passo-linha {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+}
+
+.passo-alca {
+  cursor: grab;
+  color: var(--neblina-fraca);
+  font-family: var(--mono);
+  user-select: none;
+  letter-spacing: -2px;
+}
+
+/* endereço da tarefa, não botão: as dependências apontam para este número */
+.passo-ordem {
+  width: 26px; height: 26px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--musgo);
+  border-radius: 50%;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--neblina-fraca);
+}
+
+.passo-ordem-fim { border-color: transparent; }
+.passo-feita .passo-ordem { color: var(--casca); }
+
+.bt-concluir:hover { color: var(--casca); }
+
+.passo-rodape-fim { display: flex; gap: 6px; }
+
+/* lista vazia continua existindo: é o alvo de quem arrasta da outra etapa */
+.passos-vazia { border: 1px dashed transparent; border-radius: var(--raio); }
+.passos-nada { padding: 10px 4px; font-size: 12px; color: var(--neblina-fraca); }
+.secao-recolhida .rodape-acoes { margin-top: 0; }
+
+/* O título é o campo E o caminho de leitura: duro, abre a ficha; solto, aceita
+   digitação sem mudar de lugar nem de tamanho. */
+/* o nome da tarefa é o que se procura ao varrer a lista: fica maior que tudo
+   o mais da linha, e as marcas embaixo ficam bem menores */
+.passo-texto {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: left;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--raio);
+  padding: 2px 6px;
+  margin-left: -6px;
+  color: var(--neblina);
+  font-family: inherit;
+  font-size: 16px;
+}
+
+.passo-texto[readonly] { cursor: pointer; }
+.passo-texto[readonly]:hover { color: var(--casca); }
+.passo-texto:not([readonly]):hover { border-color: var(--musgo); }
+.passo-texto:not([readonly]):focus {
+  border-color: var(--neblina-fraca);
+  background: var(--breu);
+  outline: none;
+}
+
+.passo-tempo-edita {
+  width: 74px;
+  background: var(--breu);
+  border: 1px solid var(--musgo);
+  border-radius: var(--raio);
+  padding: 3px 6px;
+  text-align: right;
+}
+
+/* o que já foi desce para o pé da seção e sai do caminho da leitura */
+.passos-divisor {
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .12em;
+  color: var(--neblina-fraca);
+  border-top: 1px solid var(--musgo);
+  margin: 16px 0 8px;
+  padding-top: 8px;
+}
+
+.passo-pronta { background: none; opacity: .7; }
+
+/* Etapa e duração são o resumo de bater o olho: ficam na barra do título, não
+   dentro da ficha. O tempo é o número que decide se a tarefa cabe no dia, então
+   ele é lido em cor cheia — o ícone é que fica apagado. */
+.passo-tempo {
+  font-family: var(--mono);
+  font-size: 13px;
+  color: var(--neblina);
+  white-space: nowrap;
+}
+
+.passo-tempo i { font-style: normal; margin-right: 5px; color: var(--neblina-fraca); }
+
+.passo-etapa {
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  color: var(--neblina-fraca);
+  border: 1px solid var(--musgo);
+  border-radius: 2px;
+  padding: 2px 7px;
+  white-space: nowrap;
+}
+
+.passo-etapa-edita {
+  background: var(--breu);
+  color: var(--neblina);
+  text-transform: none;
+  letter-spacing: 0;
+  font-family: var(--corpo);
+  font-size: 13px;
+  padding: 3px 6px;
+}
+
+/* SEM MOLDURA. Cada marca dentro de uma caixinha fazia sete caixas por linha e
+   quarenta na tela: a borda virava o desenho e o texto sumia dentro dela. O que
+   separa uma marca da outra agora é espaço, e o ícone é que dá a estrutura. */
+.passo-marcas {
+  display: flex;
+  gap: 3px 20px;
+  flex-wrap: wrap;
+  padding: 2px 12px 10px 50px;
+}
+
+.marca {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: .02em;
+  color: var(--neblina-fraca);
+}
+
+/* o recado é frase, não etiqueta: linha própria, em itálico e mais quieto */
+.passo-recado {
+  margin: 0;
+  padding: 0 12px 10px 50px;
+  font-size: 12px;
+  font-style: italic;
+  color: var(--neblina-fraca);
+  max-width: 820px;
+}
+
+.passo-corpo {
+  border-top: 1px solid var(--musgo);
+  padding: 16px 12px 16px 50px;
+}
+
+.passo-rodape {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 18px;
+}
+
+/* seções por etapa, marcadores e caixinhas */
+
+.secao-cabeca { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.secao-cabeca .secao-titulo { margin-bottom: 0; }
+
+/* sobrou só o ESTADO — a explicação da regra foi para o hover do título */
+.secao-nota {
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--neblina-fraca);
+}
+
+.secao-travada { opacity: .72; }
+
+.bt-mini { padding: 3px 9px; font-size: 12px; }
+
+.passo-check {
+  width: 26px; height: 26px;
+  flex: 0 0 auto;
+  border: 1px solid var(--musgo);
+  border-radius: 50%;
+  background: none;
+  color: var(--neblina-fraca);
+  font-family: var(--mono);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.passo-check:hover { border-color: var(--rebrota); color: var(--neblina); }
+.passo-check-on { background: var(--rebrota); border-color: var(--rebrota); color: var(--breu); }
+
+.marca i { font-style: normal; margin-right: 5px; opacity: .65; }
+
+.passo-avisos, .avisos { display: flex; flex-direction: column; gap: 4px; }
+
+.aviso-linha {
+  font-size: 12px;
+  color: var(--neblina);
+  background: var(--musgo);
+  border-radius: var(--raio);
+  padding: 5px 8px;
+  margin: 0;
+}
+
+.passo-avisos { padding: 0 12px 8px 50px; }
+
+.rotulo-solto {
+  display: block;
+  font-size: 12px;
+  color: var(--neblina-fraca);
+  margin: 14px 0 6px;
+}
+
+.caixinhas { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.caixinha {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--musgo);
+  border-radius: var(--raio);
+  padding: 5px 9px;
+  font-size: 13px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.caixinha input { accent-color: var(--rebrota); margin: 0; }
+.caixinha-on { border-color: var(--rebrota); }
+
+.separador-fino { border-top: 1px solid var(--musgo); margin: 18px 0; }
+
+/* ── fichas de recurso ──────────────────────────────── */
+
+.fichas { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+
+.ficha {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--musgo);
+  border-radius: 2px;
+  padding: 3px 6px;
+  font-size: 12px;
+}
+
+.ficha button {
+  background: none;
+  border: none;
+  color: var(--neblina-fraca);
+  cursor: pointer;
+  padding: 0;
+  line-height: 1;
+}
+
+.ficha button:hover { color: var(--neblina); }
+
+.junta { display: flex; gap: 6px; }
+.junta input { flex: 1 1 auto; }
+
+/* ── pendências ─────────────────────────────────────── */
+
+.pendencias { list-style: none; margin: 24px 0 0; padding: 0; max-width: 900px; }
+
+.pendencia {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--musgo);
+  border-left-width: 3px;
+  border-radius: var(--raio);
+  margin-bottom: 6px;
+  background: var(--mata);
+}
+
+.pendencia-verde    { border-left-color: var(--dentro); }
+.pendencia-amarelo  { border-left-color: var(--beirada); }
+.pendencia-vermelho { border-left-color: var(--passou); }
+
+.ponto {
+  display: inline-block;
+  width: 9px; height: 9px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  margin-right: 6px;
+}
+
+.ponto-verde    { background: var(--dentro); }
+.ponto-amarelo  { background: var(--beirada); }
+.ponto-vermelho { background: var(--passou); }
+
+.pendencia-corpo { flex: 1 1 auto; min-width: 0; }
+
+.pendencia-nome {
+  width: 100%;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--raio);
+  padding: 3px 5px;
+}
+
+.pendencia-nome:hover { border-color: var(--musgo); }
+.pendencia-nome:focus { border-color: var(--neblina-fraca); background: var(--breu); outline: none; }
+
+.pendencia-nota {
+  display: block;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--neblina-fraca);
+  padding: 0 5px;
+}
+
+.pendencia-vermelho .pendencia-nota { color: var(--passou); }
+.pendencia-amarelo  .pendencia-nota { color: var(--beirada); }
+
+.pendencia-data {
+  background: var(--breu);
+  border: 1px solid var(--musgo);
+  border-radius: var(--raio);
+  padding: 5px 7px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color-scheme: dark;
+}
+
+/* ── tabela ─────────────────────────────────────────── */
+
+.tabela { width: 100%; border-collapse: collapse; max-width: 900px; }
+
+.tabela th {
+  text-align: left;
+  font-family: var(--mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  color: var(--neblina-fraca);
+  font-weight: 500;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--musgo);
+}
+
+.tabela td { padding: 5px 8px; border-bottom: 1px solid var(--mata); }
+.tabela input, .tabela select { width: 100%; background: none; border: 1px solid transparent; border-radius: var(--raio); padding: 5px 6px; }
+.tabela input:hover, .tabela select:hover { border-color: var(--musgo); }
+.tabela input:focus, .tabela select:focus { border-color: var(--neblina-fraca); background: var(--mata); outline: none; }
+
+.rodape-acoes { margin-top: 28px; display: flex; gap: 10px; align-items: center; }
+
+.aviso { color: var(--neblina-fraca); font-size: 12px; }
+
+/* ── frente de campo ────────────────────────────────────
+   Postura de bota: uma mão, polegar, alvos de 44 px. O contraste entre a
+   pergunta densa e a resposta quase vazia é a identidade do app (§15). */
+
+/* NOME PRÓPRIO, e por um motivo: esta seção já se chamou `.campo` e colidia
+   com o `.campo` de cada campo de formulário da análise. Cada um deles virava
+   uma camada fixa de tela cheia por cima de tudo. */
+.execucao {
+  position: fixed;
+  inset: 0;
+  background: var(--breu);
+  z-index: 20;
+  overflow-y: auto;
+  display: flex;
+  justify-content: center;
+}
+
+.execucao[hidden] { display: none; }
+
+/* O contêiner precisa ter largura própria: como item de flex sem largura ele
+   encolhia até o texto mais largo de dentro, e as telas de botão curto — não
+   dá, parar, não quero — saíam com 240 px, desalinhadas do resto. */
+#campoTela { width: 100%; max-width: 430px; }
+
+.execucao-sair {
+  position: absolute;
+  top: 10px; right: 14px;
+  background: none;
+  border: none;
+  color: var(--neblina-fraca);
+  font-size: 26px;
+  line-height: 1;
+  cursor: pointer;
+  padding: 8px;
+  z-index: 2;
+}
+
+.execucao-sair:hover { color: var(--neblina); }
+
+.c-tela {
+  width: 100%;
+  max-width: 430px;
+  padding: 56px 20px 60px;
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+/* pergunta — densa */
+
+.c-linha { margin-bottom: 20px; }
+
+.c-rotulo {
+  display: block;
+  font-size: 13px;
+  color: var(--neblina-fraca);
+  margin-bottom: 8px;
+}
+
+.c-botoes { display: flex; flex-wrap: wrap; gap: 8px; }
+
+.c-bt {
+  flex: 1 1 auto;
+  min-height: 44px;
+  min-width: 72px;
+  padding: 10px 14px;
+  background: var(--mata);
+  border: 1px solid var(--musgo);
+  border-radius: var(--raio);
+  color: var(--neblina);
+  cursor: pointer;
+}
+
+.c-bt-on {
+  background: var(--rebrota);
+  border-color: var(--rebrota);
+  color: var(--breu);
+  font-weight: 600;
+}
+
+.c-bt-largo { flex: 1 1 100%; text-align: left; margin-bottom: 8px; }
+
+.c-acao {
+  width: 100%;
+  min-height: 56px;
+  margin-top: 12px;
+  background: var(--rebrota);
+  border: none;
+  border-radius: var(--raio);
+  color: var(--breu);
+  font-size: 17px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.c-acao[disabled] {
+  background: var(--mata);
+  color: var(--neblina-fraca);
+  cursor: default;
+}
+
+/* resposta — quase vazia. A tarefa é a única coisa grande do app. */
+
+.c-resposta, .c-vazio {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.c-frase {
+  font-family: var(--display);
+  font-size: 30px;
+  line-height: 1.2;
+  font-weight: 500;
+  margin: 0 0 18px;
+}
+
+.c-frase-media { font-family: var(--display); font-size: 22px; margin: 0 0 20px; }
+
+.c-recado {
+  border-left: 2px solid var(--musgo);
+  padding-left: 12px;
+  margin: 0 0 18px;
+  color: var(--neblina);
+  font-size: 14px;
+}
+
+.c-meta {
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--neblina-fraca);
+  margin: 0 0 24px;
+}
+
+.c-kit {
+  border-top: 1px solid var(--musgo);
+  padding-top: 12px;
+  margin-bottom: 20px;
+  font-size: 14px;
+}
+
+.c-kit summary {
+  cursor: pointer;
+  color: var(--neblina-fraca);
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.c-kit p { margin: 10px 0 0; }
+
+/* A folha de trabalho. A resposta é vazia porque serve para DECIDIR; depois do
+   "vamos" o plano inteiro precisa estar à mão, senão o trabalho de planejamento
+   foi jogado fora. */
+.c-trabalho { flex: 1 1 auto; display: flex; flex-direction: column; justify-content: center; }
+
+.c-ficha {
+  border-top: 1px solid var(--musgo);
+  margin: 4px 0 24px;
+  padding-top: 14px;
+}
+
+.c-ficha-linha {
+  display: flex;
+  gap: 14px;
+  padding: 7px 0;
+  align-items: baseline;
+}
+
+.c-ficha-linha + .c-ficha-linha { border-top: 1px solid rgba(38, 64, 58, .55); }
+
+.c-ficha-rotulo {
+  flex: 0 0 96px;
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .12em;
+  color: var(--neblina-fraca);
+}
+
+.c-ficha-valor { flex: 1 1 auto; font-size: 15px; }
+
+.c-ficha-itens {
+  flex: 1 1 auto;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 15px;
+}
+
+.c-ficha-itens li { padding: 0; }
+
+/* conferência do kit: alvo grande, de bota, com uma mão */
+.c-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 34px;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 3px 0;
+  color: var(--neblina);
+  font: inherit;
+  cursor: pointer;
+}
+
+/* NOME PRÓPRIO: já se chamou `.c-caixa` e colidia com a caixa das telas de
+   motivo (não dá, não quero, parar), que herdava 20 px de largura, borda e
+   texto na cor do fundo — a tela inteira desalinhada. */
+.c-quadro {
+  flex: 0 0 auto;
+  width: 20px; height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--musgo);
+  border-radius: 2px;
+  font-size: 12px;
+  color: var(--breu);
+}
+
+.c-item:hover .c-quadro { border-color: var(--neblina-fraca); }
+
+/* pego já não pesa: some do caminho do olho, mas continua legível */
+.c-item-on { color: var(--neblina-fraca); text-decoration: line-through; }
+.c-item-on .c-quadro {
+  background: var(--rebrota);
+  border-color: var(--rebrota);
+  text-decoration: none;
+}
+
+/* ── a trilha do projeto ─────────────────────────────────
+   Caminho de mapa, não lista: tracejado na cor da terra, com uma pegada em cada
+   coisa já feita, do mais antigo até o "você está aqui". A sequência é a
+   informação — é ela que devolve o raciocínio depois de meses parado. */
+
+.c-trilha { padding: 8px 0 20px; }
+
+.c-trilha-nome {
+  font-family: var(--mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .12em;
+  color: var(--neblina-fraca);
+  margin: 0;
+}
+
+.c-trilha-fim {
+  font-family: var(--display);
+  font-size: 17px;
+  color: var(--casca);
+  margin: 6px 0 26px;
+}
+
+.trilha {
+  list-style: none;
+  margin: 0;
+  padding: 2px 0 0 30px;
+  position: relative;
+}
+
+/* o caminho */
+.trilha::before {
+  content: '';
+  position: absolute;
+  left: 8px;
+  top: 8px;
+  bottom: 22px;
+  border-left: 2px dashed rgba(192, 138, 102, .5);
+}
+
+.pegada { position: relative; padding: 0 0 24px; }
+
+/* a marca do pé sobre o caminho */
+.pegada::before {
+  content: '';
+  position: absolute;
+  left: -30px;
+  top: 3px;
+  width: 12px; height: 12px;
+  border-radius: 50%;
+  background: var(--casca);
+  box-shadow: 0 0 0 4px var(--breu);
+}
+
+.pegada-cancelada::before {
+  background: none;
+  border: 2px solid var(--musgo);
+  width: 10px; height: 10px;
+}
+
+/* onde você está: a única coisa verde da trilha, porque é a única viva */
+.pegada-aqui::before {
+  background: var(--breu);
+  border: 2px solid var(--rebrota);
+  width: 14px; height: 14px;
+  left: -31px;
+  top: 2px;
+}
+
+/* o nome vira botão: a pegada abre e mostra a ficha inteira da tarefa */
+.pegada-nome {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: .02em;
+  color: var(--neblina-fraca);
+}
+
+.pegada-nome em {
+  font-style: normal;
+  margin-left: 8px;
+  opacity: .7;
+}
+
+/* a anotação é o corpo; o nome da tarefa é só o andaime */
+.pegada-nota {
+  margin: 3px 0 0;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--neblina);
+}
+
+.pegada-cancelada .pegada-nome { text-decoration: line-through; }
+.pegada-cancelada .pegada-nota { color: var(--neblina-fraca); }
+
+.pegada-aqui { padding-bottom: 4px; }
+.pegada-aqui .pegada-nome { color: var(--neblina); font-size: 15px; font-family: var(--corpo); }
+
+.pegada-selo {
+  display: inline-block;
+  margin-top: 4px;
+  font-family: var(--mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .14em;
+  color: var(--rebrota);
+}
+
+.c-adiante {
+  border-top: 1px solid var(--musgo);
+  margin-top: 24px;
+  padding-top: 14px;
+}
+
+.c-adiante .c-ficha-rotulo { display: block; margin-bottom: 6px; }
+.c-adiante .c-ficha-itens { color: var(--neblina-fraca); }
+
+.c-trilha-link {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  padding: 6px 0;
+  margin-bottom: 10px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: .06em;
+  color: var(--neblina-fraca);
+  cursor: pointer;
+}
+
+.c-trilha-link:hover { color: var(--casca); }
+
+.pegada-nome:hover { color: var(--casca); }
+.pegada-aberta .pegada-nome { color: var(--neblina); }
+
+/* a ficha da pegada: recuada e encostada no caminho, como uma parada na trilha */
+.pegada-ficha {
+  margin-top: 10px;
+  padding: 10px 0 2px 12px;
+  border-left: 1px solid var(--musgo);
+}
+
+.pegada-ficha .c-ficha-linha { padding: 5px 0; }
+.pegada-ficha .c-ficha-valor,
+.pegada-ficha .c-ficha-itens { font-size: 14px; }
+.pegada-ficha .c-ficha-rotulo { flex: 0 0 84px; }
+
+/* aceitar custa um toque; recusar custa dois — a assimetria é o que torna
+   o percorrer impossível sem proibir nada (§9) */
+.c-recusas { display: flex; gap: 10px; margin-top: 16px; }
+
+.c-recusa {
+  flex: 1 1 0;
+  min-height: 44px;
+  background: none;
+  border: none;
+  color: var(--neblina-fraca);
+  cursor: pointer;
+  font-size: 15px;
+}
+
+.c-recusa:hover { color: var(--neblina); }
+
+.c-porta, .c-voltar {
+  width: 100%;
+  min-height: 48px;
+  margin-top: 14px;
+  background: none;
+  border: 1px solid var(--musgo);
+  border-radius: var(--raio);
+  color: var(--neblina);
+  cursor: pointer;
+}
+
+.c-voltar { border-color: transparent; color: var(--neblina-fraca); }
+
+/* caixas de motivo */
+
+.c-caixa { display: flex; flex-direction: column; }
+
+.c-titulo {
+  font-family: var(--display);
+  font-size: 22px;
+  margin: 0 0 20px;
+}
+
+.c-campo {
+  width: 100%;
+  background: var(--mata);
+  border: 1px solid var(--musgo);
+  border-radius: var(--raio);
+  padding: 12px;
+  margin-bottom: 12px;
+  font-size: 16px;
+  resize: vertical;
+}
+
+.c-campo:focus { border-color: var(--rebrota); outline: none; }
+
+.c-label {
+  display: block;
+  font-size: 13px;
+  color: var(--neblina-fraca);
+  margin-bottom: 4px;
+}
+
+.c-nota {
+  font-size: 12px;
+  color: var(--neblina-fraca);
+  margin-top: 16px;
+  text-align: center;
+}
+
+/* o que a cascata moveu, dito uma vez, em cima da próxima resposta */
+.c-aviso {
+  margin: 0 0 22px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--musgo);
+  text-align: left;
+}
+
+/* ── bilhete sobre o app ────────────────────────────────
+   Acima de tudo, inclusive da execução: o incômodo aparece durante o uso. */
+
+/* entrar, sair e anotar sobre o app: as três coisas que não são trabalho do
+   sítio ficam juntas, pequenas e no canto */
+.ferramentas {
+  position: fixed;
+  right: 20px; bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  z-index: 40;
+}
+
+.bt-icone {
+  width: 34px; height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--musgo);
+  border-radius: var(--raio);
+  background: var(--mata);
+  color: var(--neblina-fraca);
+  cursor: pointer;
+  padding: 0;
+}
+
+.bt-icone svg { width: 18px; height: 18px; }
+.bt-icone:hover { color: var(--rebrota); border-color: var(--rebrota); }
+a.bt-icone { text-decoration: none; }
+
+.bilhete-bt {
+  position: static;
+  width: 48px; height: 48px;
+  border-radius: 50%;
+  border: 1px solid var(--musgo);
+  background: var(--mata);
+  color: var(--neblina-fraca);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  z-index: 40;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, .45);
+}
+
+.bilhete-bt:hover { color: var(--rebrota); border-color: var(--rebrota); }
+
+.bilhete {
+  position: fixed;
+  right: 20px; bottom: 80px;
+  width: min(360px, calc(100vw - 40px));
+  background: var(--mata);
+  border: 1px solid var(--musgo);
+  border-radius: var(--raio);
+  padding: 14px;
+  z-index: 40;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, .5);
+}
+
+.bilhete[hidden] { display: none; }
+
+.bilhete-topo {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.bilhete-x {
+  background: none; border: none;
+  color: var(--neblina-fraca);
+  font-size: 20px; line-height: 1;
+  cursor: pointer; padding: 0 4px;
+}
+
+.bilhete-x:hover { color: var(--neblina); }
+
+.bilhete textarea {
+  width: 100%;
+  background: var(--breu);
+  border: 1px solid var(--musgo);
+  border-radius: var(--raio);
+  color: var(--neblina);
+  padding: 10px;
+  font-family: inherit;
+  font-size: 14px;
+  resize: vertical;
+}
+
+.bilhete textarea:focus { border-color: var(--rebrota); outline: none; }
+
+.bilhete-baixo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
+}
+
+/* ── celular ─────────────────────────────────────────────
+   Um app só, não dois. A consulta já é feita para o polegar; o que muda aqui é
+   a mesa, que precisa caber em 375 px sem virar uma planilha espremida. */
+
+.aviso-copia {
+  font-size: 12px;
+  color: var(--neblina-fraca);
+  margin: 32px 0 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--musgo);
+}
+
+@media (max-width: 720px) {
+  .topo { padding: 10px 14px; }
+  .palco { padding: 18px 14px 90px; }
+  .sem-coluna .palco { padding-top: 24px; }
+
+  .abertura { padding-top: 26px; }
+  .abertura-frase { font-size: 26px; margin-bottom: 28px; }
+
+  /* Uma porta só, e grande: de bota, com uma mão, ela é a única coisa que a
+     tela pede. Alvo generoso vale mais que economia de espaço aqui. */
+  .porta-unica {
+    margin: 0 0 40px;
+    min-height: 78px;
+    font-size: 20px;
+    border-radius: 4px;
+  }
+  .abertura .voltar-lista { margin: 26px 0 0; }
+
+  /* sobra do desenho de mesa, caso a largura mude com a tela já montada */
+  .portas { flex-direction: column; }
+  .porta { flex: 0 0 auto; padding: 14px 16px; }
+
+  /* alvos de 44 px e uma coluna só: de pé, com uma mão */
+  .grade { grid-template-columns: 1fr; gap: 16px; }
+  .secao-campos { grid-template-columns: 1fr; }
+  .secao-campos > .secao-titulo { margin-bottom: 10px; }
+  .cond { flex-direction: column; align-items: stretch; gap: 6px; }
+  .cond-rotulo { flex: none; }
+  .cond-corpo .campo select { width: 100%; }
+
+  .passo-linha { flex-wrap: wrap; gap: 8px; }
+  .passo-texto { font-size: 15px; flex: 1 1 100%; order: -1; }
+  .passo-marcas, .passo-recado, .passo-avisos { padding-left: 14px; }
+  .passo-corpo { padding: 14px; }
+  .passo-alca { display: none; }          /* arrastar não funciona com o dedo */
+
+  .barra-acoes { gap: 8px; }
+  .bt-acao { flex: 1 1 auto; }
+  .ficha-projeto { flex-wrap: wrap; }
+
+  .coluna-projetos { position: static; max-height: none; }
+
+  /* De bota sobra só o bilhete: exportar, importar e a bancada de prova são
+     trabalho de mesa e não têm o que fazer no bolso. O bilhete fica porque o
+     incômodo aparece justamente durante o uso, e anotar depois é anotar pior. */
+  .ferramentas .bt-icone { display: none; }
+  .ferramentas { right: 12px; bottom: 12px; }
+  .bilhete-bt { width: 44px; height: 44px; }
+  .bilhete { right: 12px; bottom: 66px; }
+
+  /* criar e cadastrar são de mesa */
+  .coluna-cabeca .bt-forte, .coluna-cabeca .bt-fraco { display: none; }
+  .rodape-acoes { display: none; }
+  .pe-projeto { display: none; }
+}
