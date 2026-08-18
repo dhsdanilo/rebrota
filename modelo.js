@@ -453,6 +453,37 @@ var Modelo = (function () {
     return (espaco > limite * 0.5 ? corte.slice(0, espaco) : corte) + '…';
   }
 
+  /* Busca por palavra em tudo que existe — projetos, tarefas, sementes. Serve
+     ao "já existe?" da Sementeira: a pergunta é respondida no momento em que a
+     ideia nasce, não numa tela à parte. Sem acento e sem caixa; palavras curtas
+     não contam (a, de, para) porque casam com tudo. Termo pode ser uma frase
+     inteira ditada: basta uma palavra dela bater. */
+  function chao(s) {
+    return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  }
+  // palavras que aparecem em qualquer frase e não dizem do que se trata
+  var VAZIAS = ('para como mais coisa coisas fazer feito ficar deixar colocar botar novo nova novos novas ' +
+    'perto longe aqui onde quando depois antes ainda entao talvez porque sobre entre tudo nada algo ' +
+    'isso esse essa aquele aquela gente dele dela deles delas pode poder podia quero queria seria ' +
+    'estar esta muito pouco bem melhor pior grande pequeno todo toda todos todas outro outra ' +
+    'casa sitio lado parte vezes ideia').split(' ');
+  function buscar(termo) {
+    var palavras = chao(termo).split(/[^a-z0-9]+/).filter(function (w) {
+      return w.length >= 4 && VAZIAS.indexOf(w) === -1;
+    });
+    var vazio = { projetos: [], tarefas: [], sementes: [] };
+    if (!palavras.length) return vazio;
+    function bate(campos) {
+      var texto = chao(campos.join(' '));
+      return palavras.some(function (w) { return texto.indexOf(w) !== -1; });
+    }
+    return {
+      projetos: cat().projetos.filter(function (p) { return bate([p.nome, p.resultado]); }),
+      tarefas:  tarefasVivas().filter(function (t) { return bate([t.texto]); }),
+      sementes: cat().sementes.filter(function (s) { return bate([s.nome, s.frase]); })
+    };
+  }
+
   /* A semente nunca é apagada: ela muda de ESTADO, e o estado é o registro —
      de como o app foi usado e do que aconteceu com cada ideia dela.
        nova            — como nasce, de quem quer que tenha plantado
@@ -1733,7 +1764,7 @@ var Modelo = (function () {
     reordenar: reordenar,
     inserirSemente: inserirSemente, semente: semente,
     classificarSemente: classificarSemente, promoverSemente: promoverSemente,
-    semearTarefa: semearTarefa, sementesParaTarefa: sementesParaTarefa,
+    semearTarefa: semearTarefa, sementesParaTarefa: sementesParaTarefa, buscar: buscar,
     ESTADOS_SEMENTE: ESTADOS_SEMENTE,
 
     exportar: exportar,

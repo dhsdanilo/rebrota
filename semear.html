@@ -11,12 +11,13 @@
 <link rel="manifest" href="semear.webmanifest">
 <link rel="icon" href="icone-semente.svg" type="image/svg+xml">
 <link rel="apple-touch-icon" href="icone-semente.svg">
-<link rel="stylesheet" href="app.css?v=45">
+<link rel="stylesheet" href="app.css?v=46">
 </head>
 <body class="so-semear">
-<!-- A tela da esposa: só plantar sementes. Ela não executa nada, não vê
-     projeto, não vê tarefa — cada ideia que ela escrever aqui vira um evento
-     no diário dela e aparece na mesa dele como semente. -->
+<!-- A tela da esposa: plantar sementes, e ler o sítio. Ela não escreve nada
+     além da semente — cada ideia vira um evento no diário dela e aparece na
+     mesa dele como semente. "O sítio" é o catálogo inteiro em leitura (§35):
+     o que está em andamento, a fila, as avulsas, as sementes de todos. -->
 
 <header class="topo">
   <h1><span class="topo-nome">
@@ -30,13 +31,18 @@
     </svg>
     Rebrota</span>
     <span class="topo-modo">sementeira</span></h1>
+  <!-- a outra página: o sítio em leitura. O botão diz para onde vai. -->
+  <button type="button" class="semear-ir" id="btIr" data-ir="sitio">o sítio</button>
 </header>
 
-<main class="semear-pagina">
+<main class="semear-pagina" id="paginaPlantar">
   <p class="semear-frase" id="frase"></p>
 
   <textarea id="texto" class="semear-texto" rows="6"
     placeholder="a ideia, e tudo que você pensou sobre ela — pode ditar"></textarea>
+  <!-- "já existe?": enquanto ela escreve, o que se parece com a ideia — para a
+       pergunta ser respondida na hora, sem ir procurar. Não impede nada. -->
+  <div class="semear-parece" id="parece" hidden></div>
   <button type="button" class="c-acao" id="btPlantar">plantar</button>
   <p class="aviso semear-aviso" id="aviso"></p>
 
@@ -58,8 +64,16 @@
   </section>
 </main>
 
-<script src="modelo.js?v=45"></script>
-<script src="sync.js?v=45"></script>
-<script src="semear.js?v=45"></script>
+<!-- O SÍTIO — leitura. Nenhum botão aqui escreve: os únicos toques abrem e
+     fecham cartões. O que ela vê é o que veria ao lado dele no PC; o que fica
+     fora é a conversa dele com o app (a oferta do momento, as recusas). -->
+<main class="semear-pagina semear-sitio" id="paginaSitio" hidden>
+  <input type="search" id="busca" class="semear-busca" placeholder="procurar em projetos, tarefas e sementes" autocomplete="off">
+  <div id="sitio"></div>
+</main>
+
+<script src="modelo.js?v=46"></script>
+<script src="sync.js?v=46"></script>
+<script src="semear.js?v=46"></script>
 </body>
 </html>

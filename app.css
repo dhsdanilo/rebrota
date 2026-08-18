@@ -277,6 +277,90 @@ button, input, select, textarea {
   font-size: 13px;
 }
 
+/* ── o sítio, em leitura (semear.html) ────────────────
+   A outra página da Sementeira: o catálogo inteiro para ler. Nada aqui
+   escreve; os únicos toques abrem e fecham cartões. */
+.semear-ir {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: .04em;
+  background: none;
+  border: 1px solid var(--musgo);
+  border-radius: var(--raio);
+  color: var(--neblina-fraca);
+  padding: 6px 12px;
+  cursor: pointer;
+}
+.semear-ir:hover { color: var(--neblina); border-color: var(--neblina-fraca); }
+
+/* "já existe?": discreto, embaixo do campo, só quando há o que dizer */
+.semear-parece { margin: 10px 0 0; font-size: 13px; color: var(--neblina-fraca); line-height: 1.5; }
+.semear-parece p { margin: 0 0 4px; font-family: var(--mono); font-size: 11px; letter-spacing: .04em; }
+.semear-parece ul { list-style: none; margin: 0; padding: 0; }
+.semear-parece li b { font-weight: 500; color: var(--neblina); }
+
+.semear-busca {
+  width: 100%;
+  background: var(--mata);
+  border: 1px solid var(--musgo);
+  border-radius: var(--raio);
+  color: var(--neblina);
+  padding: 12px 14px;
+  font-family: inherit;
+  font-size: 16px;
+  margin-bottom: 8px;
+}
+.semear-busca:focus { border-color: var(--rebrota); outline: none; }
+.sitio-nada { margin-top: 24px; }
+
+.sitio-bloco { margin-top: 32px; }
+.sitio-bloco h2 {
+  font-family: var(--mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: .12em;
+  color: var(--neblina-fraca);
+  margin: 0 0 12px;
+}
+
+.sitio-projeto { border-top: 1px solid var(--musgo); }
+.sitio-cabeca {
+  display: flex; flex-direction: column; gap: 3px;
+  width: 100%; text-align: left;
+  background: none; border: 0; padding: 12px 0; cursor: pointer;
+  color: var(--neblina); font-family: inherit;
+}
+.sitio-cabeca strong { font-size: 17px; font-weight: 500; }
+.sitio-fim { font-family: var(--display); font-size: 15px; color: var(--casca); }
+.sitio-envelope, .sitio-cabeca em, .sitio-etiqueta {
+  font-family: var(--mono); font-style: normal; font-size: 11px; color: var(--neblina-fraca);
+}
+.sitio-etiqueta { letter-spacing: .06em; text-transform: uppercase; }
+.sitio-etiqueta-titular, .sitio-etiqueta-reserva { color: var(--rebrota); }
+.sitio-etiqueta-planejamento { color: var(--casca); }
+.sitio-etiqueta-pronto { color: var(--dentro); }
+.sitio-vaga { padding: 12px 0; display: flex; flex-direction: column; gap: 3px; }
+.sitio-vaga em { font-family: var(--mono); font-style: normal; font-size: 11px; color: var(--neblina-fraca); }
+
+.sitio-corpo { padding: 0 0 18px; }
+.sitio-corpo h4 {
+  font-family: var(--mono); font-size: 11px; letter-spacing: .06em;
+  color: var(--neblina-fraca); font-weight: normal; margin: 14px 0 6px;
+}
+.sitio-tarefas { list-style: none; margin: 0; padding: 0; }
+.sitio-tarefas li { padding: 7px 0; border-top: 1px solid rgba(38,64,58,.6); font-size: 15px; display: flex; flex-direction: column; gap: 2px; }
+.sitio-tarefas li em { font-family: var(--mono); font-style: normal; font-size: 11px; color: var(--neblina-fraca); }
+.sitio-corpo .trilha { margin-top: 6px; }
+.sitio-corpo .pegada { padding-bottom: 16px; }
+.sitio-corpo .pegada-nome { cursor: default; }
+.sitio-corpo .trilha::before { bottom: 8px; }
+.semear-lista-sementes { list-style: none; margin: 0; padding: 0; }
+.semear-lista-sementes li { padding: 10px 0; border-top: 1px solid var(--musgo); display: flex; flex-direction: column; gap: 3px; }
+.semear-lista-sementes li span { color: var(--neblina-fraca); font-size: 14px; }
+.semear-lista-sementes li em { font-family: var(--mono); font-style: normal; font-size: 11px; color: var(--neblina-fraca); }
+.semear-lista-sementes li em b { font-weight: normal; }
+.semear-lista-sementes li .semear-motivo { color: var(--passou); }
+
 /* ── botões ─────────────────────────────────────────── */
 
 .bt-forte, .bt-fraco, .bt-linha {
