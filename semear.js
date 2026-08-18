@@ -28,7 +28,7 @@
   var FRASES = [
     'O que passou pela cabeça?',
     'Uma ideia para o sítio.',
-    'Pode ser vaga. Ele lapida depois.',
+    'Pode ser vaga. O Dan lapida depois.',
     'Semente não precisa de plano.'
   ];
   document.getElementById('frase').textContent = FRASES[Math.floor(Math.random() * FRASES.length)];
@@ -132,9 +132,19 @@
     return { historico: historico, abertas: abertas };
   }
 
+  /* O envelope só cabe em projeto PLANEJADO — é quando se sabe quanto custa e
+     ainda não se começou (§36). Antes disso não existe; depois, o app já parou
+     de olhar para dinheiro (§3) e sobra só o "orçado em". */
   function envelope(p) {
     if (p.custoEstimado === null || p.custoEstimado === undefined) return '';
-    return '<p class="sitio-envelope">' + esc(M.moeda(p.guardado)) + ' de ' + esc(M.moeda(p.custoEstimado)) + '</p>';
+    if (p.estado === 'preparo' && !p.papel) {
+      return '<p class="sitio-envelope">' + esc(M.moeda(p.guardado)) + ' de ' + esc(M.moeda(p.custoEstimado)) + '</p>';
+    }
+    // rodando ou concluído: só quanto foi orçado — o envelope já disparou
+    if ((p.papel === 'titular' || p.papel === 'reserva' || p.estado === 'concluido') && Number(p.custoEstimado) > 0) {
+      return '<p class="sitio-envelope">orçado em ' + esc(M.moeda(p.custoEstimado)) + '</p>';
+    }
+    return '';
   }
 
   /* Um cartão por projeto, fechado por padrão: nome, destino, etiqueta e a
@@ -199,7 +209,7 @@
       '</em></li>';
   }
 
-  function quemPlantou(s) { return s.autor === 'esposa' ? 'você' : 'ele'; }
+  function quemPlantou(s) { return M.nomeDe(s.autor); }
 
   function desenharSitio() {
     var termo = $busca.value.trim();
@@ -213,7 +223,8 @@
           (papel === 'planejamento' ? 'em planejamento' : papel) + '</span><em>vaga aberta</em></article>';
     }).join('');
 
-    var fila = projetos.filter(function (p) { return !p.papel && (p.estado === 'fila' || p.estado === 'preparo'); });
+    var planejadas = projetos.filter(function (p) { return !p.papel && p.estado === 'preparo'; });
+    var fila = projetos.filter(function (p) { return p.estado === 'fila'; });
     var parados = projetos.filter(function (p) { return p.estado === 'parado'; });
     var concluidos = projetos.filter(function (p) { return p.estado === 'concluido'; });
 
@@ -225,6 +236,7 @@
 
     $sitio.innerHTML =
       bloco('Em andamento', vagas) +
+      (planejadas.length ? bloco('Planejadas', planejadas.map(cartaoProjeto).join('')) : '') +
       bloco('Na fila', fila.map(cartaoProjeto).join(''), 'Nenhum pré-projeto na fila.') +
       bloco('Avulsas abertas', avulsas.length ? '<ul class="sitio-tarefas">' + avulsas.map(linhaAvulsa).join('') + '</ul>' : '', 'Nenhuma tarefa avulsa aberta.') +
       bloco('Sementes', sementes.length ? '<ul class="semear-lista-sementes">' + sementes.map(function (s) {

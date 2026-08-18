@@ -234,6 +234,11 @@ var Modelo = (function () {
 
   /* Semente plantada é EVENTO no diário de quem plantou — bota, esposa, mesa.
      Assim a bota nunca escreve no catálogo, e o diário dela viaja como sempre. */
+  /* Quem é quem, pelo nome — na semente e onde mais aparecer. Uma pessoa é
+     `pe_<x>` no diário e `autor` curto na semente; os dois caem aqui. */
+  var NOMES = { pe_eu: 'Dan', eu: 'Dan', pe_esposa: 'Márcia', esposa: 'Márcia' };
+  function nomeDe(pessoaOuAutor) { return NOMES[pessoaOuAutor] || pessoaOuAutor || ''; }
+
   function semear(quem, texto) {
     var s = novaSemente(texto);
     s.autor = quem === 'pe_eu' ? 'eu' : 'esposa';
@@ -549,8 +554,9 @@ var Modelo = (function () {
   // ── derivações ────────────────────────────────────────────────────
 
   /* O que se lê na coluna. Titular, reserva e planejamento são escolhidos;
-     pré-projeto, juntando e pronto CAEM SOZINHOS conforme o custo aparece e o
-     envelope enche — o usuário não escolhe esses três. */
+     planejada e pronta CAEM SOZINHAS conforme o planejamento fecha e o envelope
+     enche. Dinheiro só existe depois de planejar (§36): na fila todo projeto é
+     pré-projeto, sem custo — orçar é trabalho da vaga de planejamento. */
   function etiquetaDe(p) {
     if (p.papel === 'titular')      return { chave: 'titular', texto: 'titular' };
     if (p.papel === 'reserva')      return { chave: 'reserva', texto: 'reserva' };
@@ -560,14 +566,7 @@ var Modelo = (function () {
         ? { chave: 'pronto', texto: 'planejada · pronta' }
         : { chave: 'planejada', texto: 'planejada' };
     }
-    if (p.estado === 'fila') {
-      if (p.custoEstimado === null || p.custoEstimado === undefined) {
-        return { chave: 'pre', texto: 'pré-projeto' };
-      }
-      return envelopeCheio(p)
-        ? { chave: 'pronto', texto: 'pronto' }
-        : { chave: 'juntando', texto: 'juntando dinheiro' };
-    }
+    if (p.estado === 'fila') return { chave: 'pre', texto: 'pré-projeto' };
     var s = SITUACOES.filter(function (x) { return x.v === situacaoDe(p); })[0];
     return { chave: p.estado, texto: s ? s.t : p.estado };
   }
@@ -659,12 +658,11 @@ var Modelo = (function () {
   function motivoTrancado(p) {
     if (['ativo', 'preparo', 'concluido', 'encerrado'].indexOf(p.estado) !== -1) return null;
 
+    // na fila só pré-requisito tranca: dinheiro é assunto de projeto planejado
     var faltando = prerequisitosPendentes(p);
     if (faltando.length) {
       return 'Espera ' + faltando.map(function (q) { return q.nome || 'projeto sem nome'; }).join(' e ') + '.';
     }
-    if (p.custoEstimado === null || p.custoEstimado === undefined) return 'Sem orçamento levantado.';
-    if (!envelopeCheio(p)) return 'Faltam ' + moeda(p.custoEstimado - p.guardado) + '.';
     return null;
   }
 
@@ -1720,6 +1718,7 @@ var Modelo = (function () {
     // sincronização
     quandoSalvar: quandoSalvar, receberCatalogo: receberCatalogo, unirDiario: unirDiario,
     semear: semear, absorverSementes: absorverSementes, sementesDe: sementesDe,
+    nomeDe: nomeDe,
 
     // diário
     derivar: derivar, tarefasVivas: tarefasVivas, desimpedida: desimpedida,

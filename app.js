@@ -170,8 +170,7 @@
       ' data-abrir="projeto" data-id="' + p.id + '"' + (atual ? ' aria-current="true"' : '') + '>' +
       '<span class="item-etiqueta"><i class="pino"></i>' + esc(r.texto) + '</span>' +
       '<span class="item-nome">' + esc(p.nome || 'sem nome') + '</span>' +
-      (p.custoEstimado !== null && p.custoEstimado !== undefined && p.estado !== 'ativo'
-        ? barraEnvelope(p) : '') +
+      (mostraEnvelope(p) ? barraEnvelope(p) : '') +
       (nota ? '<span class="item-nota">' + esc(nota) + '</span>' : '') +
       '</button></li>';
   }
@@ -197,6 +196,14 @@
         (nivel ? '<span class="ponto ponto-' + nivel + '"></span>' : '') + esc(nome) +
       '</span>' +
       '<span class="item-nota">' + esc(nota) + '</span></button></li>';
+  }
+
+  /* O envelope só aparece em projeto PLANEJADO (§36): é quando se sabe quanto
+     custa e ainda não se começou. Na fila é chute; em planejamento está sendo
+     levantado; rodando, já disparou. Só o "orçado em" sobrevive na obra. */
+  function mostraEnvelope(p) {
+    return p.estado === 'preparo' && !p.papel &&
+      p.custoEstimado !== null && p.custoEstimado !== undefined;
   }
 
   /* Barra do envelope: "X de X", nunca porcentagem. O valor tem lastro —
@@ -546,19 +553,20 @@
 
       /* O envelope é gatilho de entrada: dispara uma vez e some. Num projeto já
          rodando ele não decide mais nada, e ficar mostrando dinheiro no meio da
-         obra é convidar a virar controle financeiro, que ele não é. */
-      (p.papel === 'titular' || p.papel === 'reserva' ||
-       p.estado === 'concluido' || p.estado === 'encerrado')
+         obra é convidar a virar controle financeiro, que ele não é. E antes de
+         planejar não existe (§36): orçar é trabalho da vaga de planejamento —
+         em planejamento os campos aparecem para receber o número; a barra, só
+         quando o projeto está planejado. */
+      !(p.papel === 'planejamento' || (p.estado === 'preparo' && !p.papel))
         ? ''
         : grupo('Envelope', '',
             // a barra é a leitura; os campos são só o jeito de mexer nela
-            (p.custoEstimado === null || p.custoEstimado === undefined
-              ? '' : '<div class="envelope-largo">' + barraEnvelope(p) + '</div>') +
+            (mostraEnvelope(p) ? '<div class="envelope-largo">' + barraEnvelope(p) + '</div>' : '') +
             '<div class="grade">' +
             campoTexto('projeto', p.id, 'custoEstimado', 'Custo estimado', p.custoEstimado,
               { numero: true, min: 0, travado: !solto,
-                ajuda: 'Deixe vazio enquanto não houver orçamento levantado — é o vazio que mantém ' +
-                       'o projeto como pré-projeto. Preenchido, ele passa a juntar dinheiro.' }) +
+                ajuda: 'O que o planejamento levantou. Sem ele a planejada não sobe: ' +
+                       'o app diz "sem orçamento levantado".' }) +
             // escapa do cadeado normal (aporte é rotina), mas não do modo consulta
             campoTexto('projeto', p.id, 'guardado', 'Guardado', p.guardado, { numero: true, min: 0,
               travado: consulta,
@@ -723,8 +731,7 @@
         '<span class="ficha-nome">' + esc(p.resultado || p.nome || 'sem nome') + '</span>' +
         (p.resultado && p.nome ? '<span class="ficha-obra">' + esc(p.nome) + '</span>' : '') +
         (falta ? '<span class="item-nota">' + esc(falta) + '</span>' : '') +
-        (p.custoEstimado !== null && p.custoEstimado !== undefined && p.estado !== 'ativo'
-          ? barraEnvelope(p) : '') +
+        (mostraEnvelope(p) ? barraEnvelope(p) : '') +
         (idade >= 60 && p.estado !== 'ativo'
           ? '<span class="ficha-idade">parado há ' + idade + ' dias</span>' : '') +
       '</button>' +
@@ -1691,7 +1698,7 @@
 
     // quem plantou e quando: a semente dela e a sua não se confundem
     var cabeca = '<p class="semente-autor">' +
-      (s.autor === 'esposa' ? 'plantada por ela' : 'plantada por você') +
+      'plantada por ' + esc(M.nomeDe(s.autor)) +
       ' · ' + esc(M.formatarData(M.diaDe(s.criadaEm))) +
       ' <span class="semente-estado semente-estado-' + grupoDaSemente(s) + '">' +
         esc(ROTULO_ESTADO_SEMENTE[s.estado]) + '</span></p>';
@@ -1713,7 +1720,7 @@
         '</div>';
     } else if (descartando) {
       rodape = '<div class="semente-descarte">' +
-        '<label for="motivo_' + s.id + '">Por que descartar? Ela vai ler isto.</label>' +
+        '<label for="motivo_' + s.id + '">Por que descartar? A Márcia vai ler isto.</label>' +
         '<input type="text" id="motivo_' + s.id + '" value="' + esc(s.motivo) + '"' +
           ' placeholder="já existe como tarefa · não é do sítio · conversamos e caiu">' +
         '<div class="rodape-acoes">' +
