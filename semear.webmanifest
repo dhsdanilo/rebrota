@@ -1,7 +1,7 @@
 {
-  "name": "Sementeira",
-  "short_name": "Sementeira",
-  "description": "Uma ideia para o sítio. Ele lapida depois.",
+  "name": "Rebrota",
+  "short_name": "Rebrota",
+  "description": "Rebrota — sementeira. Uma ideia para o sítio; ele lapida depois.",
   "id": "./semear.html",
   "start_url": "./semear.html",
   "scope": "./",
