@@ -1080,6 +1080,9 @@ var Modelo = (function () {
     var trava = vistaDe(t.id).travadaPor;
     if (trava && estadoDe(trava) !== 'feita') return false;
 
+    // espera algo chegar (§40): material na loja, resposta de terceiro
+    if (esperasDe(t.id).length) return false;
+
     /* Cancelada conta como resolvida: você decidiu que aquilo não vai
        acontecer, e segurar o que vem depois por causa de uma decisão sua já
        tomada é o app teimando contra você. */
@@ -1096,6 +1099,8 @@ var Modelo = (function () {
   /* Por que esta tarefa não está disponível — sempre apontando para uma
      decisão sua, nunca para uma regra do app. */
   function porQueEspera(t) {
+    var esp = esperasDe(t.id)[0];
+    if (esp) return 'espera ' + esp.descricao + ' — ' + textoPendencia(esp).toLowerCase().replace(/\.$/, '');
     var trava = vistaDe(t.id).travadaPor;
     if (trava && estadoDe(trava) !== 'feita') {
       var p = tarefa(trava);
@@ -1244,6 +1249,26 @@ var Modelo = (function () {
     cat().pendencias.push(x);
     salvar();
     return x;
+  }
+
+  /* A espera VINCULADA (§40): "esta tarefa espera isto chegar". Enquanto a
+     pendência estiver aberta, a tarefa fica trancada — sai do páreo da bota e
+     a mesa diz o quê e quando. Chegou destranca; cancelada gera a tarefa de
+     resolver, no projeto certo. */
+  function esperarPara(tid, descricao, previsto) {
+    var t = tarefa(tid);
+    descricao = (descricao || '').trim();
+    if (!t || !descricao) return null;
+    var x = novaPendencia(descricao);
+    x.tarefaId = tid;
+    x.projetoId = t.projetoId || null;
+    if (previsto) x.previsto = previsto;
+    cat().pendencias.push(x);
+    salvar();
+    return x;
+  }
+  function esperasDe(tid) {
+    return cat().pendencias.filter(function (x) { return x.tarefaId === tid && !x.resolvida; });
   }
 
   /* Chegou: destrava a tarefa vinculada. Cancelada: gera a tarefa de resolver,
@@ -2081,6 +2106,7 @@ var Modelo = (function () {
     blocoDe: blocoDe, janelaDoPreset: janelaDoPreset,
 
     pendenciasAbertas: pendenciasAbertas, nivelPendencia: nivelPendencia,
+    esperarPara: esperarPara, esperasDe: esperasDe,
     textoPendencia: textoPendencia, inserirPendencia: inserirPendencia,
     resolverPendencia: resolverPendencia,
 

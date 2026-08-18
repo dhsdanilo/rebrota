@@ -433,6 +433,18 @@ button, input, select, textarea {
   .folha-texto em, .folha-texto span, .folha-n, .folha-total { color: #333; }
 }
 
+/* ── espera vinculada (§40) ───────────────────────────── */
+.passo-espera { padding: 6px 0 4px 40px; display: flex; flex-direction: column; gap: 6px; }
+.espera-item { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--neblina-fraca); flex-wrap: wrap; }
+.espera-item b { color: var(--neblina); font-weight: 500; }
+.espera-nova { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+.espera-nova input { background: var(--mata); border: 1px solid var(--musgo); border-radius: var(--raio); color: var(--neblina); padding: 5px 8px; font-size: 14px; }
+.espera-nova input[type="text"] { min-width: 260px; flex: 1; }
+.aviso-espera.espera-verde { color: var(--dentro); }
+.aviso-espera.espera-amarelo { color: var(--beirada); }
+.aviso-espera.espera-vermelho { color: var(--passou); }
+.pendencia-nota em { color: var(--neblina); font-style: normal; }
+
 /* ── botões ─────────────────────────────────────────── */
 
 .bt-forte, .bt-fraco, .bt-linha {

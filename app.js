@@ -32,6 +32,7 @@
   var mudaAviso = '';              // o que faltou para a muda ficar pronta, no último toque
   var mudaAvisoDe = null;          // …e de qual muda, para não vazar para a ficha de outra
   var diaristaMetade = null;       // linha da folha com o campo "sobrou quanto?" aberto
+  var esperando = null;            // tarefa com o campo "espera algo chegar" aberto
   var sementeDescartando = null;   // semente com o campo de motivo aberto
   var voltarPara = null;           // de onde se veio, para poder folhear
 
@@ -1380,9 +1381,35 @@
           : '<button type="button" class="bt-linha bt-mini" data-acao="editar-passo" data-id="' + t.id + '">editar</button>') +
       '</div>' +
 
+      (M.esperasDe(t.id).length && !aberto
+        ? '<div class="passo-avisos">' + M.esperasDe(t.id).map(function (x) {
+            return '<span class="aviso-linha aviso-espera espera-' + M.nivelPendencia(x) + '">espera ' + esc(x.descricao) +
+              ' · ' + esc(M.textoPendencia(x).toLowerCase().replace(/\.$/, '')) + '</span>'; }).join('') + '</div>'
+        : '') +
       (avisos.length && !aberto
         ? '<div class="passo-avisos">' + avisos.map(function (a) {
             return '<span class="aviso-linha">' + esc(a) + '</span>'; }).join('') + '</div>'
+        : '') +
+      // §40: o que esta tarefa espera chegar — e o campo para dizer que espera mais
+      (aberto && !emConsulta(t.projetoId) && !fechada(t)
+        ? '<div class="passo-espera">' +
+            M.esperasDe(t.id).map(function (x) {
+              return '<div class="espera-item espera-' + M.nivelPendencia(x) + '">' +
+                '<span class="ponto ponto-' + M.nivelPendencia(x) + '"></span>' +
+                '<span class="espera-texto">espera <b>' + esc(x.descricao) + '</b> · ' + esc(M.textoPendencia(x)) + '</span>' +
+                '<button type="button" class="bt-fraco bt-mini" data-acao="pendencia-chegou" data-id="' + x.id + '">chegou</button>' +
+                '<button type="button" class="bt-linha bt-mini" data-acao="pendencia-cancelada" data-id="' + x.id + '">cancelada</button>' +
+                '</div>';
+            }).join('') +
+            (esperando === t.id
+              ? '<div class="espera-nova">' +
+                  '<input type="text" id="esperaDesc_' + t.id + '" placeholder="o quê? — tela fina 1 m, agroloja">' +
+                  '<input type="date" id="esperaDia_' + t.id + '" value="' + esc(M.hoje()) + '">' +
+                  '<button type="button" class="bt-forte bt-mini" data-acao="esperar-confirmar" data-id="' + t.id + '">esperar</button>' +
+                  '<button type="button" class="bt-linha bt-mini" data-acao="esperar-cancelar">deixa</button>' +
+                '</div>'
+              : '<button type="button" class="bt-linha bt-mini" data-acao="esperar-abrir" data-id="' + t.id + '">espera algo chegar</button>') +
+          '</div>'
         : '') +
       (aberto
         ? '<div class="passo-corpo">' + formularioPasso(t, null, !solto) + '</div>'
@@ -1830,7 +1857,7 @@
 
     return [
       '<h2>Aguardando</h2>',
-      '<p class="palco-sub">O que depende de outro e tem data. Você vem aqui; isto nunca vai atrás de você.</p>',
+      '<p class="palco-sub">O que depende de outro e tem data. Você vem aqui; isto nunca vai atrás de você. Espera aberta de dentro de uma tarefa segura a tarefa até chegar.</p>',
 
       '<div class="junta" style="max-width:900px">',
         '<input type="text" id="campoPendencia" placeholder="tela fina 1 m — agroloja">',
@@ -1857,7 +1884,13 @@
       '<div class="pendencia-corpo">' +
         '<input type="text" class="pendencia-nome" data-alvo="pendencia" data-id="' + x.id +
           '" data-campo="descricao" value="' + esc(x.descricao) + '">' +
-        '<span class="pendencia-nota">' + esc(M.textoPendencia(x)) + '</span>' +
+        '<span class="pendencia-nota">' + esc(M.textoPendencia(x)) +
+          (x.tarefaId && M.tarefa(x.tarefaId)
+            ? ' · segura <em>' + esc(M.tarefa(x.tarefaId).texto) + '</em>' +
+              (M.tarefa(x.tarefaId).projetoId && M.projeto(M.tarefa(x.tarefaId).projetoId)
+                ? ' (' + esc(M.projeto(M.tarefa(x.tarefaId).projetoId).nome) + ')' : '')
+            : '') +
+        '</span>' +
       '</div>' +
       '<input type="date" class="pendencia-data" data-alvo="pendencia" data-id="' + x.id +
         '" data-campo="previsto" value="' + esc(x.previsto) + '">' +
@@ -2565,6 +2598,15 @@
       var desc = valorDoCampo('campoPendencia');
       if (!desc) return;
       M.inserirPendencia(desc);
+      return desenhar();
+    }
+    if (acao === 'esperar-abrir')  { esperando = tid; return desenharPalco(); }
+    if (acao === 'esperar-cancelar') { esperando = null; return desenharPalco(); }
+    if (acao === 'esperar-confirmar') {
+      var oque = valorDoCampo('esperaDesc_' + tid);
+      if (!oque) { var c = document.getElementById('esperaDesc_' + tid); if (c) c.focus(); return; }
+      M.esperarPara(tid, oque, valorDoCampo('esperaDia_' + tid));
+      esperando = null;
       return desenhar();
     }
     if (acao === 'pendencia-chegou')    { M.resolverPendencia(tid, 'chegou'); return desenhar(); }
