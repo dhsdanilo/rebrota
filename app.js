@@ -2057,11 +2057,9 @@
       ' <span class="semente-estado semente-estado-' + grupoDaSemente(s) + '">' +
         esc(ROTULO_ESTADO_SEMENTE[s.estado]) + '</span></p>';
 
-    // um texto só: a ideia como foi despejada. O nome sai sozinho da primeira
-    // frase (é o que as listas e a muda usam); o porquê é trabalho da muda.
-    var campos = '<div class="semente-ideia">' +
-      '<textarea rows="3" id="c_' + s.id + '_frase" data-alvo="semente" data-id="' + s.id + '" data-campo="frase"' +
-      (virou ? ' readonly' : ' placeholder="a ideia, como veio"') + '>' + esc(s.frase) + '</textarea></div>';
+    // um texto só, e só leitura: a ideia como foi despejada — ditou torto, a
+    // muda refina no "o que é"; e a semente da Márcia é dela. Não se edita.
+    var campos = '<p class="semente-texto">' + esc(s.frase || s.nome) + '</p>';
 
     var rodape;
     if (virou) {

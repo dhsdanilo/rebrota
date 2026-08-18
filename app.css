@@ -203,12 +203,10 @@ button, input, select, textarea {
 .semente-destinos { justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
 .semente-seletor { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
 .semente-motivo { margin: 10px 0 0; font-size: 13px; color: var(--passou); }
-.semente-ideia textarea {
-  width: 100%; max-width: 900px; background: var(--mata); border: 1px solid var(--musgo); border-radius: var(--raio);
-  color: var(--neblina); padding: 10px 12px; font-family: inherit; font-size: 16px; line-height: 1.45; resize: vertical;
-}
-.semente-ideia textarea:focus { border-color: var(--rebrota); outline: none; }
-.semente-ideia textarea[readonly] { background: none; border-color: transparent; padding-left: 0; }
+/* o cartão inteiro numa largura só: texto e botões alinhados pela mesma borda */
+.semente-cartao { max-width: 900px; }
+.semente-texto { margin: 4px 0 0; font-size: 17px; line-height: 1.45; color: var(--neblina); white-space: pre-wrap; }
+.semente-cartao .rodape-acoes { margin-top: 16px; }
 .semente-descarte { margin-top: 12px; max-width: 560px; }
 .semente-descarte label { display: block; font-size: 12px; color: var(--neblina-fraca); margin-bottom: 6px; }
 .semente-descarte input {
