@@ -246,6 +246,7 @@
      montar o palco, ele mostra o erro e um caminho de volta em vez de meia
      tela quebrada. Ação dentro do app tem que ser barata de desfazer. */
   function desenharPalco() {
+    guardarLugar();
     var html;
     try {
       var construtor = TELAS[tela.tipo];
@@ -2138,7 +2139,34 @@
 
   /* Com tarefa ativa, o que cria coisa nova some da coluna: o app inteiro entra
      em consulta, menos o projeto da tarefa. */
+  /* Recarregar não custa o lugar (F5 é reflexo, não decisão): a tela da mesa —
+     página, ficha aberta, filtros — fica na sessão da aba e volta ao abrir. Só
+     na mesa: a bota abre sempre na pergunta, de propósito. */
+  var CHAVE_LUGAR = 'app-sitio-lugar';
+  function guardarLugar() {
+    if (!naMesa()) return;
+    try {
+      sessionStorage.setItem(CHAVE_LUGAR, JSON.stringify({
+        tela: tela, passoAberto: passoAberto, filtroProjetos: filtroProjetos,
+        filtroAvulsas: filtroAvulsas, filtroSementes: filtroSementes
+      }));
+    } catch (e) {}
+  }
+  function voltarAoLugar() {
+    if (!naMesa()) return;
+    var l = null;
+    try { l = JSON.parse(sessionStorage.getItem(CHAVE_LUGAR)); } catch (e) {}
+    if (!l || !l.tela) return;
+    if (l.tela.tipo === 'projeto' && !M.projeto(l.tela.id)) return;
+    tela = l.tela;
+    passoAberto = l.passoAberto && M.tarefa(l.passoAberto) ? l.passoAberto : null;
+    filtroProjetos = l.filtroProjetos || '';
+    filtroAvulsas = l.filtroAvulsas || '';
+    filtroSementes = l.filtroSementes || 'nova';
+  }
+
   function desenhar() {
+    guardarLugar();
     // o que a regra já decidiu, aplicado antes de desenhar — em todo redesenho,
     // não só na abertura: arraste, apagar e edição também fecham planejamento
     if (M.cascatearVagas().length) colherAvisos();
@@ -3226,6 +3254,7 @@
   conferirProposta();
   desenharProposta();
   if (naMesa()) M.absorverSementes();
+  voltarAoLugar();
   desenhar();
   Sync.iniciar();
   desenharNuvem();
