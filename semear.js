@@ -60,8 +60,8 @@
      traz da mesa; a semente que a mesa ainda não viu é simplesmente nova.
      Nada some: descartada vem com o motivo que ele escreveu — é o combinado. */
   var ESTADO = {
-    nova: 'nova', descartada: 'descartada', projeto: 'pode virar projeto',
-    tarefa: 'pode virar tarefa', virou_projeto: 'virou projeto', virou_tarefa: 'virou tarefa'
+    nova: 'nova', descartada: 'descartada', projeto: 'pode virar muda',
+    tarefa: 'pode virar tarefa', virou_projeto: 'virou muda', virou_tarefa: 'virou tarefa'
   };
 
   function estadoDela(s) {
@@ -155,13 +155,24 @@
     var e = M.etiquetaDe(p);
     var x = feitasEAbertas(p);
     var aberto = !!abertos[p.id];
-    var resumo = [
-      x.historico.length ? x.historico.length + ' feita' + (x.historico.length === 1 ? '' : 's') : '',
-      x.abertas.length ? x.abertas.length + ' por fazer' : ''
-    ].filter(Boolean).join(' · ') || 'sem tarefas ainda';
+    var ehMuda = p.estado === 'fila' || p.estado === 'descartado';
+    var resumo = ehMuda
+      ? (p.estado === 'descartado' ? 'descartada: ' + (p.muda.motivo || '') : M.leituraFria(p) || (p.muda.estado === 'pronta' ? 'pronta, esperando vaga' : 'sendo lapidada'))
+      : [
+          x.historico.length ? x.historico.length + ' feita' + (x.historico.length === 1 ? '' : 's') : '',
+          x.abertas.length ? x.abertas.length + ' por fazer' : ''
+        ].filter(Boolean).join(' · ') || 'sem tarefas ainda';
 
     var corpo = '';
-    if (aberto) {
+    if (aberto && ehMuda) {
+      function lidas(titulo, l) {
+        var vivas = M.cadeiasVivas(l);
+        return vivas.length ? '<h4>' + titulo + '</h4><ul class="cadeias-lidas">' + vivas.map(function (c) {
+          return '<li>' + c.map(esc).join(' <span class="seta">→</span> ') + '</li>'; }).join('') + '</ul>' : '';
+      }
+      corpo = '<div class="sitio-corpo">' + lidas('vantagens', p.muda.vantagens) + lidas('desvantagens', p.muda.desvantagens) +
+        (p.muda.sentimento ? '<h4>como o Dan se sentiria</h4><p class="sitio-texto">' + esc(p.muda.sentimento) + '</p>' : '') + '</div>';
+    } else if (aberto) {
       var plan = x.abertas.filter(function (t) { return t.etapa === 'planejamento'; });
       var exec = x.abertas.filter(function (t) { return t.etapa !== 'planejamento'; });
       function listaAbertas(titulo, lista) {
@@ -227,6 +238,7 @@
     var fila = projetos.filter(function (p) { return p.estado === 'fila'; });
     var parados = projetos.filter(function (p) { return p.estado === 'parado'; });
     var concluidos = projetos.filter(function (p) { return p.estado === 'concluido'; });
+    var descartadas = projetos.filter(function (p) { return p.estado === 'descartado'; });
 
     var avulsas = M.avulsas().filter(function (t) {
       var s = M.estadoDe(t.id); return s !== 'feita' && s !== 'encerrada';
@@ -237,12 +249,13 @@
     $sitio.innerHTML =
       bloco('Em andamento', vagas) +
       (planejadas.length ? bloco('Planejadas', planejadas.map(cartaoProjeto).join('')) : '') +
-      bloco('Na fila', fila.map(cartaoProjeto).join(''), 'Nenhum pré-projeto na fila.') +
+      bloco('Mudas', fila.map(cartaoProjeto).join(''), 'Nenhuma muda plantada.') +
       bloco('Avulsas abertas', avulsas.length ? '<ul class="sitio-tarefas">' + avulsas.map(linhaAvulsa).join('') + '</ul>' : '', 'Nenhuma tarefa avulsa aberta.') +
       bloco('Sementes', sementes.length ? '<ul class="semear-lista-sementes">' + sementes.map(function (s) {
         return linhaSemente(s, s, quemPlantou(s)); }).join('') + '</ul>' : '', 'Nenhuma semente ainda.') +
       (parados.length ? bloco('Suspensos', parados.map(cartaoProjeto).join('')) : '') +
-      (concluidos.length ? bloco('Concluídos', concluidos.map(cartaoProjeto).join('')) : '');
+      (concluidos.length ? bloco('Concluídos', concluidos.map(cartaoProjeto).join('')) : '') +
+      (descartadas.length ? bloco('Mudas descartadas', descartadas.map(cartaoProjeto).join('')) : '');
   }
 
   function desenharBusca(termo) {

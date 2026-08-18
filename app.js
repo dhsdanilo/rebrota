@@ -29,6 +29,7 @@
   var filtroProjetos = '';         // grupo aberto na página de projetos
   var filtroAvulsas = '';          // grupo aberto na página das avulsas
   var filtroSementes = 'nova';     // a caixa de entrada abre no que não tem destino
+  var mudaAviso = '';              // o que faltou para a muda ficar pronta, no último toque
   var sementeDescartando = null;   // semente com o campo de motivo aberto
   var voltarPara = null;           // de onde se veio, para poder folhear
 
@@ -179,7 +180,7 @@
   function itemVagaAberta(v) {
     var prontas = M.planejadas().filter(M.aptaParaExecucao).length;
     var chamada = v.papel === 'planejamento'
-      ? 'escolher um pré-projeto'
+      ? 'escolher uma muda pronta'
       : prontas ? 'escolher entre ' + prontas + (prontas === 1 ? ' pronta' : ' prontas') : 'nada pronto ainda';
 
     return '<li><button type="button" class="item-projeto item-vaga vaga-' + v.papel + '"' +
@@ -536,9 +537,16 @@
           : '<button type="button" class="bt-fraco" data-acao="editar-projeto" data-id="' + p.id + '">editar</button>',
       '</div>',
 
+      /* A MUDA (§37): enquanto o projeto espera vaga, o trabalho é lapidar a
+         ideia — e a ficha é essa lapidação. Depois de virar obra, a muda fica
+         guardada num grupo fechado no pé: registro, não formulário. */
+      (p.estado === 'fila' || p.estado === 'descartado') ? fichaMuda(p, consulta) : '',
+
       /* A motivação é o argumento do projeto, não um campo de cadastro: fica
          numa caixa citada, em itálico, para se ler como lembrete e não como
-         mais uma linha de formulário. */
+         mais uma linha de formulário. Na muda ela ainda não existe — as
+         vantagens é que viram motivação quando a muda entra em planejamento. */
+      (p.estado === 'fila' || p.estado === 'descartado') ? '' :
       grupo('Motivação', '',
         '<div class="caixa-motivacao">' +
           '<textarea class="area-motivacao" rows="' + Math.max(2, (p.ganhos || []).length) + '"' +
@@ -548,6 +556,10 @@
         '</div>',
         'Um ganho por linha: o que esta obra compra para você em troca do trabalho. É o que se ' +
         'lê meses depois, quando a vontade acabou e você precisa lembrar por que começou.'),
+
+      // a muda que esta obra foi: guardada, fechada, para ler quando a vontade acabar
+      (p.estado !== 'fila' && p.estado !== 'descartado' && M.cadeiasVivas(p.muda.vantagens).length)
+        ? grupoRecolhido('A muda que isto foi', p.id, resumoMuda(p)) : '',
 
       caixaAcao(p),
 
@@ -562,6 +574,10 @@
         : grupo('Envelope', '',
             // a barra é a leitura; os campos são só o jeito de mexer nela
             (mostraEnvelope(p) ? '<div class="envelope-largo">' + barraEnvelope(p) + '</div>' : '') +
+            // a muda estimou por cima; o orçamento de verdade é trabalho daqui
+            (p.papel === 'planejamento' && (p.custoEstimado === null || p.custoEstimado === undefined) &&
+             Number(p.muda.despesas.inicial) > 0
+              ? '<p class="aviso" style="margin:0 0 10px">A muda estimava ' + esc(M.moeda(p.muda.despesas.inicial)) + ' por cima.</p>' : '') +
             '<div class="grade">' +
             campoTexto('projeto', p.id, 'custoEstimado', 'Custo estimado', p.custoEstimado,
               { numero: true, min: 0, travado: !solto,
@@ -586,11 +602,13 @@
             'Projetos que precisam estar concluídos antes deste. Enquanto faltar um, este fica ' +
             'com a porta trancada e o motivo aparece em texto seco na coluna da esquerda.'),
 
+      (p.estado === 'fila' || p.estado === 'descartado') ? '' :
       secaoEtapa(p, 'planejamento', 'Planejamento',
         'Decidir como vai ser feito, medir, conferir o que já existe, orçar e comprar. ' +
         'Enquanto sobrar uma tarefa aberta aqui, a execução fica segura — planejar é o prazer ' +
         'e executar é o gargalo, então vale gastar o tempo aqui antes de mexer na terra.'),
       // o estado fica na tela; a explicação da regra vai para o hover
+      (p.estado === 'fila' || p.estado === 'descartado') ? '' :
       secaoEtapa(p, 'execucao', 'Execução',
         'O trabalho em si. Nenhuma destas é oferecida enquanto houver uma tarefa de ' +
         'planejamento aberta neste projeto.',
@@ -602,6 +620,179 @@
       // as saídas ficam aqui embaixo, pequenas: existem, mas não convidam
       consulta ? '' : peDoProjeto(p)
     ].join('');
+  }
+
+  // ── a ficha da muda (§37) ─────────────────────────────────────────
+
+  /* CADEIAS: cada linha é uma razão (ou desvantagem) puxada até esgotar. Os
+     elos são caixas em sequência; a última é sempre vazia, com a pergunta que
+     puxa — deixou vazia, a cadeia acabou. A linha vazia do fim começa outra.
+     A tela não redesenha a cada tecla: o `input` só acrescenta caixa quando um
+     elo vazio ganha texto; o redesenho fica para quando um elo é apagado. */
+  function cadeias(p, campo, cadeiaLista, pergunta, novaLinha, editavel) {
+    var vivas = editavel ? cadeiaLista : M.cadeiasVivas(cadeiaLista);
+    var linhas = vivas.map(function (c, i) {
+      var elos = c.map(function (texto, j) { return elo(p, campo, i, j, texto, editavel, pergunta, j === 0); });
+      if (editavel) elos.push(elo(p, campo, i, c.length, '', true, pergunta, false));
+      return '<li class="cadeia">' + elos.join('<span class="seta" aria-hidden="true">→</span>') + '</li>';
+    });
+    if (editavel) {
+      linhas.push('<li class="cadeia cadeia-nova">' +
+        elo(p, campo, vivas.length, 0, '', true, novaLinha, true) + '</li>');
+    }
+    return '<ol class="cadeias" data-cadeias="' + campo + '">' +
+      (linhas.length ? linhas.join('') : '<li class="aviso">—</li>') + '</ol>';
+  }
+  function elo(p, campo, i, j, texto, editavel, pergunta, primeiro) {
+    if (!editavel) return '<span class="elo elo-lido">' + esc(texto) + '</span>';
+    // a caixa cresce com o texto: elo longo não pode ficar cortado
+    return '<input type="text" class="elo' + (texto ? '' : ' elo-vazio') + '"' +
+      ' size="' + Math.min(48, Math.max(14, (texto || pergunta).length + 2)) + '"' +
+      ' data-muda="' + campo + '" data-id="' + p.id + '" data-linha="' + i + '" data-elo="' + j + '"' +
+      ' placeholder="' + esc(primeiro && j === 0 && !texto ? pergunta : (j === 0 ? '' : pergunta)) + '"' +
+      ' value="' + esc(texto) + '">';
+  }
+
+  /* O centro: quando duas cadeias terminam na mesma coisa. É leitura, não
+     campo — o app só aponta a convergência quando ela existe. */
+  function centroDe(lista) {
+    var fins = {};
+    M.cadeiasVivas(lista).forEach(function (c) {
+      var fim = c[c.length - 1].trim().toLowerCase();
+      if (fim) fins[fim] = (fins[fim] || 0) + 1;
+    });
+    var melhor = Object.keys(fins).sort(function (a, b) { return fins[b] - fins[a]; })[0];
+    return melhor && fins[melhor] >= 2 ? { texto: melhor, n: fins[melhor] } : null;
+  }
+
+  function contagem(lista, minimo, singular, plural) {
+    var n = M.cadeiasVivas(lista).length;
+    return '<span class="cadeias-conta">' + n + ' ' + (n === 1 ? singular : plural) +
+      (n < minimo ? ' · pronta pede ' + minimo : '') + '</span>';
+  }
+
+  function fichaMuda(p, consulta) {
+    var m = p.muda, d = m.despesas;
+    var editavel = m.estado === 'plantando' && !consulta;
+    var falta = M.faltaParaPronta(p);
+    var centro = centroDe(m.vantagens);
+    var outros = M.cat().projetos.filter(function (q) { return q.id !== p.id && q.estado !== 'descartado' && q.estado !== 'concluido' && q.estado !== 'encerrado'; });
+
+    // o estado da muda e o botão que o vira
+    var cabeca;
+    if (m.estado === 'descartada') {
+      cabeca = '<span class="muda-estado muda-descartada">descartada em ' + esc(M.formatarData(M.diaDe(m.descartadaEm))) + '</span>' +
+        '<p class="semente-motivo">' + esc(m.motivo) + '</p>' +
+        (consulta ? '' : '<button type="button" class="bt-fraco bt-mini" data-acao="muda-reabrir" data-id="' + p.id + '">reabrir a muda</button>');
+    } else if (m.estado === 'pronta') {
+      cabeca = '<span class="muda-estado muda-pronta">pronta desde ' + esc(M.formatarData(M.diaDe(m.prontaEm))) + '</span>' +
+        (consulta ? '' : '<button type="button" class="bt-linha bt-mini" data-acao="muda-plantar" data-id="' + p.id + '">voltar a lapidar</button>');
+    } else {
+      cabeca = '<span class="muda-estado muda-plantando">plantando</span>' +
+        (consulta ? '' :
+          '<button type="button" class="bt-forte bt-mini' + (falta.length ? ' bt-travado' : '') + '"' +
+            (falta.length ? ' title="' + esc('Falta: ' + falta.join(', ') + '.') + '"' : '') +
+            ' data-acao="muda-pronta" data-id="' + p.id + '">' + (falta.length ? CADEADO : '') + 'pronta</button>') +
+        (falta.length ? '<span class="muda-falta">' + esc(mudaAviso || ('Falta: ' + falta.join(', ') + '.')) + '</span>' : '');
+    }
+
+    function caixa(campo, rotulo, valor, dica) {
+      return '<div class="campo campo-largo"><label for="m_' + p.id + '_' + campo + '">' + esc(rotulo) + '</label>' +
+        '<textarea id="m_' + p.id + '_' + campo + '" rows="3" data-muda="' + campo + '" data-id="' + p.id + '"' +
+        (editavel ? ' placeholder="' + esc(dica) + '"' : ' readonly placeholder="—"') + '>' + esc(valor) + '</textarea></div>';
+    }
+    function numero(campo, rotulo, valor, dica) {
+      var vazio = valor === null || valor === undefined;
+      return '<div class="campo"><label for="m_' + p.id + '_' + campo + '">' + esc(rotulo) + '</label>' +
+        '<input type="number" min="0" id="m_' + p.id + '_' + campo + '" data-muda="' + campo + '" data-id="' + p.id + '"' +
+        (editavel ? ' placeholder="' + esc(dica || 'R$') + '"' : ' readonly placeholder="—"') +
+        ' value="' + (vazio ? '' : esc(valor)) + '"></div>';
+    }
+
+    return [
+      '<div class="secao secao-campos muda">',
+        '<div class="secao-titulo">Muda</div>',
+        '<div class="secao-corpo">',
+          '<div class="muda-cabeca">' + cabeca + '</div>',
+          '<p class="dica muda-dica">Lapidar a ideia até dar para decidir: toca ou muda o rumo. É sobre motivação — como e quando são planejamento.</p>',
+        '</div>',
+      '</div>',
+
+      grupo('O que é', '',
+        '<p class="muda-oquee">' + (p.nome ? esc(p.nome) : '<span class="aviso">escreva o nome lá em cima — a semente refinada numa coisa concreta</span>') + '</p>',
+        'A semente refinada numa coisa concreta: "criar cabras" vira "construir um capril". É o nome da obra.'),
+
+      grupo('Vantagens', '',
+        contagem(m.vantagens, 3, 'vantagem', 'vantagens') +
+        cadeias(p, 'vantagens', m.vantagens, 'e isso, para quê?', 'por que você quer isso? — uma razão', editavel) +
+        (centro ? '<p class="muda-centro">centro: <b>' + esc(centro.texto) + '</b> — ' + centro.n + ' razões chegam aqui</p>' : ''),
+        'Uma razão por linha, e cada razão puxada até o fim: "e isso, para quê?" Deixou a caixa vazia, a cadeia acabou. Quando duas cadeias terminam no mesmo lugar, o app aponta o centro.'),
+
+      grupo('Desvantagens', '',
+        contagem(m.desvantagens, 3, 'desvantagem', 'desvantagens') +
+        cadeias(p, 'desvantagens', m.desvantagens, 'e isso causa o quê?', 'uma desvantagem', editavel),
+        'Uma por linha, cada uma puxada até o fim: "e isso causa o quê?" Cuidado diário → menos tempo de manhã. O custo por cima, em palavras, cabe aqui também.'),
+
+      grupo('Despesas', '',
+        '<div class="grade">' +
+          numero('inicial', 'Valor inicial estimado', d.inicial, 'por cima; 0 se não custa') +
+          numero('fixaMensal', 'Valor fixo mensal', d.fixaMensal, 'por cima; 0 se não tem') +
+          '<div class="campo"><label for="m_' + p.id + '_geraProduto">Gera produto ou serviço?</label>' +
+            '<select id="m_' + p.id + '_geraProduto" data-muda="geraProduto" data-id="' + p.id + '"' + (editavel ? '' : ' disabled') + '>' +
+              '<option value=""' + (d.geraProduto === null || d.geraProduto === undefined ? ' selected' : '') + '>—</option>' +
+              '<option value="sim"' + (d.geraProduto === true ? ' selected' : '') + '>sim</option>' +
+              '<option value="nao"' + (d.geraProduto === false ? ' selected' : '') + '>não</option>' +
+            '</select></div>' +
+          (d.geraProduto
+            ? '<div class="campo"><label for="m_' + p.id + '_produto">O quê?</label>' +
+              '<input type="text" id="m_' + p.id + '_produto" data-muda="produto" data-id="' + p.id + '"' +
+              (editavel ? ' placeholder="leite, limpeza do terreno, ovos"' : ' readonly placeholder="—"') +
+              ' value="' + esc(d.produto) + '"></div>'
+            : '') +
+          numero('retornoMensal', 'Retorno mensal estimado', d.retornoMensal, 'em dinheiro, mesmo que consumido aqui') +
+        '</div>' +
+        '<p class="muda-leitura" id="leitura_' + p.id + '">' + esc(M.leituraFria(p)) + '</p>',
+        'Estimativa de decisão, por cima — nunca vira envelope. O envelope nasce no planejamento, quando se orça de verdade. Zero vale; "não sei" vira um chute honesto.'),
+
+      grupo('Como você se sentiria', '',
+        caixa('sentimento', 'Com isso pronto — e por quê?', m.sentimento, 'a única pergunta emocional, de propósito depois dos números'),
+        'O valor sentimental. Fica depois dos números para não contaminar a conta — mas conta tanto quanto.'),
+
+      grupo('O que isso inviabiliza', '',
+        caixa('inviabiliza', 'Que projetos, mudas ou intenções perdem espaço ou tempo com isso?', m.inviabiliza, '"nada" também é resposta — mas escrita') +
+        (outros.length
+          ? '<p class="dica">Para olhar a lista, não a memória: ' + outros.map(function (q) {
+              return esc(q.nome || 'sem nome') + ' <i>(' + esc(M.etiquetaDe(q).texto) + ')</i>'; }).join(' · ') + '</p>'
+          : ''),
+        'O sítio tem limite de espaço e você de tempo. O que esta obra tira de outra?')
+    ].join('');
+  }
+
+  /* A muda depois de virar obra: um resumo fechado, para ler quando a vontade
+     acabou e você precisa lembrar por que começou. */
+  function resumoMuda(p) {
+    var m = p.muda;
+    function lista(l) {
+      return '<ul class="cadeias-lidas">' + M.cadeiasVivas(l).map(function (c) {
+        return '<li>' + c.map(esc).join(' <span class="seta">→</span> ') + '</li>'; }).join('') + '</ul>';
+    }
+    return '<div class="muda-resumo">' +
+      '<h4>vantagens</h4>' + lista(m.vantagens) +
+      '<h4>desvantagens</h4>' + lista(m.desvantagens) +
+      (M.leituraFria(p) ? '<h4>despesas, por cima</h4><p>' + esc(M.leituraFria(p)) + '</p>' : '') +
+      (m.sentimento ? '<h4>como me sentiria</h4><p>' + esc(m.sentimento) + '</p>' : '') +
+      (m.inviabiliza ? '<h4>o que inviabiliza</h4><p>' + esc(m.inviabiliza) + '</p>' : '') +
+      '</div>';
+  }
+
+  var recolhidos = {};   // grupos fechados abertos à mão, por chave
+  function grupoRecolhido(titulo, chave, corpo) {
+    var aberto = !!recolhidos[chave];
+    return '<div class="secao secao-campos' + (aberto ? '' : ' secao-recolhida') + '">' +
+      '<div class="secao-titulo"><button type="button" class="cabeca-link" data-acao="abrir-recolhido" data-id="' + chave + '">' +
+        esc(titulo) + (aberto ? ' ▾' : ' ▸') + '</button></div>' +
+      (aberto ? '<div class="secao-corpo">' + corpo + '</div>' : '') +
+      '</div>';
   }
 
   /* Suspender e cancelar com uma tarefa em andamento dentro deixava a bota
@@ -618,7 +809,7 @@
     } else {
       corpo = saidasDe(p).map(function (k) {
         return '<button type="button" class="bt-linha bt-mini" data-acao="projeto-' + k +
-          '" data-id="' + p.id + '">' + ACOES[k].rotulo + ' este projeto</button>';
+          '" data-id="' + p.id + '">' + ACOES[k].rotulo + (p.estado === 'fila' ? ' esta muda' : ' este projeto') + '</button>';
       }).join('') +
       '<button type="button" class="bt-linha bt-mini" data-acao="abrir-perigo" data-id="' + p.id + '">apagar</button>';
     }
@@ -638,12 +829,15 @@
       cabe: function (p) { return p.papel === 'titular' || p.papel === 'reserva' || p.papel === 'planejamento'; } },
     { chave: 'planejada',  t: 'planejadas',
       cabe: function (p) { return p.estado === 'preparo' && !p.papel; } },
-    { chave: 'fila',       t: 'pré-projetos',
+    { chave: 'fila',       t: 'mudas',
       cabe: function (p) { return p.estado === 'fila'; } },
     { chave: 'suspenso',   t: 'suspensos',
       cabe: function (p) { return p.estado === 'parado'; } },
     { chave: 'encerrado',  t: 'concluídos e cancelados',
-      cabe: function (p) { return p.estado === 'concluido' || p.estado === 'encerrado'; } }
+      cabe: function (p) { return p.estado === 'concluido' || p.estado === 'encerrado'; } },
+    // muda descartada é registro: fica visível, com o motivo, sem contar no teto
+    { chave: 'descartada', t: 'mudas descartadas',
+      cabe: function (p) { return p.estado === 'descartado'; } }
   ];
 
   function marcacaoProjetos() {
@@ -700,10 +894,12 @@
         : 'Nenhuma planejada está pronta ainda.');
     }
     if (querPlanejamento) {
-      var fila = M.cat().projetos.filter(function (p) { return p.estado === 'fila'; }).length;
-      frases.push(fila
-        ? 'Há ' + fila + (fila === 1 ? ' pré-projeto' : ' pré-projetos') + ' para escolher.'
-        : 'Nenhum pré-projeto cadastrado.');
+      var mudas = M.mudasVivas();
+      var prontasM = mudas.filter(M.mudaPronta).length;
+      frases.push(mudas.length
+        ? (prontasM ? 'Há ' + prontasM + (prontasM === 1 ? ' muda pronta' : ' mudas prontas') + ' para escolher.'
+                    : 'Há ' + mudas.length + (mudas.length === 1 ? ' muda' : ' mudas') + ', nenhuma pronta ainda.')
+        : 'Nenhuma muda plantada.');
     }
     return frases.join(' ');
   }
@@ -741,7 +937,7 @@
           p.id + '">pôr em execução</button>'
         : '') +
       (emConsultaGeral() ? '' :
-       p.estado === 'fila' && !M.projetoPorPapel('planejamento')
+       p.estado === 'fila' && M.mudaPronta(p) && !M.projetoPorPapel('planejamento')
         ? '<button type="button" class="bt-fraco bt-mini" data-acao="projeto-promover" data-id="' +
           p.id + '">planejar</button>'
         : '') +
@@ -751,7 +947,7 @@
   // ── ações do projeto ──────────────────────────────────────────────
   /* O select de sete situações morreu. Ele permitia qualquer salto, inclusive
      os absurdos — titular voltando a planejamento —, e tratava como campo de
-     cadastro o que é decisão. O caminho é um só: pré-projeto → planejamento →
+     cadastro o que é decisão. O caminho é um só: muda → planejamento →
      execução → concluído, com suspender e cancelar como saídas laterais.
      A ÚNICA promoção que é escolha é a entrada no planejamento, porque é a
      única em que existe mais de um candidato. */
@@ -762,6 +958,7 @@
 
   var ACOES = {
     promover:  { rotulo: 'promover',  forte: true },
+    descartar: { rotulo: 'descartar' },
     concluir:  { rotulo: 'concluir',  forte: true },
     retomar:   { rotulo: 'retomar',   forte: true },
     suspender: { rotulo: 'suspender' },
@@ -774,6 +971,7 @@
      quem trava não pode oferecer a desistência com mais clareza que a
      conclusão. */
   function acaoQueAvanca(p) {
+    if (p.estado === 'descartado') return null;   // reabrir mora no pé, junto do motivo
     if (p.estado === 'parado') return 'retomar';
     if (p.estado === 'concluido' || p.estado === 'encerrado') return 'retomar';
     if (p.papel === 'titular' || p.papel === 'reserva') return 'concluir';
@@ -781,13 +979,14 @@
     return 'promover';
   }
 
-  // pré-projeto sobe para planejamento; planejada sobe para reserva
+  // muda sobe para planejamento; planejada sobe para reserva
   function destinoDaPromocao(p) {
     return p.estado === 'preparo' ? 'reserva' : 'planejamento';
   }
 
   function saidasDe(p) {
-    if (p.estado === 'concluido' || p.estado === 'encerrado') return [];
+    if (p.estado === 'concluido' || p.estado === 'encerrado' || p.estado === 'descartado') return [];
+    if (p.estado === 'fila') return ['descartar'];   // muda não suspende nem cancela: descarta, com motivo
     if (p.estado === 'parado') return ['cancelar'];
     return ['suspender', 'cancelar'];
   }
@@ -807,7 +1006,8 @@
         ? !!M.projetoPorPapel('reserva') && !!M.projetoPorPapel('titular')
         : !!M.projetoPorPapel('planejamento'));
 
-      var trava = (k === 'concluir' && abertas > 0) || ocupada ||
+      var mudaCrua = k === 'promover' && p.estado === 'fila' && !M.mudaPronta(p);
+      var trava = (k === 'concluir' && abertas > 0) || ocupada || mudaCrua ||
                   (k === 'promover' && destinoDaPromocao(p) === 'reserva' && !M.aptaParaExecucao(p));
       var rotulo = k === 'promover'
         ? (destinoDaPromocao(p) === 'reserva' ? 'pôr em execução' : 'promover a planejamento')
@@ -830,7 +1030,9 @@
     }
 
     var nota = '';
-    if (ocupada) {
+    if (mudaCrua) {
+      nota = 'A muda ainda não está pronta. Só muda pronta entra em planejamento.';
+    } else if (ocupada) {
       var dono = M.projetoPorPapel(destinoDaPromocao(p) === 'reserva' ? 'reserva' : 'planejamento');
       nota = 'A vaga está com ' + (dono.nome || 'outro projeto') +
         '. Conclua, suspenda ou cancele um dos que estão andando primeiro.';
@@ -853,6 +1055,8 @@
   var TEXTOS_ACAO = {
     promover:  { frase: 'Entra em planejamento e ganha o esqueleto: decidir, medir, conferir, orçar, comprar.',
                  ok: 'promover' },
+    descartar: { frase: 'Descartar a muda. Tudo o que você escreveu fica guardado, com o motivo — a Márcia também lê.',
+                 campo: 'Por quê?', ok: 'descartar' },
     revisar:   { frase: 'Volta para a vaga de planejamento e entra uma tarefa: revisar preços, medidas ' +
                         'e disponibilidade. Enquanto houver tarefa de planejamento aberta aqui, ele fica ' +
                         'nessa vaga — é o momento de reclassificar o que estiver na etapa errada. Quando ' +
@@ -865,7 +1069,7 @@
                  campo: 'Por quê?', ok: 'suspender' },
     cancelar:  { frase: 'Cancelar. O projeto e as tarefas continuam no registro, mas saem do caminho.',
                  campo: 'Por quê?', ok: 'cancelar' },
-    retomar:   { frase: 'Retomar. Volta para onde estava antes de parar — planejada ou pré-projeto — ' +
+    retomar:   { frase: 'Retomar. Volta para onde estava antes de parar — planejada ou muda — ' +
                         'sem vaga: a vaga você dá de novo, pela mesma porta de todos.',
                  ok: 'retomar' }
   };
@@ -1649,14 +1853,14 @@
      Nada é apagado: a semente carrega o estado, e o estado é o registro. */
   var FILTROS_SEMENTES = [
     { chave: 'nova',       t: 'novas',              vazio: 'Nada novo. A caixa está limpa.' },
-    { chave: 'projeto',    t: 'pode virar projeto', vazio: 'Nenhuma aprovada para projeto.' },
+    { chave: 'projeto',    t: 'pode virar muda',    vazio: 'Nenhuma aprovada para muda.' },
     { chave: 'tarefa',     t: 'pode virar tarefa',  vazio: 'Nenhuma aprovada para tarefa.' },
     { chave: 'descartada', t: 'descartadas',        vazio: 'Nenhuma descartada.' },
     { chave: 'virou',      t: 'viraram',            vazio: 'Nenhuma virou projeto ou tarefa ainda.' }
   ];
   var ROTULO_ESTADO_SEMENTE = {
-    nova: 'nova', descartada: 'descartada', projeto: 'pode virar projeto',
-    tarefa: 'pode virar tarefa', virou_projeto: 'virou projeto', virou_tarefa: 'virou tarefa'
+    nova: 'nova', descartada: 'descartada', projeto: 'pode virar muda',
+    tarefa: 'pode virar tarefa', virou_projeto: 'virou muda', virou_tarefa: 'virou tarefa'
   };
 
   function grupoDaSemente(s) { return s.estado.indexOf('virou_') === 0 ? 'virou' : s.estado; }
@@ -1677,7 +1881,7 @@
 
     return [
       '<h2>Sementes</h2>',
-      '<p class="palco-sub">A caixa de entrada das ideias. Nenhuma gera tarefa antes de virar pré-projeto ou tarefa avulsa.</p>',
+      '<p class="palco-sub">A caixa de entrada das ideias. Nenhuma gera tarefa antes de virar muda ou tarefa avulsa.</p>',
       '<div class="junta" style="max-width:900px">',
         '<input type="text" id="campoSemente" placeholder="escreva uma ideia">',
         '<button type="button" class="bt-forte" data-acao="nova-semente">guardar</button>',
@@ -1715,7 +1919,7 @@
       rodape = '<div class="rodape-acoes">' +
         (oQueVirou
           ? '<button type="button" class="bt-fraco" data-acao="ir-ao-fruto" data-id="' + s.id + '">' +
-              esc(s.estado === 'virou_projeto' ? 'abrir o projeto' : 'ver a tarefa') + '</button>'
+              esc(s.estado === 'virou_projeto' ? 'abrir a muda' : 'ver a tarefa') + '</button>'
           : '<span class="aviso">o que nasceu dela não existe mais</span>') +
         '</div>';
     } else if (descartando) {
@@ -1740,12 +1944,14 @@
           ? '<p class="semente-motivo">descartada: ' + esc(s.motivo) + '</p>' : '') +
         '<div class="rodape-acoes semente-destinos">' +
           (s.estado === 'projeto'
-            ? '<button type="button" class="bt-forte" data-acao="promover-semente" data-id="' + s.id + '">virar pré-projeto</button>' : '') +
+            ? (M.motivoTetoMudas()
+                ? '<span class="aviso">' + esc(M.motivoTetoMudas()) + '</span>'
+                : '<button type="button" class="bt-forte" data-acao="promover-semente" data-id="' + s.id + '">virar muda</button>') : '') +
           (s.estado === 'tarefa'
             ? '<button type="button" class="bt-forte" data-acao="semente-vira-tarefa" data-id="' + s.id + '">virar tarefa avulsa</button>' : '') +
           '<span class="semente-seletor">' +
             destino('nova', 'nova') +
-            destino('projeto', 'pode virar projeto') +
+            destino('projeto', 'pode virar muda') +
             destino('tarefa', 'pode virar tarefa') +
             '<button type="button" class="filtro' + (s.estado === 'descartada' ? ' filtro-on' : '') +
               '" data-acao="pedir-descarte" data-id="' + s.id + '">descartar</button>' +
@@ -1800,7 +2006,11 @@
      em consulta, menos o projeto da tarefa. */
   function desenhar() {
     var criar = emConsultaGeral();
-    document.getElementById('btNovoProjeto').hidden = criar;
+    var btNovo = document.getElementById('btNovoProjeto');
+    btNovo.hidden = criar;
+    // teto de mudas é parede: o botão fica, trancado, com o motivo no hover
+    btNovo.disabled = !!M.motivoTetoMudas();
+    btNovo.title = M.motivoTetoMudas() || 'Nova muda: toda obra nasce muda, e são no máximo ' + M.TETO_MUDAS + '.';
     document.getElementById('btNovaAvulsa').hidden = criar;
     document.body.classList.toggle('modo-consulta', criar);
     // na entrada a coluna sai de cena: ali a pergunta é uma só, e a lista de
@@ -1840,6 +2050,93 @@
       return dona.coleta.filter(function (c) { return c.id === cid; })[0];
     }
     return null;
+  }
+
+  /* Escrita da muda. Os campos simples gravam a cada tecla; as CADEIAS também,
+     mas sem redesenhar enquanto se digita: um elo vazio que ganha texto só
+     ganha a próxima caixa ao lado; um elo apagado (no blur) emenda a cadeia e
+     aí sim a tela redesenha. */
+  function escreverMuda(el, fim) {
+    var p = M.projeto(el.getAttribute('data-id'));
+    if (!p) return;
+    var campo = el.getAttribute('data-muda');
+    var m = p.muda;
+
+    if (campo === 'vantagens' || campo === 'desvantagens') {
+      var i = Number(el.getAttribute('data-linha')), j = Number(el.getAttribute('data-elo'));
+      var lista = m[campo];
+      var v = el.value;
+      var eraVazio = el.classList.contains('elo-vazio');
+      while (lista.length <= i) lista.push([]);
+      var c = lista[i];
+      if (v.trim()) {
+        c[j] = v;
+        el.size = Math.min(48, Math.max(14, v.length + 2));
+        if (eraVazio) {
+          // acabou de nascer: ganha a próxima caixa (ou a próxima linha)
+          el.classList.remove('elo-vazio');
+          var linhaEl = el.closest('.cadeia');
+          var pergunta = campo === 'vantagens' ? 'e isso, para quê?' : 'e isso causa o quê?';
+          if (linhaEl.classList.contains('cadeia-nova')) {
+            linhaEl.classList.remove('cadeia-nova');
+            var nova = document.createElement('li');
+            nova.className = 'cadeia cadeia-nova';
+            nova.innerHTML = elo(p, campo, i + 1, 0, '', true, campo === 'vantagens' ? 'por que você quer isso? — uma razão' : 'uma desvantagem', true);
+            linhaEl.parentNode.appendChild(nova);
+          }
+          var seta = document.createElement('span'); seta.className = 'seta'; seta.textContent = '→';
+          var prox = document.createElement('span'); prox.innerHTML = elo(p, campo, i, j + 1, '', true, pergunta, false);
+          linhaEl.appendChild(seta); linhaEl.appendChild(prox.firstChild);
+        }
+        p.ultimoToque = M.agora(); M.salvar();
+        retocarMuda(p);
+        return;
+      }
+      // apagou: só no blur, para não sumir a caixa enquanto se corrige
+      if (!fim || eraVazio) return;
+      if (j === 0) lista.splice(i, 1); else c.splice(j, 1);
+      m[campo] = lista.filter(function (x) { return x.length; });
+      p.ultimoToque = M.agora(); M.salvar();
+      return desenharPalco();
+    }
+
+    if (campo === 'inicial' || campo === 'fixaMensal' || campo === 'retornoMensal') {
+      m.despesas[campo] = el.value === '' ? null : Math.max(0, Number(el.value));
+    } else if (campo === 'geraProduto') {
+      m.despesas.geraProduto = el.value === '' ? null : el.value === 'sim';
+      p.ultimoToque = M.agora(); M.salvar();
+      return desenharPalco();   // o campo "o quê?" aparece ou some
+    } else if (campo === 'produto') {
+      m.despesas.produto = el.value;
+    } else {
+      m[campo] = el.value;
+    }
+    p.ultimoToque = M.agora(); M.salvar();
+    retocarMuda(p);
+  }
+
+  // o que muda de leitura sem redesenhar: contagens, o que falta, a leitura fria
+  function retocarMuda(p) {
+    var leitura = document.getElementById('leitura_' + p.id);
+    if (leitura) leitura.textContent = M.leituraFria(p);
+    var falta = M.faltaParaPronta(p);
+    var aviso = $palco.querySelector('.muda-falta');
+    var bt = $palco.querySelector('[data-acao="muda-pronta"]');
+    if (bt) {
+      bt.classList.toggle('bt-travado', !!falta.length);
+      bt.innerHTML = (falta.length ? CADEADO : '') + 'pronta';
+      bt.title = falta.length ? 'Falta: ' + falta.join(', ') + '.' : '';
+    }
+    if (aviso) aviso.textContent = falta.length ? 'Falta: ' + falta.join(', ') + '.' : '';
+    ['vantagens', 'desvantagens'].forEach(function (campo) {
+      var ol = $palco.querySelector('[data-cadeias="' + campo + '"]');
+      var conta = ol && ol.previousElementSibling;
+      if (conta && conta.classList.contains('cadeias-conta')) {
+        var n = M.cadeiasVivas(p.muda[campo]).length;
+        var sing = campo === 'vantagens' ? 'vantagem' : 'desvantagem';
+        conta.textContent = n + ' ' + (n === 1 ? sing : campo) + (n < 3 ? ' · pronta pede 3' : '');
+      }
+    });
   }
 
   function escrever(el) {
@@ -1990,6 +2287,7 @@
 
   function criarProjeto() {
     var p = M.inserirProjeto();
+    if (!p) { alert(M.motivoTetoMudas()); return; }
     tela = { tipo: 'projeto', id: p.id };
     projetoEditando = p.id;
     desenhar();
@@ -2024,6 +2322,9 @@
       tela = { tipo: 'projeto', id: p.id };
     } else if (acaoProjeto.tipo === 'retomar') {
       M.retomarProjeto(p.id);
+      avisoCascata = '';
+    } else if (acaoProjeto.tipo === 'descartar') {
+      M.descartarMuda(p.id, texto);
       avisoCascata = '';
     } else {
       M.fecharProjeto(p.id, DESFECHO_DE[acaoProjeto.tipo], texto);
@@ -2196,6 +2497,20 @@
     if (acao === 'promover-semente') {
       var novo = M.promoverSemente(tid);
       if (novo) tela = { tipo: 'projeto', id: novo.id };
+      else if (M.motivoTetoMudas()) alert(M.motivoTetoMudas());
+      return desenhar();
+    }
+    // ── muda: pronta, plantando, reabrir ──
+    if (acao === 'muda-pronta') {
+      var falta = M.marcarMudaPronta(tid);
+      if (falta && falta.length) mudaAviso = 'Falta: ' + falta.join(', ') + '.';
+      else mudaAviso = '';
+      return desenhar();
+    }
+    if (acao === 'muda-plantar') { M.voltarAPlantar(tid); mudaAviso = ''; return desenhar(); }
+    if (acao === 'abrir-recolhido') { recolhidos[tid] = !recolhidos[tid]; return desenharPalco(); }
+    if (acao === 'muda-reabrir') {
+      if (!M.reabrirMuda(tid)) alert(M.motivoTetoMudas() || 'Não deu para reabrir.');
       return desenhar();
     }
     // da semente para a lista das avulsas, com a ficha nova já solta
@@ -2494,8 +2809,12 @@
     e.target.value = '';
   });
 
-  $palco.addEventListener('input',  function (e) { if (e.target.hasAttribute('data-campo')) escrever(e.target); });
+  $palco.addEventListener('input',  function (e) {
+    if (e.target.hasAttribute('data-muda')) return escreverMuda(e.target, false);
+    if (e.target.hasAttribute('data-campo')) escrever(e.target);
+  });
   $palco.addEventListener('change', function (e) {
+    if (e.target.hasAttribute('data-muda')) return escreverMuda(e.target, true);
     if (e.target.hasAttribute('data-campo')) return escrever(e.target);
     // escolher a semente já cria a tarefa: a escolha é a ação
     if (e.target.id === 'selSementeTarefa' && e.target.value) {

@@ -49,7 +49,9 @@ var Modelo = (function () {
      "titular" e "fila" ao mesmo tempo. Viraram um só; os dois campos por baixo
      continuam, porque o motor de elegibilidade lê cada um por um motivo. */
   var SITUACOES = [
-    { v: 'fila',         t: 'fila — pré-projeto', estado: 'fila',      papel: '' },
+    // MUDA (§37): a semente lapidada, esperando vaga. Antes chamava pré-projeto.
+    { v: 'fila',         t: 'muda',               estado: 'fila',      papel: '' },
+    { v: 'descartada',   t: 'muda descartada',    estado: 'descartado', papel: '' },
     { v: 'planejamento', t: 'em planejamento',    estado: 'preparo',   papel: 'planejamento' },
     /* PLANEJADA: o plano está pronto e o projeto espera vaga. Sem este estado,
        um projeto planejado e sem dinheiro ficava ocupando a única vaga de
@@ -356,7 +358,12 @@ var Modelo = (function () {
     }
     return [];
   }
-  function costurarProjeto(p)  { return completar(p, novoProjeto()); }
+  function costurarProjeto(p)  {
+    completar(p, novoProjeto());
+    p.muda = completar(p.muda || {}, novaMuda());
+    p.muda.despesas = completar(p.muda.despesas || {}, novaMuda().despesas);
+    return p;
+  }
   function costurarSemente(s)  { return completar(s, novaSemente('')); }
   function costurarPendencia(x) { return completar(x, novaPendencia('')); }
 
@@ -380,8 +387,30 @@ var Modelo = (function () {
       contratavel: false,
       custoEstimado: null,   // null = ainda não orçado
       guardado: 0,
+      muda: novaMuda(),
       criadoEm: agora(),
       ultimoToque: agora()
+    };
+  }
+
+  /* A MUDA (§37) — o trabalho do projeto enquanto espera vaga: lapidar a
+     ideia até dar para decidir se toca ou muda o rumo. É teste de MOTIVAÇÃO,
+     não de viabilidade: como e quando são planejamento. Vantagens e
+     desvantagens são CADEIAS — cada linha é uma razão puxada até esgotar
+     ("e isso, para quê?" / "e isso causa o quê?"). As despesas daqui são
+     estimativa de decisão e NUNCA viram envelope (§36). Todo dado fica no
+     projeto para sempre, inclusive depois de virar obra. */
+  function novaMuda() {
+    return {
+      estado: 'plantando',        // plantando (em edição) · pronta · descartada
+      vantagens: [],              // [[elo, elo, ...], ...]
+      desvantagens: [],
+      despesas: { inicial: null, fixaMensal: null, geraProduto: null, produto: '', retornoMensal: null },
+      sentimento: '',
+      inviabiliza: '',
+      motivo: '',                 // do descarte
+      prontaEm: null,
+      descartadaEm: null
     };
   }
 
@@ -566,7 +595,12 @@ var Modelo = (function () {
         ? { chave: 'pronto', texto: 'planejada · pronta' }
         : { chave: 'planejada', texto: 'planejada' };
     }
-    if (p.estado === 'fila') return { chave: 'pre', texto: 'pré-projeto' };
+    if (p.estado === 'fila') {
+      return p.muda.estado === 'pronta'
+        ? { chave: 'pre', texto: 'muda · pronta' }
+        : { chave: 'pre', texto: 'muda' };
+    }
+    if (p.estado === 'descartado') return { chave: 'descartada', texto: 'muda descartada' };
     var s = SITUACOES.filter(function (x) { return x.v === situacaoDe(p); })[0];
     return { chave: p.estado, texto: s ? s.t : p.estado };
   }
@@ -656,7 +690,7 @@ var Modelo = (function () {
   /* A porta trancada: o próximo projeto e o que o segura, em texto seco.
      Projeto em planejamento ou executando não está trancado — está andando. */
   function motivoTrancado(p) {
-    if (['ativo', 'preparo', 'concluido', 'encerrado'].indexOf(p.estado) !== -1) return null;
+    if (['ativo', 'preparo', 'concluido', 'encerrado', 'descartado'].indexOf(p.estado) !== -1) return null;
 
     // na fila só pré-requisito tranca: dinheiro é assunto de projeto planejado
     var faltando = prerequisitosPendentes(p);
@@ -880,9 +914,122 @@ var Modelo = (function () {
   }
 
   function promoverParaPlanejamento(pid) {
+    var p = projeto(pid);
+    // só muda PRONTA entra em planejamento: plantando pela metade não vira obra
+    if (p && p.estado === 'fila' && !mudaPronta(p)) return null;
+    // as vantagens viram a motivação da obra, se ela ainda não tiver uma
+    if (p && !(p.ganhos || []).length) {
+      p.ganhos = cadeiasVivas(p.muda.vantagens).map(function (c) { return c.join(' → '); });
+    }
     var anterior = projetoPorPapel('planejamento');
     definirSituacao(pid, 'planejamento');   // expulsa o ocupante e semeia o esqueleto
     return anterior && anterior.id !== pid ? anterior : null;
+  }
+
+  // ── muda: teto, portão, estados ───────────────────────────────────
+
+  /* Cinco e só — prontas ou plantando; descartadas não contam. Mais que isso
+     ninguém lapida de verdade: vira lista, e lista de projeto é onde ele se
+     perde brincando de planejar. O teto é parede, como as vagas (§17). */
+  var TETO_MUDAS = 5;
+  function mudasVivas() { return cat().projetos.filter(function (p) { return p.estado === 'fila'; }); }
+  function motivoTetoMudas() {
+    return mudasVivas().length >= TETO_MUDAS
+      ? 'Já há ' + TETO_MUDAS + ' mudas. Descarte ou promova uma antes de lapidar outra.'
+      : null;
+  }
+
+  function cadeiasVivas(lista) {
+    return (lista || []).filter(function (c) { return c.length && c[0]; });
+  }
+
+  /* Pronta exige TUDO (decisão dele): o que é, 3 vantagens, 3 desvantagens,
+     as quatro despesas (0 vale; "não sei" vira estimativa por cima), o
+     sentimento e o que inviabiliza. O que falta vem em texto, para a tela. */
+  function faltaParaPronta(p) {
+    var m = p.muda, d = m.despesas, falta = [];
+    var v = cadeiasVivas(m.vantagens).length, dv = cadeiasVivas(m.desvantagens).length;
+    if (!(p.nome || '').trim()) falta.push('o que é');
+    if (v < 3) falta.push((3 - v) + (3 - v === 1 ? ' vantagem' : ' vantagens'));
+    if (dv < 3) falta.push((3 - dv) + (3 - dv === 1 ? ' desvantagem' : ' desvantagens'));
+    if (d.inicial === null || d.inicial === undefined) falta.push('o valor inicial');
+    if (d.fixaMensal === null || d.fixaMensal === undefined) falta.push('o valor fixo mensal');
+    if (d.geraProduto === null || d.geraProduto === undefined) falta.push('se gera produto ou serviço');
+    if (d.geraProduto && !(d.produto || '').trim()) falta.push('qual produto ou serviço');
+    if (d.retornoMensal === null || d.retornoMensal === undefined) falta.push('o retorno mensal');
+    if (!(m.sentimento || '').trim()) falta.push('como você se sentiria');
+    if (!(m.inviabiliza || '').trim()) falta.push('o que isso inviabiliza');
+    return falta;
+  }
+  function mudaPronta(p) { return p.muda.estado === 'pronta'; }
+
+  function marcarMudaPronta(pid) {
+    var p = projeto(pid);
+    if (!p || p.estado !== 'fila') return null;
+    var falta = faltaParaPronta(p);
+    if (falta.length) return falta;
+    p.muda.estado = 'pronta'; p.muda.prontaEm = agora(); p.ultimoToque = agora();
+    salvar();
+    return [];
+  }
+  function voltarAPlantar(pid) {
+    var p = projeto(pid);
+    if (!p || p.estado !== 'fila') return;
+    p.muda.estado = 'plantando'; p.muda.prontaEm = null; p.ultimoToque = agora();
+    salvar();
+  }
+  /* Descartar guarda tudo: a muda vira registro, com o motivo. Fica na página
+     de projetos, num grupo próprio, e não conta no teto. */
+  function descartarMuda(pid, motivo) {
+    var p = projeto(pid);
+    motivo = (motivo || '').trim();
+    if (!p || p.estado !== 'fila' || !motivo) return null;
+    p.estado = 'descartado'; p.papel = '';
+    p.muda.estado = 'descartada'; p.muda.motivo = motivo; p.muda.descartadaEm = agora();
+    p.ultimoToque = agora();
+    salvar();
+    return p;
+  }
+  function reabrirMuda(pid) {
+    var p = projeto(pid);
+    if (!p || p.estado !== 'descartado') return null;
+    if (motivoTetoMudas()) return null;
+    p.estado = 'fila';
+    p.muda.estado = 'plantando'; p.muda.motivo = ''; p.muda.descartadaEm = null;
+    p.ultimoToque = agora();
+    salvar();
+    return p;
+  }
+
+  /* A leitura fria das despesas: os números ditos numa frase, sem opinião.
+     "Custa R$ 6.000 para começar e R$ 150 por mês; devolve uns R$ 400 por mês —
+     se paga em ~2 anos." */
+  function leituraFria(p) {
+    var d = p.muda.despesas;
+    var temIni = d.inicial !== null && d.inicial !== undefined;
+    var temFixa = d.fixaMensal !== null && d.fixaMensal !== undefined;
+    var temRet = d.retornoMensal !== null && d.retornoMensal !== undefined;
+    var ini = Number(d.inicial) || 0, fixa = Number(d.fixaMensal) || 0, ret = Number(d.retornoMensal) || 0;
+    if (!temIni && !temFixa && !temRet) return '';
+    var frase = '';
+    if (temIni) frase = ini > 0 ? 'custa ' + moeda(ini) + ' para começar' : 'não custa nada para começar';
+    if (temFixa && fixa > 0) frase += (frase ? ' e ' : 'custa ') + moeda(fixa) + ' por mês';
+    if (temRet) {
+      if (ret > 0) {
+        frase += (frase ? '; ' : '') + 'devolve uns ' + moeda(ret) + ' por mês';
+        var liquido = ret - fixa;
+        if (liquido > 0 && ini > 0) {
+          var meses = Math.ceil(ini / liquido);
+          frase += ' — se paga em ' + (meses >= 24 ? '~' + Math.round(meses / 12) + ' anos'
+            : meses >= 12 ? '~1 ano' : meses + (meses === 1 ? ' mês' : ' meses'));
+        } else if (liquido <= 0 && fixa > 0) {
+          frase += ' — não cobre o fixo';
+        }
+      } else {
+        frase += (frase ? '; ' : '') + 'não devolve dinheiro';
+      }
+    }
+    return frase ? frase.charAt(0).toUpperCase() + frase.slice(1) + '.' : '';
   }
 
   /* Filtros estruturais: valem em qualquer situação. Os de momento — clima,
@@ -1112,6 +1259,7 @@ var Modelo = (function () {
   // ── escrita ───────────────────────────────────────────────────────
 
   function inserirProjeto() {
+    if (motivoTetoMudas()) return null;   // toda obra nasce muda, e o teto é parede
     var p = novoProjeto();
     p.ordemFila = cat().projetos.length + 1;
     cat().projetos.push(p);
@@ -1247,6 +1395,7 @@ var Modelo = (function () {
     var s = semente(sid);
     if (!s || s.virouId) return null;
     var p = inserirProjeto();
+    if (!p) return null;                  // teto de mudas
     p.nome = s.nome;
     p.resultado = s.frase;
     p.origem = 'semente';
@@ -1739,6 +1888,10 @@ var Modelo = (function () {
 
     situacaoDe: situacaoDe, definirSituacao: definirSituacao, etiquetaDe: etiquetaDe,
     envelopeCheio: envelopeCheio, motivoTrancado: motivoTrancado,
+    TETO_MUDAS: TETO_MUDAS, mudasVivas: mudasVivas, motivoTetoMudas: motivoTetoMudas,
+    faltaParaPronta: faltaParaPronta, mudaPronta: mudaPronta, marcarMudaPronta: marcarMudaPronta,
+    voltarAPlantar: voltarAPlantar, descartarMuda: descartarMuda, reabrirMuda: reabrirMuda,
+    leituraFria: leituraFria, cadeiasVivas: cadeiasVivas,
     prerequisitosPendentes: prerequisitosPendentes, passoCorrente: passoCorrente,
     resolvida: resolvida, tarefasAbertasDe: tarefasAbertasDe,
     projetoPorPapel: projetoPorPapel, planejamentoFechado: planejamentoFechado,
