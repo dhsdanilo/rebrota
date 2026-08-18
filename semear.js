@@ -320,6 +320,10 @@
     if (document.visibilityState === 'hidden') M.usoFechar(); else M.usoRetomar();
   });
   window.addEventListener('pagehide', function () { M.usoFechar(); });
+  ['pointerdown', 'keydown', 'wheel', 'touchstart', 'scroll'].forEach(function (n) {
+    window.addEventListener(n, M.usoAtividade, { passive: true, capture: true });
+  });
+  setInterval(M.usoVerificarOcio, 60 * 1000);
   window.addEventListener('storage', function (e) {
     if (e.key !== 'app-sitio-v3') return;
     if (M.relerSeOutraAbaGravou()) { desenharLista(); if (pagina === 'sitio') desenharSitio(); }

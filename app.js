@@ -3017,6 +3017,10 @@
     else M.usoRetomar();
   });
   window.addEventListener('pagehide', function () { M.usoFechar(); });
+  ['pointerdown', 'keydown', 'wheel', 'touchstart', 'scroll'].forEach(function (n) {
+    window.addEventListener(n, M.usoAtividade, { passive: true, capture: true });
+  });
+  setInterval(M.usoVerificarOcio, 60 * 1000);
 
   // outra aba (ou a Sementeira no mesmo aparelho) gravou: relê e redesenha,
   // em vez de gravar memória velha por cima na próxima tecla

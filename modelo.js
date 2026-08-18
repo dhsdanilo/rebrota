@@ -1714,34 +1714,52 @@ var Modelo = (function () {
      tela. É dado, não julgamento: nada disto aparece em tela nenhuma; é
      matéria-prima para o modo analisar saber se o app deixa a pessoa mais
      ativa ou só mais ocupada na mesa. Sessão de menos de 15 s não entra. */
-  var uso = { app: '', desde: null, tela: '', telaDesde: 0, telas: {}, quem: 'pe_eu' };
+  var uso = { app: '', desde: null, tela: '', telaDesde: 0, telas: {}, quem: 'pe_eu', ultimaAtividade: 0 };
+  var OCIO_MS = 5 * 60 * 1000;   // tela aberta e parada não é uso
 
   function usoIniciar(quem, app) {
-    uso = { app: app, desde: agora(), tela: '', telaDesde: Date.now(), telas: {}, quem: quem };
-  }
-  function usoTela(nome) {
     var t = Date.now();
-    if (uso.tela) uso.telas[uso.tela] = (uso.telas[uso.tela] || 0) + Math.round((t - uso.telaDesde) / 1000);
+    uso = { app: app, desde: agora(), tela: '', telaDesde: t, telas: {}, quem: quem, ultimaAtividade: t };
+  }
+  function usoTela(nome, ateMs) {
+    var t = ateMs || Date.now();
+    if (uso.tela) uso.telas[uso.tela] = (uso.telas[uso.tela] || 0) + Math.max(0, Math.round((t - uso.telaDesde) / 1000));
     uso.tela = nome || '';
     uso.telaDesde = t;
   }
-  function usoFechar() {
+  /* Fecha a sessão. `ateMs` é o instante em que ela acabou de verdade — no
+     ócio, a última atividade, não o agora. */
+  function usoFechar(ateMs) {
     if (!uso.desde) return null;
-    usoTela(uso.tela);            // fecha a tela corrente
-    var seg = Math.round((Date.now() - new Date(uso.desde).getTime()) / 1000);
+    var fim = ateMs || Date.now();
+    usoTela(uso.tela, fim);       // fecha a tela corrente até o fim
+    var seg = Math.round((fim - new Date(uso.desde).getTime()) / 1000);
     var ev = null;
     if (seg >= 15) {
       ev = registrar(uso.quem, 'esteve', {
-        app: uso.app, de: uso.desde, ate: agora(),
+        app: uso.app, de: uso.desde, ate: new Date(fim).toISOString(),
         minutos: Math.round(seg / 6) / 10, telas: uso.telas
       });
     }
-    // a sessão seguinte começa daqui, se o app voltar sem recarregar
-    uso = { app: uso.app, desde: null, tela: uso.tela, telaDesde: Date.now(), telas: {}, quem: uso.quem };
+    // a sessão seguinte começa no próximo toque, se o app voltar sem recarregar
+    uso = { app: uso.app, desde: null, tela: uso.tela, telaDesde: Date.now(), telas: {}, quem: uso.quem, ultimaAtividade: uso.ultimaAtividade };
     return ev;
   }
   function usoRetomar() {
-    if (!uso.desde) { uso.desde = agora(); uso.telaDesde = Date.now(); uso.telas = {}; }
+    var t = Date.now();
+    if (!uso.desde) { uso.desde = agora(); uso.telaDesde = t; uso.telas = {}; }
+    uso.ultimaAtividade = t;
+  }
+  /* Toque, tecla, mouse, rolagem: é atividade. Parado 5 min com a tela aberta,
+     a sessão fecha no instante do último toque; o próximo toque abre outra. */
+  function usoAtividade() {
+    var t = Date.now();
+    if (!uso.desde) return usoRetomar();
+    if (t - uso.ultimaAtividade > OCIO_MS) { usoFechar(uso.ultimaAtividade); return usoRetomar(); }
+    uso.ultimaAtividade = t;
+  }
+  function usoVerificarOcio() {
+    if (uso.desde && Date.now() - uso.ultimaAtividade > OCIO_MS) usoFechar(uso.ultimaAtividade);
   }
 
   function registrarClima(quem, tempo, barro) {
@@ -1943,6 +1961,7 @@ var Modelo = (function () {
     quandoSalvar: quandoSalvar, receberCatalogo: receberCatalogo, unirDiario: unirDiario,
     catalogoVazio: catalogoVazio, versaoDoCatalogo: versaoDoCatalogo, relerSeOutraAbaGravou: relerSeOutraAbaGravou,
     usoIniciar: usoIniciar, usoTela: usoTela, usoFechar: usoFechar, usoRetomar: usoRetomar,
+    usoAtividade: usoAtividade, usoVerificarOcio: usoVerificarOcio,
     semear: semear, absorverSementes: absorverSementes, sementesDe: sementesDe,
     nomeDe: nomeDe,
 
