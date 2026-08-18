@@ -28,6 +28,8 @@
   var planejamentoAberto = null;   // pid com o planejamento concluído reaberto
   var filtroProjetos = '';         // grupo aberto na página de projetos
   var filtroAvulsas = '';          // grupo aberto na página das avulsas
+  var filtroSementes = 'nova';     // a caixa de entrada abre no que não tem destino
+  var sementeDescartando = null;   // semente com o campo de motivo aberto
   var voltarPara = null;           // de onde se veio, para poder folhear
 
   var perigo = { aberto: null };   // projeto com o apagar destravado
@@ -152,9 +154,10 @@
       abertas.length ? abertas.length + ' em aberto' : 'nada esperando',
       pior);
 
-    var se = M.cat().sementes.length;
+    // a coluna diz o que pede análise: as novas. O resto já tem destino.
+    var novas = M.cat().sementes.filter(function (s) { return s.estado === 'nova'; }).length;
     document.getElementById('listaRoadmap').innerHTML = itemSimples('sementes', 'Sementes',
-      se + ' guardada' + (se === 1 ? '' : 's'));
+      novas ? novas + ' nova' + (novas === 1 ? '' : 's') + ' para analisar' : 'nada novo');
   }
 
   function itemProjeto(p) {
@@ -1020,8 +1023,24 @@
       emConsulta(null) ? '' :
       '<div class="rodape-acoes">' +
         '<button type="button" class="bt-forte" data-acao="novo-passo" data-id="">adicionar tarefa</button>' +
+        deSemente() +
       '</div>'
     ].join('');
+  }
+
+  /* A outra porta da tarefa nova: partir de uma semente já aprovada para isso.
+     Só aparece quando há alguma — sem semente elegível, criar do zero é o único
+     caminho e a linha não existe. */
+  function deSemente() {
+    var elegiveis = M.sementesParaTarefa();
+    if (!elegiveis.length) return '';
+    return '<label class="de-semente">a partir de uma semente ' +
+      '<select id="selSementeTarefa">' +
+        '<option value="">escolher…</option>' +
+        elegiveis.map(function (s) {
+          return '<option value="' + s.id + '">' + esc(s.nome) + '</option>';
+        }).join('') +
+      '</select></label>';
   }
 
   // ── passos ────────────────────────────────────────────────────────
@@ -1616,30 +1635,118 @@
 
   // ── sementes ──────────────────────────────────────────────────────
 
+  /* A página de sementes é a CAIXA DE ENTRADA da análise: abre em "nova" —
+     só o que ainda não tem destino — e cada semente pede um toque. Descartar
+     pede motivo; aprovar separa o que pode virar projeto do que pode virar
+     tarefa, para a promoção acontecer noutro momento, quando abrir vaga.
+     Nada é apagado: a semente carrega o estado, e o estado é o registro. */
+  var FILTROS_SEMENTES = [
+    { chave: 'nova',       t: 'novas',              vazio: 'Nada novo. A caixa está limpa.' },
+    { chave: 'projeto',    t: 'pode virar projeto', vazio: 'Nenhuma aprovada para projeto.' },
+    { chave: 'tarefa',     t: 'pode virar tarefa',  vazio: 'Nenhuma aprovada para tarefa.' },
+    { chave: 'descartada', t: 'descartadas',        vazio: 'Nenhuma descartada.' },
+    { chave: 'virou',      t: 'viraram',            vazio: 'Nenhuma virou projeto ou tarefa ainda.' }
+  ];
+  var ROTULO_ESTADO_SEMENTE = {
+    nova: 'nova', descartada: 'descartada', projeto: 'pode virar projeto',
+    tarefa: 'pode virar tarefa', virou_projeto: 'virou projeto', virou_tarefa: 'virou tarefa'
+  };
+
+  function grupoDaSemente(s) { return s.estado.indexOf('virou_') === 0 ? 'virou' : s.estado; }
+
   function marcacaoSementes() {
-    var lista = M.cat().sementes;
+    var todas = M.cat().sementes;
+    var grupo = FILTROS_SEMENTES.filter(function (g) { return g.chave === filtroSementes; })[0];
+    var lista = grupo ? todas.filter(function (s) { return grupoDaSemente(s) === grupo.chave; }) : todas;
+    // as mais recentes primeiro: a análise começa pelo que acabou de chegar
+    lista = lista.slice().sort(function (a, b) { return a.criadaEm < b.criadaEm ? 1 : -1; });
+
+    function botaoFiltroSementes(chave, texto) {
+      var n = chave ? todas.filter(function (s) { return grupoDaSemente(s) === chave; }).length : todas.length;
+      return '<button type="button" class="filtro' + (filtroSementes === chave ? ' filtro-on' : '') +
+        '" data-acao="filtrar-sementes" data-valor="' + chave + '">' + esc(texto) +
+        (n ? ' <i>' + n + '</i>' : '') + '</button>';
+    }
+
     return [
       '<h2>Sementes</h2>',
-      '<p class="palco-sub">Ideias soltas. Nenhuma gera tarefa antes de virar pré-projeto.</p>',
+      '<p class="palco-sub">A caixa de entrada das ideias. Nenhuma gera tarefa antes de virar pré-projeto ou tarefa avulsa.</p>',
       '<div class="junta" style="max-width:900px">',
         '<input type="text" id="campoSemente" placeholder="escreva uma ideia">',
         '<button type="button" class="bt-forte" data-acao="nova-semente">guardar</button>',
       '</div>',
-      lista.length ? lista.map(function (s) {
-        // quem plantou e quando: a semente dela e a sua não se confundem
-        return '<div class="secao">' +
-          '<p class="semente-autor">' + (s.autor === 'esposa' ? 'plantada por ela' : 'plantada por você') +
-            ' · ' + esc(M.formatarData(M.diaDe(s.criadaEm))) + '</p>' +
-          '<div class="grade">' +
-          campoTexto('semente', s.id, 'nome', 'Nome', s.nome, { largo: true }) +
-          campoTexto('semente', s.id, 'frase', 'A ideia', s.frase, { largo: true }) +
-          campoTexto('semente', s.id, 'porque', 'Por quê', s.porque, { largo: true }) +
-          '</div><div class="rodape-acoes">' +
-            '<button type="button" class="bt-forte" data-acao="promover-semente" data-id="' + s.id + '">virar pré-projeto</button>' +
-            '<button type="button" class="bt-linha" data-acao="remover-semente" data-id="' + s.id + '">descartar</button>' +
-          '</div></div>';
-      }).join('') : '<p class="aviso" style="margin-top:24px">Nada na caixa.</p>'
+      '<div class="filtros filtros-sementes">',
+        FILTROS_SEMENTES.map(function (g) { return botaoFiltroSementes(g.chave, g.t); }).join(''),
+        botaoFiltroSementes('', 'todas'),
+      '</div>',
+      lista.length ? lista.map(cartaoSemente).join('')
+        : '<p class="aviso" style="margin-top:24px">' + esc(grupo ? grupo.vazio : 'Nada na caixa.') + '</p>'
     ].join('');
+  }
+
+  function cartaoSemente(s) {
+    var virou = !!s.virouId;
+    var descartando = sementeDescartando === s.id;
+    var oQueVirou = virou && (s.estado === 'virou_projeto' ? M.projeto(s.virouId) : M.tarefa(s.virouId));
+
+    // quem plantou e quando: a semente dela e a sua não se confundem
+    var cabeca = '<p class="semente-autor">' +
+      (s.autor === 'esposa' ? 'plantada por ela' : 'plantada por você') +
+      ' · ' + esc(M.formatarData(M.diaDe(s.criadaEm))) +
+      ' <span class="semente-estado semente-estado-' + grupoDaSemente(s) + '">' +
+        esc(ROTULO_ESTADO_SEMENTE[s.estado]) + '</span></p>';
+
+    var campos = '<div class="grade">' +
+      campoTexto('semente', s.id, 'nome', 'Nome', s.nome, { largo: true, travado: virou }) +
+      campoTexto('semente', s.id, 'frase', 'A ideia', s.frase, { largo: true, travado: virou }) +
+      campoTexto('semente', s.id, 'porque', 'Por quê', s.porque, { largo: true, travado: virou }) +
+      '</div>';
+
+    var rodape;
+    if (virou) {
+      // terminal: só diz no que deu, e leva até lá
+      rodape = '<div class="rodape-acoes">' +
+        (oQueVirou
+          ? '<button type="button" class="bt-fraco" data-acao="ir-ao-fruto" data-id="' + s.id + '">' +
+              esc(s.estado === 'virou_projeto' ? 'abrir o projeto' : 'ver a tarefa') + '</button>'
+          : '<span class="aviso">o que nasceu dela não existe mais</span>') +
+        '</div>';
+    } else if (descartando) {
+      rodape = '<div class="semente-descarte">' +
+        '<label for="motivo_' + s.id + '">Por que descartar? Ela vai ler isto.</label>' +
+        '<input type="text" id="motivo_' + s.id + '" value="' + esc(s.motivo) + '"' +
+          ' placeholder="já existe como tarefa · não é do sítio · conversamos e caiu">' +
+        '<div class="rodape-acoes">' +
+          '<button type="button" class="bt-forte" data-acao="descartar-semente" data-id="' + s.id + '">descartar</button>' +
+          '<button type="button" class="bt-linha" data-acao="cancelar-descarte">cancelar</button>' +
+        '</div></div>';
+    } else {
+      /* Os destinos são um seletor: o atual marcado, os outros a um toque.
+         Reclassificar é livre — uma descartada volta a nova, uma aprovada cai. */
+      function destino(estado, texto) {
+        return '<button type="button" class="filtro' + (s.estado === estado ? ' filtro-on' : '') +
+          '" data-acao="classificar-semente" data-id="' + s.id + '" data-valor="' + estado + '">' +
+          esc(texto) + '</button>';
+      }
+      rodape =
+        (s.estado === 'descartada'
+          ? '<p class="semente-motivo">descartada: ' + esc(s.motivo) + '</p>' : '') +
+        '<div class="rodape-acoes semente-destinos">' +
+          (s.estado === 'projeto'
+            ? '<button type="button" class="bt-forte" data-acao="promover-semente" data-id="' + s.id + '">virar pré-projeto</button>' : '') +
+          (s.estado === 'tarefa'
+            ? '<button type="button" class="bt-forte" data-acao="semente-vira-tarefa" data-id="' + s.id + '">virar tarefa avulsa</button>' : '') +
+          '<span class="semente-seletor">' +
+            destino('nova', 'nova') +
+            destino('projeto', 'pode virar projeto') +
+            destino('tarefa', 'pode virar tarefa') +
+            '<button type="button" class="filtro' + (s.estado === 'descartada' ? ' filtro-on' : '') +
+              '" data-acao="pedir-descarte" data-id="' + s.id + '">descartar</button>' +
+          '</span>' +
+        '</div>';
+    }
+
+    return '<div class="secao semente-cartao">' + cabeca + campos + rodape + '</div>';
   }
 
   // ── proposta vinda do dados.js ────────────────────────────────────
@@ -2062,14 +2169,43 @@
       M.inserirSemente(texto);
       return desenhar();
     }
+    if (acao === 'filtrar-sementes') {
+      filtroSementes = el.getAttribute('data-valor'); sementeDescartando = null;
+      return desenharPalco();
+    }
+    if (acao === 'classificar-semente') {
+      M.classificarSemente(tid, el.getAttribute('data-valor'));
+      return desenhar();
+    }
+    if (acao === 'pedir-descarte') { sementeDescartando = tid; return desenharPalco(); }
+    if (acao === 'cancelar-descarte') { sementeDescartando = null; return desenharPalco(); }
+    if (acao === 'descartar-semente') {
+      var motivo = valorDoCampo('motivo_' + tid);
+      if (!motivo) { document.getElementById('motivo_' + tid).focus(); return; }
+      M.classificarSemente(tid, 'descartada', motivo);
+      sementeDescartando = null;
+      return desenhar();
+    }
     if (acao === 'promover-semente') {
       var novo = M.promoverSemente(tid);
       if (novo) tela = { tipo: 'projeto', id: novo.id };
       return desenhar();
     }
-    if (acao === 'remover-semente') {
-      if (!confirm('Descartar esta semente?')) return;
-      M.removerSemente(tid);
+    // da semente para a lista das avulsas, com a ficha nova já solta
+    if (acao === 'semente-vira-tarefa') {
+      var nascida = M.semearTarefa(tid);
+      if (nascida) {
+        tela = { tipo: 'avulsas', id: null };
+        filtroAvulsas = '';
+        passoAberto = passoEditando = nascida.id;
+      }
+      return desenhar();
+    }
+    if (acao === 'ir-ao-fruto') {
+      var origem = M.semente(tid);
+      if (!origem) return;
+      if (origem.estado === 'virou_projeto') tela = { tipo: 'projeto', id: origem.virouId };
+      else { tela = { tipo: 'avulsas', id: null }; filtroAvulsas = ''; passoAberto = origem.virouId; }
       return desenhar();
     }
 
@@ -2352,7 +2488,15 @@
   });
 
   $palco.addEventListener('input',  function (e) { if (e.target.hasAttribute('data-campo')) escrever(e.target); });
-  $palco.addEventListener('change', function (e) { if (e.target.hasAttribute('data-campo')) escrever(e.target); });
+  $palco.addEventListener('change', function (e) {
+    if (e.target.hasAttribute('data-campo')) return escrever(e.target);
+    // escolher a semente já cria a tarefa: a escolha é a ação
+    if (e.target.id === 'selSementeTarefa' && e.target.value) {
+      var nascida = M.semearTarefa(e.target.value);
+      if (nascida) passoAberto = passoEditando = nascida.id;
+      desenhar();
+    }
+  });
 
   // ── bilhete sobre o app ───────────────────────────────────────────
   /* Fica por cima de tudo, inclusive da tela de execução: o incômodo aparece

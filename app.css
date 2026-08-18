@@ -184,6 +184,40 @@ button, input, select, textarea {
   margin: 0 0 10px;
 }
 
+/* ── caixa de entrada das sementes ────────────────────────
+   O estado é uma etiqueta na cabeça do cartão; os destinos são o mesmo
+   seletor dos filtros, para a análise ser um toque por semente. */
+.filtros-sementes { margin: 18px 0 10px; }
+.filtro i { font-style: normal; color: var(--neblina-fraca); margin-left: 3px; }
+.semente-estado {
+  margin-left: 8px;
+  padding: 1px 7px;
+  border: 1px solid var(--musgo);
+  border-radius: var(--raio);
+  color: var(--neblina-fraca);
+  letter-spacing: 0;
+}
+.semente-estado-projeto, .semente-estado-tarefa { border-color: var(--rebrota); color: var(--rebrota); }
+.semente-estado-virou { border-color: var(--dentro); color: var(--dentro); }
+.semente-estado-descartada { border-color: var(--passou); color: var(--passou); }
+.semente-destinos { justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
+.semente-seletor { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
+.semente-motivo { margin: 10px 0 0; font-size: 13px; color: var(--passou); }
+.semente-descarte { margin-top: 12px; max-width: 560px; }
+.semente-descarte label { display: block; font-size: 12px; color: var(--neblina-fraca); margin-bottom: 6px; }
+.semente-descarte input {
+  background: var(--mata); border: 1px solid var(--musgo); border-radius: var(--raio);
+  padding: 8px 10px; width: 100%; font-size: 15px; color: var(--neblina);
+}
+.semente-descarte input:focus { border-color: var(--passou); outline: none; }
+
+/* a outra porta da avulsa nova: partir de uma semente aprovada para isso */
+.de-semente { font-size: 12px; color: var(--neblina-fraca); display: inline-flex; align-items: center; gap: 8px; margin-left: 12px; }
+.de-semente select {
+  background: var(--mata); border: 1px solid var(--musgo); border-radius: var(--raio);
+  color: var(--neblina); font-size: 13px; padding: 5px 8px; max-width: 260px;
+}
+
 /* ── a tela de sementes (semear.html) ─────────────────────
    Uma página só, de bota, para quem só planta: campo, botão, o que já
    plantou, e a nuvem embaixo. */
@@ -230,6 +264,8 @@ button, input, select, textarea {
 }
 .semear-lista li span { color: var(--neblina-fraca); font-size: 14px; }
 .semear-lista li em { font-family: var(--mono); font-style: normal; font-size: 11px; color: var(--neblina-fraca); }
+.semear-lista li em b { font-weight: normal; }
+.semear-lista li .semear-motivo { color: var(--passou); }
 .semear-nuvem input {
   width: 100%;
   background: var(--breu);

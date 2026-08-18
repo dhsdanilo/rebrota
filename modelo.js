@@ -453,6 +453,14 @@ var Modelo = (function () {
     return (espaco > limite * 0.5 ? corte.slice(0, espaco) : corte) + '…';
   }
 
+  /* A semente nunca é apagada: ela muda de ESTADO, e o estado é o registro —
+     de como o app foi usado e do que aconteceu com cada ideia dela.
+       nova            — como nasce, de quem quer que tenha plantado
+       descartada      — com motivo obrigatório: quem plantou tem que poder ler
+       projeto/tarefa  — aprovada: pode virar pré-projeto / tarefa avulsa
+       virou_projeto / virou_tarefa — terminais, com o id do que nasceu dela */
+  var ESTADOS_SEMENTE = ['nova', 'descartada', 'projeto', 'tarefa', 'virou_projeto', 'virou_tarefa'];
+
   function novaSemente(texto) {
     var bruto = (texto || '').trim();
     return {
@@ -461,6 +469,10 @@ var Modelo = (function () {
       frase: bruto,
       porque: '',
       autor: 'eu',
+      estado: 'nova',
+      motivo: '',          // do descarte
+      virouId: null,       // projeto ou tarefa que nasceu dela
+      classificadaEm: null,
       criadaEm: agora(), ultimoToque: agora()
     };
   }
@@ -1174,23 +1186,61 @@ var Modelo = (function () {
     return s;
   }
 
-  function removerSemente(sid) {
-    cat().sementes = cat().sementes.filter(function (s) { return s.id !== sid; });
+  function semente(sid) { return achar(cat().sementes, sid); }
+
+  /* Classificar é a análise de sementes: um toque por semente. Descartar exige
+     motivo — se ele descarta sozinho uma ideia dela, ela lê o porquê na
+     Sementeira. Os estados terminais não voltam: o que virou, virou. */
+  function classificarSemente(sid, estado, motivo) {
+    var s = semente(sid);
+    if (!s || ESTADOS_SEMENTE.indexOf(estado) < 0) return null;
+    if (s.estado === 'virou_projeto' || s.estado === 'virou_tarefa') return null;
+    if (estado.indexOf('virou_') === 0) return null;
+    motivo = (motivo || '').trim();
+    if (estado === 'descartada' && !motivo) return null;
+    s.estado = estado;
+    s.motivo = estado === 'descartada' ? motivo : '';
+    s.classificadaEm = agora();
+    s.ultimoToque = agora();
     salvar();
+    return s;
+  }
+
+  function fecharSemente(s, estado, oQueNasceu) {
+    s.estado = estado;
+    s.virouId = oQueNasceu.id;
+    s.classificadaEm = s.ultimoToque = agora();
   }
 
   /* Semente vira pré-projeto: entra em `fila`, sem tarefas e sem custo.
      Detalhar é trabalho da vaga de planejamento, não deste momento. */
   function promoverSemente(sid) {
-    var s = achar(cat().sementes, sid);
-    if (!s) return null;
+    var s = semente(sid);
+    if (!s || s.virouId) return null;
     var p = inserirProjeto();
     p.nome = s.nome;
     p.resultado = s.frase;
     p.origem = 'semente';
-    removerSemente(sid);
+    fecharSemente(s, 'virou_projeto', p);
     salvar();
     return p;
+  }
+
+  /* Semente vira tarefa avulsa: só o nome vai; o resto se preenche na ficha,
+     como qualquer tarefa criada do zero. */
+  function semearTarefa(sid) {
+    var s = semente(sid);
+    if (!s || s.virouId) return null;
+    var t = inserirPasso(null, null);
+    t.texto = s.nome;
+    fecharSemente(s, 'virou_tarefa', t);
+    salvar();
+    return t;
+  }
+
+  // as aprovadas para tarefa, ainda à espera: é delas que a nova avulsa pode partir
+  function sementesParaTarefa() {
+    return cat().sementes.filter(function (s) { return s.estado === 'tarefa'; });
   }
 
   // ── diário: o que aconteceu ───────────────────────────────────────
@@ -1681,8 +1731,10 @@ var Modelo = (function () {
     inserirProjeto: inserirProjeto, inserirPasso: inserirPasso,
     removerProjeto: removerProjeto, removerTarefa: removerTarefa,
     reordenar: reordenar,
-    inserirSemente: inserirSemente, removerSemente: removerSemente,
-    promoverSemente: promoverSemente,
+    inserirSemente: inserirSemente, semente: semente,
+    classificarSemente: classificarSemente, promoverSemente: promoverSemente,
+    semearTarefa: semearTarefa, sementesParaTarefa: sementesParaTarefa,
+    ESTADOS_SEMENTE: ESTADOS_SEMENTE,
 
     exportar: exportar,
     lerImportacao: lerImportacao, confirmarImportacao: confirmarImportacao

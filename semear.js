@@ -31,13 +31,31 @@
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
+  /* O que aconteceu com cada semente dela. O estado mora no catálogo, que a
+     nuvem traz da mesa; a semente que a mesa ainda não viu é simplesmente nova.
+     Nada some: descartada vem com o motivo que ele escreveu — é o combinado. */
+  var ESTADO = {
+    nova: 'nova', descartada: 'descartada', projeto: 'pode virar projeto',
+    tarefa: 'pode virar tarefa', virou_projeto: 'virou projeto', virou_tarefa: 'virou tarefa'
+  };
+
+  function estadoDela(s) {
+    var noCatalogo = M.semente(s.id);
+    return noCatalogo || { estado: 'nova', motivo: '' };
+  }
+
   function desenharLista() {
-    var minhas = M.sementesDe(EU).slice().reverse().slice(0, 8);
+    var minhas = M.sementesDe(EU).slice().reverse();
     $lista.innerHTML = minhas.length
       ? minhas.map(function (s) {
+          var e = estadoDela(s);
+          var grupo = e.estado.indexOf('virou_') === 0 ? 'virou' : e.estado;
           return '<li><strong>' + esc(s.nome) + '</strong>' +
             (s.frase !== s.nome ? '<span>' + esc(s.frase) + '</span>' : '') +
-            '<em>' + esc(M.formatarData(M.diaDe(s.criadaEm))) + '</em></li>';
+            '<em>' + esc(M.formatarData(M.diaDe(s.criadaEm))) +
+              ' <b class="semente-estado semente-estado-' + grupo + '">' + esc(ESTADO[e.estado] || e.estado) + '</b></em>' +
+            (e.estado === 'descartada' && e.motivo ? '<span class="semear-motivo">' + esc(e.motivo) + '</span>' : '') +
+            '</li>';
         }).join('')
       : '<li class="aviso">Nada plantado ainda.</li>';
   }
