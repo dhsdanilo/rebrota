@@ -221,6 +221,10 @@ var Sync = (function () {
      envio, se ficou sujo no meio, vai de novo. */
   var sujouNoMeio = false;
 
+  /* Além de abrir, voltar e gravar: com a aba visível, olha a nuvem a cada
+     2 min. Sem isso a mesa aberta o dia todo não via o que a bota fez até
+     alguém trocar de aba — e a semente plantada no pasto parecia sumida. */
+  var CADENCIA_MS = 2 * 60 * 1000;
   function iniciar() {
     carregarCfg();
     // voltar para o app é a hora de ver o que os outros aparelhos fizeram
@@ -228,6 +232,9 @@ var Sync = (function () {
       if (document.visibilityState === 'visible') sincronizar();
     });
     window.addEventListener('online', sincronizar);
+    setInterval(function () {
+      if (document.visibilityState === 'visible') sincronizar();
+    }, CADENCIA_MS);
     return sincronizar();
   }
 

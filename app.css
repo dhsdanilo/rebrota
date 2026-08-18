@@ -2085,6 +2085,16 @@ input[type="number"][readonly] { -moz-appearance: textfield; }
   gap: 8px;
   z-index: 40;
 }
+/* o carimbo da nuvem: miúdo, em mono, clicável */
+.nuvem-carimbo {
+  font-family: var(--mono); font-size: 11px; color: var(--neblina-fraca);
+  padding: 4px 8px; border: 1px solid transparent; border-radius: var(--raio); cursor: pointer;
+  background: var(--breu);
+}
+.nuvem-carimbo:hover { color: var(--neblina); border-color: var(--musgo); }
+.nuvem-carimbo-erro { color: var(--passou); }
+.aviso-copia.aviso-erro { color: var(--passou); }
+@media (max-width: 720px) { .nuvem-carimbo { display: none; } }
 
 .bt-icone {
   width: 34px; height: 34px;

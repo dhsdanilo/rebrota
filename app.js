@@ -469,9 +469,17 @@
   /* Aparelho sem sincronização diz isso na entrada, uma linha, sem alarme —
      é onde se descobre que a semente plantada no pasto não chegou na mesa. */
   function avisoDeNuvem() {
-    if (typeof Sync === 'undefined' || Sync.ligado()) return '';
-    return '<p class="aviso-copia">Este aparelho não sincroniza com os outros. ' +
-      '<button type="button" class="bt-linha bt-mini" data-acao="nuvem">ligar</button></p>';
+    if (typeof Sync === 'undefined') return '';
+    if (!Sync.ligado()) {
+      return '<p class="aviso-copia">Este aparelho não sincroniza com os outros. ' +
+        '<button type="button" class="bt-linha bt-mini" data-acao="nuvem">ligar</button></p>';
+    }
+    // ligado: a última sincronização, miúda, sempre à vista — clique sincroniza
+    var s = Sync.situacao();
+    var texto = s.ocupado ? 'sincronizando…' : s.erro ? '⚠ nuvem: ' + s.erro
+      : s.ultimo ? 'nuvem · sincronizado às ' + M.horaDe(new Date(s.ultimo)) : 'nuvem ligada';
+    return '<p class="aviso-copia' + (s.erro ? ' aviso-erro' : '') + '">' + esc(texto) +
+      ' <button type="button" class="bt-linha bt-mini" data-acao="sincronizar-agora">sincronizar agora</button></p>';
   }
 
   function vagasDaAbertura() {
@@ -2645,6 +2653,7 @@
       M.inserirPendencia(desc);
       return desenhar();
     }
+    if (acao === 'sincronizar-agora') { Sync.sincronizar(); return; }
     if (acao === 'esperar-abrir')  { esperando = tid; return desenharPalco(); }
     if (acao === 'esperar-cancelar') { esperando = null; return desenharPalco(); }
     if (acao === 'esperar-confirmar') {
@@ -3193,6 +3202,15 @@
   function desenharNuvem() {
     var s = Sync.situacao();
     $nuvemEstado.textContent = textoDaNuvem(s);
+    // o carimbo na barra: a última sincronização, sem abrir painel nenhum
+    var carimbo = document.getElementById('nuvemCarimbo');
+    carimbo.hidden = !s.ligado;
+    carimbo.classList.toggle('nuvem-carimbo-erro', !!s.erro);
+    carimbo.textContent = s.ocupado ? 'sincronizando…'
+      : s.erro ? '⚠ nuvem: ' + s.erro
+      : s.ultimo ? 'nuvem · ' + M.horaDe(new Date(s.ultimo))
+      : 'nuvem ligada';
+    carimbo.title = textoDaNuvem(s) + ' — clique para sincronizar agora';
     document.getElementById('btLigarNuvem').hidden = s.ligado;
     document.getElementById('btDesligarNuvem').hidden = !s.ligado;
     document.getElementById('btSincronizarAgora').hidden = !s.ligado;
@@ -3220,6 +3238,7 @@
     Sync.desligar(); desenharNuvem(); desenhar();
   });
   document.getElementById('btSincronizarAgora').addEventListener('click', function () { Sync.sincronizar(); });
+  document.getElementById('nuvemCarimbo').addEventListener('click', function () { Sync.sincronizar(); });
 
   Sync.configurar({ escreveCatalogo: naMesa(), pessoa: 'pe_eu' });
   window.matchMedia('(min-width: 721px)').addEventListener('change', function () {
@@ -3247,6 +3266,8 @@
   });
   Sync.ouvir(function (s, mudouLocal) {
     desenharNuvem();
+    // a linha da nuvem na entrada acompanha o estado (hora, erro), sem mexer no resto
+    if (!mudouLocal && tela.tipo === null && $campo.hidden && !s.ocupado) return desenhar();
     if (!mudouLocal) return;
     if (naMesa()) M.absorverSementes();
     M.cascatearVagas(); colherAvisos();
@@ -3262,7 +3283,9 @@
   desenharProposta();
   if (naMesa()) M.absorverSementes();
   voltarAoLugar();
-  desenhar();
+  // a nuvem carrega o token ANTES do primeiro desenho: senão a entrada dizia
+  // "não sincroniza" com o painel dizendo "sincronizado às…"
   Sync.iniciar();
+  desenhar();
   desenharNuvem();
 })();
