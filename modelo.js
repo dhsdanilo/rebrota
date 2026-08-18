@@ -1335,6 +1335,7 @@ var Modelo = (function () {
   }
 
   function removerTarefa(tid) {
+    var era = tarefa(tid);
     cat().tarefas = cat().tarefas.filter(function (t) { return t.id !== tid; });
     cat().tarefas.forEach(function (t) {
       t.dependeDe = (t.dependeDe || []).filter(function (d) { return d !== tid; });
@@ -1347,6 +1348,8 @@ var Modelo = (function () {
       });
     });
     salvar();
+    // apagar a última de planejamento também fecha o planejamento
+    if (era && era.etapa === 'planejamento') cascatearVagas();
   }
 
   /* Reordena por arraste e renumera. O vínculo aponta para o id da tarefa,
@@ -1391,7 +1394,12 @@ var Modelo = (function () {
       var t = vistos[id];
       if (t.etapa !== etapa) { t.etapa = etapa; t.ultimoToque = agora(); movidas.push(t); }
     });
-    if (movidas.length) salvar();
+    if (movidas.length) {
+      salvar();
+      // a última de planejamento arrastada para execução fecha o planejamento:
+      // a vaga tem que andar, como quando ela é concluída
+      cascatearVagas();
+    }
     return movidas;
   }
 

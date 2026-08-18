@@ -1048,6 +1048,10 @@
       nota = abertas === 1 ? 'Falta 1 tarefa aberta.' : 'Faltam ' + abertas + ' tarefas abertas.';
     } else if (p.papel === 'planejamento' || (p.estado === 'preparo' && !p.papel)) {
       nota = M.oQueFaltaParaSubir(p);
+      // o cadeado tem que dizer o caminho: sem custo, o botão parece morto
+      if (p.estado === 'preparo' && !p.papel && /orçamento/.test(nota || '')) {
+        nota += ' Preencha o custo estimado no Envelope — 0 se não custa nada — e o botão abre.';
+      }
       var idade = M.diasDesde(p.ultimoToque);
       if (p.estado === 'preparo' && !p.papel && idade >= 60) {
         nota += ' Planejado há ' + idade + ' dias.';
@@ -2095,6 +2099,9 @@
   /* Com tarefa ativa, o que cria coisa nova some da coluna: o app inteiro entra
      em consulta, menos o projeto da tarefa. */
   function desenhar() {
+    // o que a regra já decidiu, aplicado antes de desenhar — em todo redesenho,
+    // não só na abertura: arraste, apagar e edição também fecham planejamento
+    if (M.cascatearVagas().length) colherAvisos();
     // registro de uso: qual tela está na frente (a frente de campo é a bota)
     var campoAberto = !document.getElementById('execucao').hidden;
     M.usoTela(campoAberto ? 'campo' : (tela.tipo || 'entrada'));
@@ -2246,6 +2253,7 @@
       avisoCascata = junto > 0
         ? 'Levei junto ' + junto + (junto === 1 ? ' tarefa da mesma corrente.' : ' tarefas da mesma corrente.')
         : '';
+      colherAvisos();
       return desenhar();
     }
 
@@ -2371,7 +2379,8 @@
   function colherAvisos() {
     var movidos = M.avisosDeCascata();
     if (!movidos.length) return;
-    avisoCascata = movidos.map(function (m) {
+    // soma ao que já ia ser dito ("levei junto…"), não substitui
+    avisoCascata = (avisoCascata ? avisoCascata + ' ' : '') + movidos.map(function (m) {
       return m.vaga === 'planejadas'
         ? (m.projeto.nome || 'O projeto') + ' terminou o planejamento e entrou nas planejadas.'
         : (m.projeto.nome || 'Um projeto') + ' assume a vaga de ' + m.vaga + '.';
@@ -2746,6 +2755,7 @@
         avisoCascata = levadas > 0
           ? 'Levei junto ' + levadas + (levadas === 1 ? ' tarefa da mesma corrente.' : ' tarefas da mesma corrente.')
           : '';
+        colherAvisos();
       }
 
       M.reordenar(Array.prototype.map.call(ul.querySelectorAll('.passo'), function (li) {
