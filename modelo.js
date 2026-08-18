@@ -147,7 +147,10 @@ var Modelo = (function () {
         // absorveram a caixa de entrada: o que entra pelo ( + ) já nasce semente
         sementes: [],
         // ids de sementes que nasceram como evento e a mesa já trouxe para cá
-        absorvidas: []
+        absorvidas: [],
+        // sobe a cada gravação que muda o catálogo: é o que impede um aparelho
+        // com catálogo velho de escrever por cima do novo (§38)
+        versao: 0
       },
       diarios: { pe_eu: { pessoa: 'pe_eu', eventos: [] } }
     };
@@ -174,10 +177,11 @@ var Modelo = (function () {
   function carregar() {
     try {
       var cru = localStorage.getItem(CHAVE);
-      if (cru) estado = costurar(JSON.parse(cru));
+      if (cru) { estado = costurar(JSON.parse(cru)); ultimoCru = cru; }
     } catch (e) {
       console.warn('Não consegui ler o guardado. Começando vazio.', e);
     }
+    ultimoCatalogo = JSON.stringify(estado.catalogo);
     carregarKit();
     derivar();
     return estado;
@@ -188,15 +192,39 @@ var Modelo = (function () {
      entrava no páreo com restante zero e "cabia" em qualquer janela. */
   var aoSalvar = null;      // quem quer saber que algo foi gravado (a sincronização)
   var silencio = false;     // gravação vinda de fora não avisa de volta
+  var ultimoCatalogo = '';  // o catálogo como foi gravado da última vez, para saber se mudou
+  var ultimoCru = null;     // a string gravada por ESTA aba, para reconhecer gravação de outra
 
   function salvar() {
+    // catálogo mudou por mão local: sobe a versão (gravação vinda de fora chega com a dela)
+    var agoraCat = JSON.stringify(estado.catalogo);
+    if (!silencio && ultimoCatalogo && agoraCat !== ultimoCatalogo) {
+      estado.catalogo.versao = (Number(estado.catalogo.versao) || 0) + 1;
+    }
+    ultimoCatalogo = JSON.stringify(estado.catalogo);
     try {
-      localStorage.setItem(CHAVE, JSON.stringify(estado));
+      ultimoCru = JSON.stringify(estado);
+      localStorage.setItem(CHAVE, ultimoCru);
     } catch (e) {
       console.warn('Não consegui gravar. Use exportar como paraquedas.', e);
     }
     derivar();
     if (aoSalvar && !silencio) aoSalvar();
+  }
+
+  /* Outra aba da mesma origem gravou (evento `storage`): esta relê, em vez de
+     ficar com a memória velha e gravar por cima na próxima tecla. Devolve se
+     mudou algo — quem chamou redesenha. */
+  function relerSeOutraAbaGravou() {
+    var cru = null;
+    try { cru = localStorage.getItem(CHAVE); } catch (e) { return false; }
+    if (!cru || cru === ultimoCru) return false;
+    try { estado = costurar(JSON.parse(cru)); } catch (e) { return false; }
+    ultimoCru = cru;
+    ultimoCatalogo = JSON.stringify(estado.catalogo);
+    carregarKit();
+    derivar();
+    return true;
   }
 
   function quandoSalvar(fn) { aoSalvar = fn; }
@@ -212,6 +240,13 @@ var Modelo = (function () {
     silencio = true; salvar(); silencio = false;
     return true;
   }
+
+  // catálogo sem projeto, tarefa nem semente: nunca deve escrever por cima de um cheio
+  function catalogoVazio(c) {
+    c = c || estado.catalogo;
+    return !(c.projetos || []).length && !(c.tarefas || []).length && !(c.sementes || []).length;
+  }
+  function versaoDoCatalogo(c) { return Number((c || estado.catalogo).versao) || 0; }
 
   /* União por id: entra o que ainda não tinha, nada sai. Devolve quantos
      entraram aqui e quantos daqui faltam lá — quem chamou decide subir. */
@@ -283,6 +318,7 @@ var Modelo = (function () {
     Object.keys(base.catalogo).forEach(function (k) {
       if (Array.isArray(cat[k])) base.catalogo[k] = cat[k];
     });
+    base.catalogo.versao = Number(cat.versao) || 0;
     if (!base.catalogo.pessoas.length) base.catalogo.pessoas = vazio().catalogo.pessoas;
 
     // arquivos anteriores à fusão traziam uma caixa de entrada separada
@@ -1620,6 +1656,9 @@ var Modelo = (function () {
 
   function tarefaDePensar(t, nota) {
     var nova = novaTarefa(t ? t.projetoId : null, 0);
+    // herda a etapa: destrave de planejamento nascendo como execução nunca era
+    // oferecido (a vaga de planejamento só emite planejamento) — travava tudo
+    if (t && t.etapa) nova.etapa = t.etapa;
     nova.texto = 'Pensar em como destravar: ' + (t ? t.texto : 'a tarefa');
     nova.ondePrecisaEstar = 'computador';
     nova.duracaoTotal = nova.restanteEstimado = 30;
@@ -1653,6 +1692,7 @@ var Modelo = (function () {
     }
     if (regra && regra.destrave) {
       var d = novaTarefa(t ? t.projetoId : null, 0);
+      if (t && t.etapa) d.etapa = t.etapa;   // mesma razão da tarefa de pensar
       d.texto = regra.destrave + (nota || (t ? t.texto : ''));
       d.ondePrecisaEstar = (motivo === 'terceiro') ? 'fora'
                          : (motivo === 'sem_ferramenta' || motivo === 'faltou_material') ? 'computador'
@@ -1669,6 +1709,41 @@ var Modelo = (function () {
   /* Clima é registro do dia, não critério de consulta: fica guardado como
      série temporal para um dia a estação meteorológica ocupar esse lugar sem
      mudar mais nada. Perguntado uma vez por dia; depois vira confirmação. */
+  /* USO (§38): onde as horas foram. Uma linha por sessão — abrir → sair —,
+     com o app (mesa · bota · sementeira), início, fim, minutos e segundos por
+     tela. É dado, não julgamento: nada disto aparece em tela nenhuma; é
+     matéria-prima para o modo analisar saber se o app deixa a pessoa mais
+     ativa ou só mais ocupada na mesa. Sessão de menos de 15 s não entra. */
+  var uso = { app: '', desde: null, tela: '', telaDesde: 0, telas: {}, quem: 'pe_eu' };
+
+  function usoIniciar(quem, app) {
+    uso = { app: app, desde: agora(), tela: '', telaDesde: Date.now(), telas: {}, quem: quem };
+  }
+  function usoTela(nome) {
+    var t = Date.now();
+    if (uso.tela) uso.telas[uso.tela] = (uso.telas[uso.tela] || 0) + Math.round((t - uso.telaDesde) / 1000);
+    uso.tela = nome || '';
+    uso.telaDesde = t;
+  }
+  function usoFechar() {
+    if (!uso.desde) return null;
+    usoTela(uso.tela);            // fecha a tela corrente
+    var seg = Math.round((Date.now() - new Date(uso.desde).getTime()) / 1000);
+    var ev = null;
+    if (seg >= 15) {
+      ev = registrar(uso.quem, 'esteve', {
+        app: uso.app, de: uso.desde, ate: agora(),
+        minutos: Math.round(seg / 6) / 10, telas: uso.telas
+      });
+    }
+    // a sessão seguinte começa daqui, se o app voltar sem recarregar
+    uso = { app: uso.app, desde: null, tela: uso.tela, telaDesde: Date.now(), telas: {}, quem: uso.quem };
+    return ev;
+  }
+  function usoRetomar() {
+    if (!uso.desde) { uso.desde = agora(); uso.telaDesde = Date.now(); uso.telas = {}; }
+  }
+
   function registrarClima(quem, tempo, barro) {
     return registrar(quem, 'clima', { dia: hoje(), tempo: tempo, barro: !!barro });
   }
@@ -1866,6 +1941,8 @@ var Modelo = (function () {
 
     // sincronização
     quandoSalvar: quandoSalvar, receberCatalogo: receberCatalogo, unirDiario: unirDiario,
+    catalogoVazio: catalogoVazio, versaoDoCatalogo: versaoDoCatalogo, relerSeOutraAbaGravou: relerSeOutraAbaGravou,
+    usoIniciar: usoIniciar, usoTela: usoTela, usoFechar: usoFechar, usoRetomar: usoRetomar,
     semear: semear, absorverSementes: absorverSementes, sementesDe: sementesDe,
     nomeDe: nomeDe,
 

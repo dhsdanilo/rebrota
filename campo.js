@@ -447,6 +447,7 @@ var Campo = (function () {
   // ── desenho ───────────────────────────────────────────────────────
 
   function desenhar() {
+    M.usoTela('campo:' + cena.fase);
     var html =
       cena.fase === 'pergunta'  ? marcacaoPergunta()
     : cena.fase === 'resposta'  ? marcacaoResposta()

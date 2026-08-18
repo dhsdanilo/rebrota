@@ -30,6 +30,7 @@
   var filtroAvulsas = '';          // grupo aberto na página das avulsas
   var filtroSementes = 'nova';     // a caixa de entrada abre no que não tem destino
   var mudaAviso = '';              // o que faltou para a muda ficar pronta, no último toque
+  var mudaAvisoDe = null;          // …e de qual muda, para não vazar para a ficha de outra
   var sementeDescartando = null;   // semente com o campo de motivo aberto
   var voltarPara = null;           // de onde se veio, para poder folhear
 
@@ -693,7 +694,7 @@
           '<button type="button" class="bt-forte bt-mini' + (falta.length ? ' bt-travado' : '') + '"' +
             (falta.length ? ' title="' + esc('Falta: ' + falta.join(', ') + '.') + '"' : '') +
             ' data-acao="muda-pronta" data-id="' + p.id + '">' + (falta.length ? CADEADO : '') + 'pronta</button>') +
-        (falta.length ? '<span class="muda-falta">' + esc(mudaAviso || ('Falta: ' + falta.join(', ') + '.')) + '</span>' : '');
+        (falta.length ? '<span class="muda-falta">' + esc((mudaAvisoDe === p.id && mudaAviso) || ('Falta: ' + falta.join(', ') + '.')) + '</span>' : '');
     }
 
     function caixa(campo, rotulo, valor, dica) {
@@ -2005,6 +2006,9 @@
   /* Com tarefa ativa, o que cria coisa nova some da coluna: o app inteiro entra
      em consulta, menos o projeto da tarefa. */
   function desenhar() {
+    // registro de uso: qual tela está na frente (a frente de campo é a bota)
+    var campoAberto = !document.getElementById('execucao').hidden;
+    M.usoTela(campoAberto ? 'campo' : (tela.tipo || 'entrada'));
     var criar = emConsultaGeral();
     var btNovo = document.getElementById('btNovoProjeto');
     btNovo.hidden = criar;
@@ -2503,8 +2507,8 @@
     // ── muda: pronta, plantando, reabrir ──
     if (acao === 'muda-pronta') {
       var falta = M.marcarMudaPronta(tid);
-      if (falta && falta.length) mudaAviso = 'Falta: ' + falta.join(', ') + '.';
-      else mudaAviso = '';
+      if (falta && falta.length) { mudaAviso = 'Falta: ' + falta.join(', ') + '.'; mudaAvisoDe = tid; }
+      else { mudaAviso = ''; mudaAvisoDe = null; }
       return desenhar();
     }
     if (acao === 'muda-plantar') { M.voltarAPlantar(tid); mudaAviso = ''; return desenhar(); }
@@ -3005,6 +3009,21 @@
     Sync.configurar({ escreveCatalogo: naMesa(), pessoa: 'pe_eu' });
   });
   M.quandoSalvar(function () { Sync.marcarSujo(); });
+
+  // ── uso: uma linha por sessão, para o modo analisar (§38) ──
+  M.usoIniciar('pe_eu', naMesa() ? 'mesa' : 'bota');
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'hidden') M.usoFechar();
+    else M.usoRetomar();
+  });
+  window.addEventListener('pagehide', function () { M.usoFechar(); });
+
+  // outra aba (ou a Sementeira no mesmo aparelho) gravou: relê e redesenha,
+  // em vez de gravar memória velha por cima na próxima tecla
+  window.addEventListener('storage', function (e) {
+    if (e.key !== 'app-sitio-v3') return;
+    if (M.relerSeOutraAbaGravou()) desenhar();
+  });
   Sync.ouvir(function (s, mudouLocal) {
     desenharNuvem();
     if (!mudouLocal) return;

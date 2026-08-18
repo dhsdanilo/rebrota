@@ -133,7 +133,9 @@ var Sync = (function () {
   /* Baixa tudo, junta com o local, sobe o que este aparelho tem direito de
      escrever. Uma passada só; quem chamou de novo no meio espera a próxima. */
   function sincronizar() {
-    if (!ligado() || estado.ocupado || !navigator.onLine) return Promise.resolve(false);
+    if (!ligado() || !navigator.onLine) return Promise.resolve(false);
+    if (estado.ocupado) { sujouNoMeio = true; return Promise.resolve(false); }
+    sujouNoMeio = false;
     estado.ocupado = true; estado.erro = '';
     avisar();
 
@@ -143,12 +145,30 @@ var Sync = (function () {
     return acharGist().then(lerGist).then(function (arquivos) {
       var subir = {};
 
-      // 1. catálogo: a mesa é a fonte; os outros aceitam o que vier
+      /* 1. catálogo. A mesa é a fonte — mas LÊ ANTES de escrever (§38):
+           - versão maior lá do que aqui → o daqui está velho, aceita o de lá
+             (é o celular deitado, a janela estreita, a mesa nova, a segunda mesa);
+           - catálogo daqui vazio e o de lá cheio → nunca escreve por cima;
+           - primeira sincronização deste aparelho como mesa → aceita o de lá,
+             porque o daqui pode ser a amostra do dados.js;
+           - senão, o daqui é o mais novo: sobe.
+           Quem não é mesa aceita o de lá, salvo se o daqui for mais novo (foi
+           mesa há pouco e ainda não subiu) — aí espera. */
       var remoto = lerJson(arquivos['catalogo.json']);
+      var remotoValido = remoto && typeof remoto === 'object';
+      var vLa = remotoValido ? M.versaoDoCatalogo(remoto) : -1;
+      var vAqui = M.versaoDoCatalogo();
       if (papel.escreveCatalogo) {
-        var meu = JSON.stringify(M.cat());
-        if (!remoto || JSON.stringify(remoto) !== meu) subir['catalogo.json'] = meu;
-      } else if (remoto && typeof remoto === 'object') {
+        var aceitarDeLa = remotoValido && !M.catalogoVazio(remoto) &&
+          (vLa > vAqui || M.catalogoVazio() || !cfg.jaFoiMesa);
+        if (aceitarDeLa) {
+          if (M.receberCatalogo(remoto)) mudouLocal = true;
+        } else {
+          var meu = JSON.stringify(M.cat());
+          if (!remotoValido || JSON.stringify(remoto) !== meu) subir['catalogo.json'] = meu;
+        }
+        if (!cfg.jaFoiMesa) { cfg.jaFoiMesa = true; salvarCfg(); }
+      } else if (remotoValido && vLa >= vAqui) {
         if (M.receberCatalogo(remoto)) mudouLocal = true;
       }
 
@@ -177,11 +197,13 @@ var Sync = (function () {
       sujo.catalogo = sujo.diarios = false;
       avisar();
       if (mudouLocal) ouvintes.forEach(function (fn) { try { fn(situacao(), true); } catch (e) {} });
+      if (sujouNoMeio) { clearTimeout(relogio); relogio = setTimeout(sincronizar, ESPERA_MS); }
       return mudouLocal;
     }).catch(function (e) {
       estado.ocupado = false;
       estado.erro = e.message || String(e);
       avisar();
+      if (sujouNoMeio) { clearTimeout(relogio); relogio = setTimeout(sincronizar, ESPERA_MS); }
       return false;
     });
   }
@@ -194,6 +216,10 @@ var Sync = (function () {
     clearTimeout(relogio);
     relogio = setTimeout(sincronizar, ESPERA_MS);
   }
+
+  /* Gravação que chegou com um envio no ar não pode se perder: ao acabar o
+     envio, se ficou sujo no meio, vai de novo. */
+  var sujouNoMeio = false;
 
   function iniciar() {
     carregarCfg();

@@ -45,6 +45,7 @@
 
   function ir(para) {
     pagina = para;
+    M.usoTela(para);
     document.getElementById('paginaPlantar').hidden = para !== 'plantar';
     document.getElementById('paginaSitio').hidden = para !== 'sitio';
     $btIr.textContent = para === 'sitio' ? 'plantar' : 'o sítio';
@@ -314,6 +315,15 @@
 
   Sync.configurar({ escreveCatalogo: false, pessoa: EU });
   M.quandoSalvar(function () { Sync.marcarSujo(); });
+  M.usoIniciar(EU, 'sementeira'); M.usoTela('plantar');
+  document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'hidden') M.usoFechar(); else M.usoRetomar();
+  });
+  window.addEventListener('pagehide', function () { M.usoFechar(); });
+  window.addEventListener('storage', function (e) {
+    if (e.key !== 'app-sitio-v3') return;
+    if (M.relerSeOutraAbaGravou()) { desenharLista(); if (pagina === 'sitio') desenharSitio(); }
+  });
   Sync.ouvir(function () {
     desenharNuvem(); desenharLista();
     if (pagina === 'sitio') desenharSitio();
