@@ -1356,6 +1356,14 @@
             ' value="' + esc(t.duracaoTotal) + '">'
           : '<span class="passo-tempo" title="' + esc(AJUDA_DURACAO) + '">' +
             '<i aria-hidden="true">⏱</i>' + esc(M.duracao(t.duracaoTotal)) + '</span>') +
+        // delegar ao diarista (§39): decisão de véspera, na própria linha
+        (emConsulta(t.projetoId) ? ''
+          : t.separada
+          ? '<span class="passo-delegada" title="separada para o diarista">delegada · ' + esc(M.formatarData(t.separada.dia)) + '</span>' +
+            '<button type="button" class="bt-linha bt-mini" data-acao="desfazer-separacao" data-id="' + t.id + '">tirar da folha</button>'
+          : M.podeSeparar(t)
+          ? '<button type="button" class="bt-linha bt-mini" data-acao="separar-diarista" data-id="' + t.id + '">delegar</button>'
+          : '') +
         // as duas ações da linha, com nome: concluir de um lado do editar
         (emConsulta(t.projetoId) ? ''
           : pronta
@@ -1366,18 +1374,7 @@
           ? '<button type="button" class="bt-forte bt-mini" data-acao="salvar-passo">salvar</button>'
           : '<button type="button" class="bt-linha bt-mini" data-acao="editar-passo" data-id="' + t.id + '">editar</button>') +
       '</div>' +
-      /* o diarista (§39): com a ficha aberta, a linha oferece separar — não
-         precisa entrar em editar para isso, que é decisão de véspera */
-      (aberto && !solto && !emConsulta(t.projetoId) && (M.podeSeparar(t) || t.separada)
-        ? '<div class="passo-diarista">' +
-          (t.separada
-            ? '<span class="aviso-linha aviso-diarista">separada para o diarista · ' + esc(M.formatarData(t.separada.dia)) + '</span>' +
-              '<button type="button" class="bt-linha bt-mini" data-acao="desfazer-separacao" data-id="' + t.id + '">tirar da folha</button>'
-            : '<button type="button" class="bt-linha bt-mini" data-acao="separar-diarista" data-id="' + t.id + '">separar para o diarista</button>') +
-          '</div>'
-        : '') +
-      (t.separada && !aberto
-        ? '<div class="passo-avisos"><span class="aviso-linha aviso-diarista">separada para o diarista · ' + esc(M.formatarData(t.separada.dia)) + '</span></div>' : '') +
+
       (avisos.length && !aberto
         ? '<div class="passo-avisos">' + avisos.map(function (a) {
             return '<span class="aviso-linha">' + esc(a) + '</span>'; }).join('') + '</div>'
@@ -1590,10 +1587,6 @@
         : '<div class="passo-rodape">' +
             '<button type="button" class="bt-forte" data-acao="salvar-passo">salvar</button>' +
             '<span class="passo-rodape-fim">' +
-              (M.podeSeparar(t)
-                ? '<button type="button" class="bt-linha" data-acao="separar-diarista" data-id="' + t.id + '">separar para o diarista</button>' : '') +
-              (t.separada
-                ? '<button type="button" class="bt-linha" data-acao="desfazer-separacao" data-id="' + t.id + '">tirar da folha do diarista</button>' : '') +
               '<button type="button" class="bt-linha" data-acao="cancelar-tarefa" data-id="' + t.id + '">cancelar tarefa</button>' +
               '<button type="button" class="bt-linha" data-acao="remover-passo" data-id="' + t.id + '">apagar</button>' +
             '</span>' +

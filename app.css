@@ -425,7 +425,7 @@ button, input, select, textarea {
 .folha-metade input { background: var(--mata); border: 1px solid var(--musgo); border-radius: var(--raio); color: var(--neblina); padding: 5px 8px; font-size: 14px; }
 .folha-metade input[type="number"] { width: 80px; }
 .aviso-diarista { color: var(--casca); }
-.passo-diarista { display: flex; align-items: center; gap: 10px; padding: 4px 0 6px 40px; }
+.passo-delegada { font-family: var(--mono); font-size: 11px; color: var(--casca); white-space: nowrap; }
 @media print {
   .coluna-projetos, .ferramentas, .topo, .folha-acoes, .rodape-acoes, .folha-cabeca button, .bilhete-bt { display: none !important; }
   body { background: #fff; color: #000; }
