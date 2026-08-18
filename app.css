@@ -1418,6 +1418,7 @@ input[type="number"][readonly] { -moz-appearance: textfield; }
 /* seções por etapa, marcadores e caixinhas */
 
 .secao-cabeca { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.secao-adicionar { margin-left: auto; }
 .secao-cabeca .secao-titulo { margin-bottom: 0; }
 
 /* sobrou só o ESTADO — a explicação da regra foi para o hover do título */

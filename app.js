@@ -1177,6 +1177,12 @@
             (recolhido ? tarefas.length + ' tarefas, todas resolvidas · mostrar' : 'esconder') +
             '</button>'
           : '') +
+        // adicionar também aqui em cima: numa lista longa, descer até o pé para
+        // incluir uma tarefa é caminhada demais (fica nos dois lugares)
+        (!emConsulta(p.id) && p.estado !== 'fila' && !recolhido
+          ? '<button type="button" class="bt-fraco bt-mini secao-adicionar" data-acao="nova-tarefa" data-id="' + p.id +
+            '" data-etapa="' + etapa + '">adicionar tarefa</button>'
+          : '') +
       '</div>' +
       (recolhido ? '' :
         listaPassos(tarefas, etapa) +
@@ -2535,7 +2541,11 @@
       nova.etapa = etapa;
       M.salvar();
       passoAberto = passoEditando = nova.id;   // tarefa nova nasce solta
-      return desenhar();
+      desenhar();
+      // ela nasce no pé da lista; quem clicou em cima precisa ser levado até ela
+      var li = $palco.querySelector('[data-tarefa="' + nova.id + '"]');
+      if (li) { li.scrollIntoView({ block: 'center', behavior: 'smooth' }); var campo = li.querySelector('.passo-texto'); if (campo) campo.focus(); }
+      return;
     }
 
     // o título abre e fecha a ficha; o botão da linha solta os campos
