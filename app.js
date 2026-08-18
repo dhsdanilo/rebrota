@@ -545,6 +545,9 @@
           : '<button type="button" class="bt-fraco" data-acao="editar-projeto" data-id="' + p.id + '">editar</button>',
       '</div>',
 
+      // a confirmação da ação fica colada na barra que a abriu — não no meio da ficha
+      caixaAcao(p),
+
       /* A MUDA (§37): enquanto o projeto espera vaga, o trabalho é lapidar a
          ideia — e a ficha é essa lapidação. Depois de virar obra, a muda fica
          guardada num grupo fechado no pé: registro, não formulário. */
@@ -568,8 +571,6 @@
       // a muda que esta obra foi: guardada, fechada, para ler quando a vontade acabar
       (p.estado !== 'fila' && p.estado !== 'descartado' && M.cadeiasVivas(p.muda.vantagens).length)
         ? grupoRecolhido('A muda que isto foi', p.id, resumoMuda(p)) : '',
-
-      caixaAcao(p),
 
       /* O envelope é gatilho de entrada: dispara uma vez e some. Num projeto já
          rodando ele não decide mais nada, e ficar mostrando dinheiro no meio da
