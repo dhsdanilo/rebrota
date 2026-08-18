@@ -638,7 +638,8 @@ button, input, select, textarea {
 
 .ficha-abrir:hover .ficha-nome { color: var(--casca); }
 .ficha-nome { display: block; font-size: 15px; }
-.ficha-obra { display: block; font-size: 12px; color: var(--neblina-fraca); }
+/* o resultado, embaixo do nome: o destino, na cor de destaque, como na ficha */
+.ficha-obra { display: block; font-size: 13px; color: var(--casca); }
 
 .ficha-idade {
   display: block;

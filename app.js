@@ -930,10 +930,10 @@
     return '<li class="ficha-projeto vaga-' + r.chave + '">' +
       '<button type="button" class="ficha-abrir" data-abrir="projeto" data-id="' + p.id + '">' +
         '<span class="item-etiqueta"><i class="pino"></i>' + esc(r.texto) + '</span>' +
-        // o resultado, não o nome da obra: porta trancada só puxa se atrás dela
-        // houver um fim pretendido, não um serviço
-        '<span class="ficha-nome">' + esc(p.resultado || p.nome || 'sem nome') + '</span>' +
-        (p.resultado && p.nome ? '<span class="ficha-obra">' + esc(p.nome) + '</span>' : '') +
+        // na mesa, o nome da obra é o destaque (§4: o PC mostra o nome; a bota,
+        // o resultado). O resultado vem embaixo, como o destino que a obra serve.
+        '<span class="ficha-nome">' + esc(p.nome || p.resultado || 'sem nome') + '</span>' +
+        (p.resultado && p.nome ? '<span class="ficha-obra">' + esc(p.resultado) + '</span>' : '') +
         (falta ? '<span class="item-nota">' + esc(falta) + '</span>' : '') +
         (mostraEnvelope(p) ? barraEnvelope(p) : '') +
         (idade >= 60 && p.estado !== 'ativo'
