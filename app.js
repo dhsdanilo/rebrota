@@ -31,6 +31,7 @@
   var filtroSementes = 'nova';     // a caixa de entrada abre no que não tem destino
   var mudaAviso = '';              // o que faltou para a muda ficar pronta, no último toque
   var mudaAvisoDe = null;          // …e de qual muda, para não vazar para a ficha de outra
+  var diaristaMetade = null;       // linha da folha com o campo "sobrou quanto?" aberto
   var sementeDescartando = null;   // semente com o campo de motivo aberto
   var voltarPara = null;           // de onde se veio, para poder folhear
 
@@ -154,7 +155,12 @@
     document.getElementById('listaPendencias').innerHTML = itemSimples(
       'pendencias', 'Aguardando',
       abertas.length ? abertas.length + ' em aberto' : 'nada esperando',
-      pior);
+      pior) +
+      // a folha do diarista só existe quando há algo separado
+      (M.separadas().length
+        ? itemSimples('diarista', 'Diarista', M.separadas().length + ' separada' + (M.separadas().length === 1 ? '' : 's') +
+            ' · ' + M.formatarData(M.separadas()[0].separada.dia) + ' · ~' + M.duracao(M.minutosSeparados()))
+        : '');
 
     // a coluna diz o que pede análise: as novas. O resto já tem destino.
     var novas = M.cat().sementes.filter(function (s) { return s.estado === 'nova'; }).length;
@@ -231,6 +237,7 @@
     avulsas:    marcacaoAvulsas,
     pendencias: marcacaoPendencias,
     sementes:   marcacaoSementes,
+    diarista:   marcacaoDiarista,
     proposta:   marcacaoProposta
   };
 
@@ -1359,6 +1366,8 @@
           ? '<button type="button" class="bt-forte bt-mini" data-acao="salvar-passo">salvar</button>'
           : '<button type="button" class="bt-linha bt-mini" data-acao="editar-passo" data-id="' + t.id + '">editar</button>') +
       '</div>' +
+      (t.separada && !aberto
+        ? '<div class="passo-avisos"><span class="aviso-linha aviso-diarista">separada para o diarista · ' + esc(M.formatarData(t.separada.dia)) + '</span></div>' : '') +
       (avisos.length && !aberto
         ? '<div class="passo-avisos">' + avisos.map(function (a) {
             return '<span class="aviso-linha">' + esc(a) + '</span>'; }).join('') + '</div>'
@@ -1571,6 +1580,10 @@
         : '<div class="passo-rodape">' +
             '<button type="button" class="bt-forte" data-acao="salvar-passo">salvar</button>' +
             '<span class="passo-rodape-fim">' +
+              (M.podeSeparar(t)
+                ? '<button type="button" class="bt-linha" data-acao="separar-diarista" data-id="' + t.id + '">separar para o diarista</button>' : '') +
+              (t.separada
+                ? '<button type="button" class="bt-linha" data-acao="desfazer-separacao" data-id="' + t.id + '">tirar da folha do diarista</button>' : '') +
               '<button type="button" class="bt-linha" data-acao="cancelar-tarefa" data-id="' + t.id + '">cancelar tarefa</button>' +
               '<button type="button" class="bt-linha" data-acao="remover-passo" data-id="' + t.id + '">apagar</button>' +
             '</span>' +
@@ -1846,6 +1859,79 @@
   }
 
   // ── sementes ──────────────────────────────────────────────────────
+
+  // ── a folha do diarista (§39) ─────────────────────────────────────
+  /* Uma lista na ordem que o Dan quer, com o que a pessoa precisa saber para
+     fazer sem perguntar: onde, ferramentas, materiais, quanto tempo. Copia
+     como texto puro para mandar; imprime limpa. Fechar o dia é aqui também:
+     feita · pela metade · não fez, em nome dele. */
+  function marcacaoDiarista() {
+    var lista = M.separadas();
+    if (!lista.length) {
+      return '<h2>Diarista</h2><p class="palco-sub">Nada separado. Abra uma tarefa de execução (projeto em vaga ou avulsa) e use <em>separar para o diarista</em>.</p>';
+    }
+    var dia = lista[0].separada.dia;
+    return [
+      '<h2>Folha do diarista</h2>',
+      '<p class="palco-sub">Só o que ele precisa para fazer sem perguntar. Separada, a tarefa sai do seu páreo até você fechar o dia.</p>',
+      '<div class="folha-cabeca">',
+        '<label class="folha-dia">para o dia <input type="date" id="diaDiarista" value="' + esc(dia) + '"></label>',
+        '<span class="folha-total">~' + esc(M.duracao(M.minutosSeparados())) + ' · ' + lista.length + (lista.length === 1 ? ' tarefa' : ' tarefas') + '</span>',
+        '<button type="button" class="bt-fraco bt-mini" data-acao="diarista-copiar">copiar a folha</button>',
+        '<button type="button" class="bt-fraco bt-mini" onclick="window.print()">imprimir</button>',
+      '</div>',
+      '<ol class="folha">',
+      lista.map(function (t, i) {
+        var p = t.projetoId ? M.projeto(t.projetoId) : null;
+        var abrindo = diaristaMetade === t.id;
+        return '<li class="folha-item">' +
+          '<div class="folha-linha">' +
+            '<span class="folha-n">' + (i + 1) + '</span>' +
+            '<div class="folha-texto"><strong>' + esc(t.texto || 'tarefa sem texto') + '</strong>' +
+              '<em>' + (p ? esc(p.nome) + ' · ' : '') + esc(M.duracao(M.restanteDe(t.id) || t.duracaoTotal)) +
+                (t.onde ? ' · ' + esc(t.onde) : '') + '</em>' +
+              ((t.ferramentas || []).length ? '<span>⚒ ' + esc(t.ferramentas.join(', ')) + '</span>' : '') +
+              ((t.materiais || []).length ? '<span>▤ ' + esc(t.materiais.join(', ')) + '</span>' : '') +
+              (M.recadoDe && M.recadoDe(t.id) ? '<span class="folha-recado">' + esc(M.recadoDe(t.id)) + '</span>' : '') +
+            '</div>' +
+            '<span class="folha-acoes">' +
+              '<button type="button" class="bt-linha bt-mini" data-acao="diarista-mover" data-valor="-1" data-id="' + t.id + '" aria-label="subir">↑</button>' +
+              '<button type="button" class="bt-linha bt-mini" data-acao="diarista-mover" data-valor="1" data-id="' + t.id + '" aria-label="descer">↓</button>' +
+              '<button type="button" class="bt-fraco bt-mini" data-acao="diarista-fechar" data-valor="feita" data-id="' + t.id + '">feita</button>' +
+              '<button type="button" class="bt-fraco bt-mini" data-acao="diarista-metade" data-id="' + t.id + '">pela metade</button>' +
+              '<button type="button" class="bt-linha bt-mini" data-acao="diarista-fechar" data-valor="nao_fez" data-id="' + t.id + '">não fez</button>' +
+            '</span>' +
+          '</div>' +
+          (abrindo
+            ? '<div class="folha-metade">' +
+                '<label>sobrou quanto? <input type="number" min="5" id="sobrou_' + t.id + '" placeholder="min"></label>' +
+                '<input type="text" id="nota_' + t.id + '" placeholder="o que ele disse (opcional)">' +
+                '<button type="button" class="bt-forte bt-mini" data-acao="diarista-fechar" data-valor="metade" data-id="' + t.id + '">registrar</button>' +
+              '</div>'
+            : '') +
+          '</li>';
+      }).join(''),
+      '</ol>',
+      '<div class="rodape-acoes"><button type="button" class="bt-linha" data-acao="diarista-desfazer-tudo">ele não veio — devolver tudo ao meu páreo</button></div>'
+    ].join('');
+  }
+
+  function textoDaFolha() {
+    var lista = M.separadas();
+    var linhas = ['Rebrota — folha do diarista · ' + M.formatarData(lista[0].separada.dia), ''];
+    lista.forEach(function (t, i) {
+      var p = t.projetoId ? M.projeto(t.projetoId) : null;
+      linhas.push((i + 1) + '. ' + (t.texto || 'tarefa sem texto') + (p ? ' (' + p.nome + ')' : ''));
+      var det = [];
+      if (t.onde) det.push('onde: ' + t.onde);
+      det.push('~' + M.duracao(M.restanteDe(t.id) || t.duracaoTotal));
+      if ((t.ferramentas || []).length) det.push('ferramentas: ' + t.ferramentas.join(', '));
+      if ((t.materiais || []).length) det.push('material: ' + t.materiais.join(', '));
+      linhas.push('   ' + det.join(' · '));
+    });
+    linhas.push('', 'total ~' + M.duracao(M.minutosSeparados()));
+    return linhas.join('\n');
+  }
 
   /* A página de sementes é a CAIXA DE ENTRADA da análise: abre em "nova" —
      só o que ainda não tem destino — e cada semente pede um toque. Descartar
@@ -2481,6 +2567,35 @@
       M.inserirSemente(texto);
       return desenhar();
     }
+    // ── diarista ──
+    if (acao === 'separar-diarista') { M.separarTarefa(tid); return desenhar(); }
+    if (acao === 'desfazer-separacao') { M.desfazerSeparacao(tid); return desenhar(); }
+    if (acao === 'diarista-fechar') {
+      var como = el.getAttribute('data-valor');
+      var sobrou = como === 'metade' ? valorDoCampo('sobrou_' + tid) : null;
+      if (como === 'metade' && !sobrou) { var c = document.getElementById('sobrou_' + tid); if (c) c.focus(); return; }
+      M.fecharDiarista(tid, como, sobrou, valorDoCampo('nota_' + tid));
+      colherAvisos();
+      return desenhar();
+    }
+    if (acao === 'diarista-metade') { diaristaMetade = tid; return desenharPalco(); }
+    if (acao === 'diarista-mover') {
+      var ids = M.separadas().map(function (t) { return t.id; });
+      var i = ids.indexOf(tid), j = i + Number(el.getAttribute('data-valor'));
+      if (i < 0 || j < 0 || j >= ids.length) return;
+      ids.splice(j, 0, ids.splice(i, 1)[0]);
+      M.reordenarSeparadas(ids);
+      return desenharPalco();
+    }
+    if (acao === 'diarista-copiar') {
+      var texto = textoDaFolha();
+      function feito() { var b = el; b.textContent = 'copiado'; setTimeout(function () { b.textContent = 'copiar a folha'; }, 1500); }
+      if (navigator.clipboard) navigator.clipboard.writeText(texto).then(feito, function () { prompt('Copie:', texto); });
+      else prompt('Copie:', texto);
+      return;
+    }
+    if (acao === 'diarista-desfazer-tudo') { M.separadas().forEach(function (t) { M.desfazerSeparacao(t.id); }); tela = { tipo: null, id: null }; return desenhar(); }
+
     if (acao === 'filtrar-sementes') {
       filtroSementes = el.getAttribute('data-valor'); sementeDescartando = null;
       return desenharPalco();
@@ -2818,6 +2933,7 @@
     if (e.target.hasAttribute('data-campo')) escrever(e.target);
   });
   $palco.addEventListener('change', function (e) {
+    if (e.target.id === 'diaDiarista' && e.target.value) { M.definirDiaDiarista(e.target.value); return desenhar(); }
     if (e.target.hasAttribute('data-muda')) return escreverMuda(e.target, true);
     if (e.target.hasAttribute('data-campo')) return escrever(e.target);
     // escolher a semente já cria a tarefa: a escolha é a ação

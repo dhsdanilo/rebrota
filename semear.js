@@ -180,7 +180,8 @@
         if (!lista.length) return '';
         return '<h4>' + titulo + '</h4><ul class="sitio-tarefas">' + lista.map(function (t) {
           return '<li>' + esc(t.texto || 'tarefa sem texto') +
-            '<em>' + esc(M.duracao(t.duracaoTotal)) + (t.onde ? ' · ' + esc(t.onde) : '') + '</em></li>';
+            '<em>' + esc(M.duracao(t.duracaoTotal)) + (t.onde ? ' · ' + esc(t.onde) : '') +
+              (t.separada ? ' · separada para o ' + esc(M.nomeDe(t.separada.para)) : '') + '</em></li>';
         }).join('') + '</ul>';
       }
       corpo = '<div class="sitio-corpo">' +
@@ -189,7 +190,8 @@
           ? '<h4>o projeto até aqui</h4><ol class="trilha">' + x.historico.map(function (h) {
               return '<li class="pegada pegada-' + h.tipo + '">' +
                 '<span class="pegada-nome">' + esc(h.tarefa.texto || 'sem texto') +
-                  '<em>' + esc(M.formatarData(h.quando.slice(0, 10))) + '</em></span>' +
+                  '<em>' + esc(M.formatarData(h.quando.slice(0, 10))) +
+                    (h.quem && h.quem !== 'pe_eu' ? ' · ' + esc(M.nomeDe(h.quem)) : '') + '</em></span>' +
                 (h.nota ? '<p class="pegada-nota">' + esc(h.nota) + '</p>' : '') +
                 '</li>';
             }).join('') + '</ol>'

@@ -130,6 +130,7 @@ var Motor = (function () {
      periódico. Só as três vagas abertas e as avulsas chegam ao páreo; é o teto
      de frentes que impede o volume de obrigação de crescer. */
   function emitindo(t) {
+    if (t.separada) return false;   // está na folha do diarista: não é do Dan hoje
     if (!t.projetoId) return true;
     var p = M.projeto(t.projetoId);
     if (!p || VAGAS.indexOf(p.papel) === -1) return false;

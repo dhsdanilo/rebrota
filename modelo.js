@@ -273,7 +273,8 @@ var Modelo = (function () {
      Assim a bota nunca escreve no catálogo, e o diário dela viaja como sempre. */
   /* Quem é quem, pelo nome — na semente e onde mais aparecer. Uma pessoa é
      `pe_<x>` no diário e `autor` curto na semente; os dois caem aqui. */
-  var NOMES = { pe_eu: 'Dan', eu: 'Dan', pe_esposa: 'Márcia', esposa: 'Márcia' };
+  var NOMES = { pe_eu: 'Dan', eu: 'Dan', pe_esposa: 'Márcia', esposa: 'Márcia', pe_diarista: 'Diarista' };
+  var DIARISTA = 'pe_diarista';
   function nomeDe(pessoaOuAutor) { return NOMES[pessoaOuAutor] || pessoaOuAutor || ''; }
 
   function semear(quem, texto) {
@@ -488,6 +489,8 @@ var Modelo = (function () {
 
       agendada: null,
       disparadaPor: null,
+      // separada para o diarista (§39): { para, dia, ordem } — sai do páreo dele
+      separada: null,
       dependeDe: [],
 
       // sem atribuição = do proprietário. Ninguém novo enxerga por acidente.
@@ -1615,7 +1618,7 @@ var Modelo = (function () {
       var t = dono[ev.tarefaId];
       if (!t) return;
       if (ev.tipo === 'terminou') {
-        linhas[t.id] = { tarefa: t, tipo: 'feita', quando: ev.quando, nota: ev.anotacao || '' };
+        linhas[t.id] = { tarefa: t, tipo: 'feita', quando: ev.quando, nota: ev.anotacao || '', quem: ev.quem };
       }
       if (ev.tipo === 'encerrou') {
         linhas[t.id] = { tarefa: t, tipo: 'cancelada', quando: ev.quando, nota: ev.nota || '' };
@@ -1760,6 +1763,73 @@ var Modelo = (function () {
   }
   function usoVerificarOcio() {
     if (uso.desde && Date.now() - uso.ultimaAtividade > OCIO_MS) usoFechar(uso.ultimaAtividade);
+  }
+
+  // ── o diarista (§39): braço, não usuário ──────────────────────────
+  /* Ele não consulta, não recusa, não trava: recebe uma folha e faz até onde
+     der. Quem escreve em nome dele é o Dan. Separar tira a tarefa do páreo do
+     Dan; fechar o dia registra no diário COMO DELE (`quem: pe_diarista`) — o
+     registro é honesto sobre quem fez. Só tarefa que já existe: de projeto em
+     vaga de execução ou avulsa, aberta. Coisa nova vai na lata, fora do app. */
+  function podeSeparar(t) {
+    if (!t || t.separada || t.etapa !== 'execucao') return false;
+    if (estadoDe(t.id) !== 'aberta') return false;
+    if (!t.projetoId) return true;
+    var p = projeto(t.projetoId);
+    return !!p && (p.papel === 'titular' || p.papel === 'reserva');
+  }
+  function separadas() {
+    return tarefasVivas().filter(function (t) { return t.separada; })
+      .sort(function (a, b) { return (a.separada.ordem || 0) - (b.separada.ordem || 0); });
+  }
+  function separarTarefa(tid, dia) {
+    var t = tarefa(tid);
+    if (!podeSeparar(t)) return null;
+    var ultima = separadas().slice(-1)[0];
+    t.separada = { para: DIARISTA, dia: dia || diaSeguinte(), ordem: ultima ? (ultima.separada.ordem || 0) + 1 : 1 };
+    t.ultimoToque = agora();
+    salvar();
+    return t;
+  }
+  function desfazerSeparacao(tid) {
+    var t = tarefa(tid);
+    if (!t || !t.separada) return;
+    t.separada = null; t.ultimoToque = agora();
+    salvar();
+  }
+  function reordenarSeparadas(ids) {
+    ids.forEach(function (id, i) { var t = tarefa(id); if (t && t.separada) t.separada.ordem = i + 1; });
+    salvar();
+  }
+  function definirDiaDiarista(dia) {
+    separadas().forEach(function (t) { t.separada.dia = dia; });
+    salvar();
+  }
+  function diaSeguinte() {
+    var d = new Date(); d.setDate(d.getDate() + 1);
+    return diaLocal(d);
+  }
+  /* Fechar o dia: o que ele fez entra como dele. `como`: feita · metade
+     (com o que sobrou, em minutos) · nao_fez. Em todos os casos a tarefa sai
+     da folha e volta ao páreo do Dan, se ainda estiver aberta. */
+  function fecharDiarista(tid, como, sobrouMin, nota) {
+    var t = tarefa(tid);
+    if (!t || !t.separada) return null;
+    var dia = t.separada.dia;
+    t.separada = null; t.ultimoToque = agora();
+    var ev = null;
+    if (como === 'feita') {
+      ev = registrar(DIARISTA, 'terminou', { tarefaId: tid, anotacao: nota || '', dia: dia });
+    } else if (como === 'metade') {
+      ev = registrar(DIARISTA, 'parou', { tarefaId: tid, restante: Math.max(5, Number(sobrouMin) || 0),
+        avanco: 'metade', motivo: 'saiu', nota: nota || '', dia: dia });
+    } else {
+      salvar();
+    }
+    return ev;
+  }
+  function minutosSeparados() {
+    return separadas().reduce(function (s, t) { return s + (restanteDe(t.id) || t.duracaoTotal || 0); }, 0);
   }
 
   function registrarClima(quem, tempo, barro) {
@@ -1962,6 +2032,9 @@ var Modelo = (function () {
     catalogoVazio: catalogoVazio, versaoDoCatalogo: versaoDoCatalogo, relerSeOutraAbaGravou: relerSeOutraAbaGravou,
     usoIniciar: usoIniciar, usoTela: usoTela, usoFechar: usoFechar, usoRetomar: usoRetomar,
     usoAtividade: usoAtividade, usoVerificarOcio: usoVerificarOcio,
+    DIARISTA: DIARISTA, podeSeparar: podeSeparar, separadas: separadas, separarTarefa: separarTarefa,
+    desfazerSeparacao: desfazerSeparacao, reordenarSeparadas: reordenarSeparadas,
+    definirDiaDiarista: definirDiaDiarista, fecharDiarista: fecharDiarista, minutosSeparados: minutosSeparados,
     semear: semear, absorverSementes: absorverSementes, sementesDe: sementesDe,
     nomeDe: nomeDe,
 

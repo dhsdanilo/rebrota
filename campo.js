@@ -272,7 +272,8 @@ var Campo = (function () {
               '<button type="button" class="pegada-nome" data-acao="abrir-pegada"' +
                 ' data-valor="' + p.tarefa.id + '"' + (aberta ? ' aria-expanded="true"' : '') + '>' +
                 esc(p.tarefa.texto || 'sem texto') +
-                '<em>' + esc(M.formatarData(p.quando.slice(0, 10))) + '</em></button>' +
+                '<em>' + esc(M.formatarData(p.quando.slice(0, 10))) +
+                  (p.quem && p.quem !== EU ? ' · ' + esc(M.nomeDe(p.quem)) : '') + '</em></button>' +
               // sem nota também vale: "comprar a tela" concluída já diz tudo
               (p.nota || p.tarefa.recado
                 ? '<p class="pegada-nota">' + esc(p.nota || p.tarefa.recado) + '</p>'
