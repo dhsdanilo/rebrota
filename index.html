@@ -14,7 +14,7 @@
 <link rel="apple-touch-icon" href="icone.svg">
 <!-- ?v= sobe a cada mudança: sem isso o navegador serve o arquivo velho do
      cache e a correção parece não ter funcionado -->
-<link rel="stylesheet" href="app.css?v=38">
+<link rel="stylesheet" href="app.css?v=39">
 </head>
 <body>
 
@@ -39,8 +39,19 @@
     <!-- diz ONDE você está, não o que vai fazer: executar, organizar e analisar
          são três coisas diferentes, e nenhuma delas pode ser prometida aqui -->
     <span class="topo-modo">mesa</span></h1>
-  <!-- o espaço à direita fica vago de propósito: é onde a estação
-       meteorológica vai entrar, quando existir -->
+  <!-- O (+) da §14: capturar uma semente. Ideia solta que passa pela cabeça
+       andando pelo sítio — despeja tudo aqui, ditado inclusive, e analisa
+       depois na mesa. É a única escrita da bota fora dos eventos da tarefa. -->
+  <button type="button" class="semear-bt" data-acao="semear" aria-label="plantar uma semente"
+          title="Plantar uma semente: uma ideia para virar projeto um dia. Escreva ou dite tudo que pensou; o resto se preenche depois, na mesa.">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <!-- a semente: uma gota deitada; o broto ainda é só um traço -->
+      <path d="M6.5 17.5c-2.2-2.2-1.9-6.4.9-9.2s7-3.1 9.2-.9c2.2 2.2 1.9 6.4-.9 9.2s-7 3.1-9.2.9z"/>
+      <path d="M9.5 14.5l4-4"/>
+      <path d="M16.6 7.4c.4-2 1.6-3.3 3.4-3.9"/>
+    </svg>
+  </button>
 </header>
 
 <main class="quadro">
@@ -77,9 +88,35 @@
 
 <!-- frente de campo: no celular isto é o app inteiro e a tela inicial -->
 <section class="execucao" id="execucao" hidden>
+  <!-- a frente de campo cobre o topo, então a semente ganha um botão aqui
+       também — é no pasto que a ideia aparece -->
+  <button type="button" class="semear-bt semear-bt-campo" data-acao="semear" aria-label="plantar uma semente"
+          title="Plantar uma semente: uma ideia para virar projeto um dia.">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M6.5 17.5c-2.2-2.2-1.9-6.4.9-9.2s7-3.1 9.2-.9c2.2 2.2 1.9 6.4-.9 9.2s-7 3.1-9.2.9z"/>
+      <path d="M9.5 14.5l4-4"/>
+      <path d="M16.6 7.4c.4-2 1.6-3.3 3.4-3.9"/>
+    </svg>
+  </button>
   <button type="button" class="execucao-sair" id="btSairCampo" aria-label="voltar para a análise">×</button>
   <div id="campoTela"></div>
 </section>
+
+<!-- a caixa da semente: um lugar para despejar tudo que passou pela cabeça,
+     ditado inclusive. Nome ela ganha sozinha; o resto se preenche na mesa. -->
+<div class="bilhete semear" id="semear" hidden>
+  <div class="bilhete-topo">
+    <strong>Semente</strong>
+    <button type="button" class="bilhete-x" id="btFecharSemear" aria-label="fechar">×</button>
+  </div>
+  <textarea id="semearTexto" rows="7"
+    placeholder="a ideia, e tudo que você pensou sobre ela agora — pode ditar"></textarea>
+  <div class="bilhete-baixo">
+    <button type="button" class="bt-forte" id="btGuardarSemente">guardar</button>
+    <span class="aviso" id="semearAviso"></span>
+  </div>
+</div>
 
 <!-- as três ferramentas de arquivo, juntas e fora do caminho: entrar, sair e
      anotar sobre o próprio app. Nenhuma delas é trabalho do sítio. -->
@@ -124,10 +161,10 @@
   </div>
 </div>
 
-<script src="modelo.js?v=38"></script>
-<script src="motor.js?v=38"></script>
-<script src="dados.js?v=38"></script>
-<script src="campo.js?v=38"></script>
-<script src="app.js?v=38"></script>
+<script src="modelo.js?v=39"></script>
+<script src="motor.js?v=39"></script>
+<script src="dados.js?v=39"></script>
+<script src="campo.js?v=39"></script>
+<script src="app.js?v=39"></script>
 </body>
 </html>

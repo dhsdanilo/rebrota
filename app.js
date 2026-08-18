@@ -1916,6 +1916,7 @@
       fecharFicha();
       return desenhar();
     }
+    if (acao === 'semear') return alternarSemear();
 
     if (acao === 'editar-projeto')  { projetoEditando = tid; return desenharPalco(); }
     if (acao === 'salvar-projeto')  { projetoEditando = null; return desenhar(); }
@@ -2313,6 +2314,10 @@
   // digitado pela metade: aí Esc só larga o campo, e não joga o texto fora.
   document.addEventListener('keydown', function (e) {
     if (e.key !== 'Escape') return;
+    if (!$semear.hidden) {
+      if ($semearTexto.value.trim()) return $semearTexto.blur();   // não joga a ideia fora
+      $semear.hidden = true; return;
+    }
     if (!$campo.hidden) {
       var digitando = $campoTela.querySelector('textarea');
       if (digitando && digitando.value.trim()) return digitando.blur();
@@ -2409,6 +2414,38 @@
       try { document.execCommand('copy'); avisar(); }
       catch (e) { $bilheteAviso.textContent = 'selecionei o texto — copie com Ctrl+C'; }
     }
+  });
+
+  // ── semente: o (+) da §14 ─────────────────────────────────────────
+  /* Captura em um toque, nos dois modos e por cima da frente de campo: a ideia
+     aparece andando pelo sítio, e o que não se despeja na hora se perde. O
+     texto pode ser longo e ditado; o nome a semente tira sozinha da primeira
+     frase, e o resto se preenche na mesa, com calma. */
+
+  var $semear = document.getElementById('semear');
+  var $semearTexto = document.getElementById('semearTexto');
+  var $semearAviso = document.getElementById('semearAviso');
+
+  function alternarSemear() {
+    if (!$semear.hidden) { $semear.hidden = true; return; }
+    $bilhete.hidden = true;
+    $semear.hidden = false;
+    $semearAviso.textContent = '';
+    $semearTexto.focus();
+  }
+
+  document.getElementById('btFecharSemear').addEventListener('click', function () {
+    $semear.hidden = true;
+  });
+
+  document.getElementById('btGuardarSemente').addEventListener('click', function () {
+    var texto = $semearTexto.value.trim();
+    if (!texto) return ($semearAviso.textContent = 'nada escrito ainda');
+    var s = M.inserirSemente(texto);
+    $semearTexto.value = '';
+    $semearAviso.textContent = 'guardada: ' + s.nome;
+    // a coluna conta as sementes; a página de sementes, se aberta, ganha a nova
+    if ($campo.hidden) desenhar(); else desenharLista();
   });
 
   // ── casco do app ──────────────────────────────────────────────────

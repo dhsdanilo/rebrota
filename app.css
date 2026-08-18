@@ -133,6 +133,32 @@ button, input, select, textarea {
 
 .topo-acoes { display: flex; gap: 8px; }
 
+/* o (+) da §14, desenhado como semente: no canto direito do topo, e repetido
+   na frente de campo (que cobre o topo) ao lado do × */
+.semear-bt {
+  width: 36px; height: 36px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: var(--raio);
+  color: var(--rebrota);
+  cursor: pointer;
+  padding: 0;
+}
+.semear-bt svg { width: 22px; height: 22px; }
+.semear-bt:hover { border-color: var(--musgo); background: var(--mata); }
+
+.semear-bt-campo {
+  position: absolute;
+  top: 8px; right: 54px;
+  z-index: 2;
+}
+
+/* a caixa da semente fica no alto, embaixo do botão que a abriu */
+.semear { top: 56px; bottom: auto; right: 16px; }
+
 /* ── botões ─────────────────────────────────────────── */
 
 .bt-forte, .bt-fraco, .bt-linha {
