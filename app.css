@@ -175,6 +175,15 @@ button, input, select, textarea {
 .nuvem-como em { color: var(--neblina); font-style: normal; }
 .nuvem-estado { margin: 10px 0 0; }
 
+/* quem plantou a semente, e quando — em mono, como toda escrituração */
+.semente-autor {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: .04em;
+  color: var(--casca);
+  margin: 0 0 10px;
+}
+
 /* ── a tela de sementes (semear.html) ─────────────────────
    Uma página só, de bota, para quem só planta: campo, botão, o que já
    plantou, e a nuvem embaixo. */

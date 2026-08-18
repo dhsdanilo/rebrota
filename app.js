@@ -1626,7 +1626,11 @@
         '<button type="button" class="bt-forte" data-acao="nova-semente">guardar</button>',
       '</div>',
       lista.length ? lista.map(function (s) {
-        return '<div class="secao"><div class="grade">' +
+        // quem plantou e quando: a semente dela e a sua não se confundem
+        return '<div class="secao">' +
+          '<p class="semente-autor">' + (s.autor === 'esposa' ? 'plantada por ela' : 'plantada por você') +
+            ' · ' + esc(M.formatarData(M.diaDe(s.criadaEm))) + '</p>' +
+          '<div class="grade">' +
           campoTexto('semente', s.id, 'nome', 'Nome', s.nome, { largo: true }) +
           campoTexto('semente', s.id, 'frase', 'A ideia', s.frase, { largo: true }) +
           campoTexto('semente', s.id, 'porque', 'Por quê', s.porque, { largo: true }) +
