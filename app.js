@@ -33,6 +33,18 @@
   var mudaAvisoDe = null;          // …e de qual muda, para não vazar para a ficha de outra
   var diaristaMetade = null;       // linha da folha com o campo "sobrou quanto?" aberto
   var esperando = null;            // tarefa com o campo "espera algo chegar" aberto
+
+  /* Cada tecla grava — então "desfazer" é devolver a foto tirada na hora do
+     editar. Entrou na tarefa errada, mexeu, viu: desfazer, e ela volta inteira. */
+  var foto = null;                 // { id, copia } do que está em edição
+  function fotografar(obj) { foto = obj ? { id: obj.id, copia: JSON.parse(JSON.stringify(obj)) } : null; }
+  function revelar(obj) {
+    if (!obj || !foto || foto.id !== obj.id) return;
+    Object.keys(obj).forEach(function (k) { delete obj[k]; });
+    Object.keys(foto.copia).forEach(function (k) { obj[k] = foto.copia[k]; });
+    foto = null;
+    M.salvar();
+  }
   var sementeDescartando = null;   // semente com o campo de motivo aberto
   var voltarPara = null;           // de onde se veio, para poder folhear
 
@@ -551,7 +563,9 @@
         '</div>',
         consulta ? '<span class="selo-consulta">consulta</span>'
           : solto
-          ? '<button type="button" class="bt-forte" data-acao="salvar-projeto">salvar</button>'
+          ? '<button type="button" class="bt-forte" data-acao="salvar-projeto">salvar</button>' +
+            (foto && foto.id === p.id
+              ? '<button type="button" class="bt-fraco" data-acao="desfazer-projeto" data-id="' + p.id + '" title="Volta o projeto a como estava quando você clicou em editar.">desfazer</button>' : '')
           : '<button type="button" class="bt-fraco" data-acao="editar-projeto" data-id="' + p.id + '">editar</button>',
       '</div>',
 
@@ -1640,6 +1654,8 @@
             '</div></div>'
         : '<div class="passo-rodape">' +
             '<button type="button" class="bt-forte" data-acao="salvar-passo">salvar</button>' +
+            (foto && foto.id === t.id
+              ? '<button type="button" class="bt-fraco" data-acao="desfazer-passo" data-id="' + t.id + '" title="Volta a tarefa a como estava quando você clicou em editar.">desfazer</button>' : '') +
             '<span class="passo-rodape-fim">' +
               '<button type="button" class="bt-linha" data-acao="cancelar-tarefa" data-id="' + t.id + '">cancelar tarefa</button>' +
               '<button type="button" class="bt-linha" data-acao="remover-passo" data-id="' + t.id + '">apagar</button>' +
@@ -2537,8 +2553,9 @@
     if (acao === 'semear') return alternarSemear();
     if (acao === 'nuvem')  return alternarNuvem();
 
-    if (acao === 'editar-projeto')  { projetoEditando = tid; return desenharPalco(); }
-    if (acao === 'salvar-projeto')  { projetoEditando = null; return desenhar(); }
+    if (acao === 'editar-projeto')  { projetoEditando = tid; fotografar(M.projeto(tid)); return desenharPalco(); }
+    if (acao === 'salvar-projeto')  { projetoEditando = null; foto = null; return desenhar(); }
+    if (acao === 'desfazer-projeto') { revelar(M.projeto(tid)); projetoEditando = null; return desenhar(); }
 
     if (acao.indexOf('projeto-') === 0) {
       acaoProjeto = { pid: tid, tipo: acao.slice(8) };
@@ -2603,8 +2620,9 @@
       else { passoAberto = tid; passoEditando = null; }
       return desenharPalco();
     }
-    if (acao === 'editar-passo') { passoAberto = passoEditando = tid; return desenharPalco(); }
-    if (acao === 'salvar-passo') { passoEditando = null; return desenhar(); }
+    if (acao === 'editar-passo') { passoAberto = passoEditando = tid; fotografar(M.tarefa(tid)); return desenharPalco(); }
+    if (acao === 'salvar-passo') { passoEditando = null; foto = null; return desenhar(); }
+    if (acao === 'desfazer-passo') { revelar(M.tarefa(tid)); passoEditando = null; return desenhar(); }
 
     if (acao === 'ir-executar') {
       $campo.hidden = false;
