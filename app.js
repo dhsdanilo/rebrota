@@ -1166,6 +1166,11 @@
     var cumprido = etapa === 'planejamento' && tarefas.length &&
                    !M.tarefasAbertasDe(p.id, 'planejamento').length;
     var recolhido = cumprido && planejamentoAberto !== p.id;
+    /* Obra rodando não ganha tarefa de planejamento: planejamento já foi. O que
+       parecer planejamento agora acontece na execução. A seção fica só como
+       registro. Muda também não adiciona (detalhar é da vaga de planejamento). */
+    var executando = p.papel === 'titular' || p.papel === 'reserva';
+    var podeAdicionar = !emConsulta(p.id) && p.estado !== 'fila' && !(etapa === 'planejamento' && executando);
 
     return '<div class="secao secao-etapa' + (travada ? ' secao-travada' : '') +
       (recolhido ? ' secao-recolhida' : '') + '">' +
@@ -1180,7 +1185,7 @@
           : '') +
         // adicionar também aqui em cima: numa lista longa, descer até o pé para
         // incluir uma tarefa é caminhada demais (fica nos dois lugares)
-        (!emConsulta(p.id) && p.estado !== 'fila' && !recolhido
+        (podeAdicionar && !recolhido
           ? '<button type="button" class="bt-fraco bt-mini secao-adicionar" data-acao="nova-tarefa" data-id="' + p.id +
             '" data-etapa="' + etapa + '">adicionar tarefa</button>'
           : '') +
@@ -1193,6 +1198,8 @@
         (emConsulta(p.id) ? ''
           : p.estado === 'fila'
           ? '<p class="aviso" style="margin-top:14px">Detalhar é trabalho da vaga de planejamento.</p>'
+          : !podeAdicionar
+          ? ''
           : '<div class="rodape-acoes">' +
             '<button type="button" class="bt-fraco" data-acao="nova-tarefa" data-id="' + p.id +
             '" data-etapa="' + etapa + '">adicionar tarefa</button>' +
