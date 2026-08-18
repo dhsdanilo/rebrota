@@ -55,12 +55,16 @@
   iframe { display: block; border: 0; width: 100%; height: 100%; background: var(--breu); }
   .nota { font-size: 12px; color: var(--neblina-fraca); max-width: 460px; text-align: center; line-height: 1.5; }
   .medida { font-family: var(--mono); font-size: 11px; color: var(--neblina-fraca); }
+  .sep { width: 1px; height: 18px; background: var(--musgo); margin: 0 4px; }
 </style>
 </head>
 <body>
 
 <div class="barra">
   <strong>Prova de celular</strong>
+  <button type="button" data-tela="index.html">app</button>
+  <button type="button" data-tela="semear.html">sementeira</button>
+  <span class="sep"></span>
   <button type="button" data-w="360" data-h="640">360 × 640</button>
   <button type="button" data-w="390" data-h="844">390 × 844</button>
   <button type="button" data-w="412" data-h="915">412 × 915</button>
@@ -78,8 +82,9 @@
 
 <p class="nota">
   O app aqui dentro é o de verdade e usa os mesmos dados guardados neste
-  navegador. Esta bancada não vai para o ar — serve só para lapidar o desenho
-  antes de publicar.
+  navegador — inclusive a Sementeira: semente plantada aqui é semente de
+  verdade, e sobe pela sincronização como se ela tivesse plantado. Esta bancada
+  não vai para o ar — serve só para lapidar o desenho antes de publicar.
 </p>
 
 <script>
@@ -90,6 +95,27 @@
   var deitado = false;
 
   var suporte = document.getElementById('suporte');
+
+  /* Qual app vai na moldura: o Rebrota (mesa/bota) ou a Sementeira. Os dois
+     moram na mesma pasta e nos mesmos dados; a moldura só troca a página.
+     `celular.html?tela=semear` já abre na Sementeira — é o que o ícone de
+     semente no app usa. */
+  var TELAS = { app: 'index.html', semear: 'semear.html' };
+  var pedida = new URLSearchParams(location.search).get('tela');
+  var telaAtual = TELAS[pedida] || TELAS.app;
+
+  function mostrarTela(src) {
+    telaAtual = src;
+    if (tela.getAttribute('src') !== src) tela.setAttribute('src', src);
+    document.querySelectorAll('[data-tela]').forEach(function (b) {
+      b.setAttribute('aria-pressed', String(b.dataset.tela === src));
+    });
+    document.title = 'Rebrota · prova de celular' + (src === TELAS.semear ? ' · sementeira' : '');
+  }
+
+  document.querySelectorAll('[data-tela]').forEach(function (b) {
+    b.addEventListener('click', function () { mostrarTela(b.dataset.tela); });
+  });
 
   function aplicar() {
     var l = deitado ? atual.h : atual.w;
@@ -128,10 +154,12 @@
   });
 
   document.getElementById('btRecarregar').addEventListener('click', function () {
-    tela.contentWindow.location.reload();
+    // recarrega pelo src, não pelo contentWindow: em file:// o iframe é opaco
+    tela.setAttribute('src', telaAtual + '?r=' + Date.now());
   });
 
   window.addEventListener('resize', aplicar);
+  mostrarTela(telaAtual);
   aplicar();
 </script>
 </body>
