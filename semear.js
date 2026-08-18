@@ -1,4 +1,4 @@
-/* Sementes — a tela da esposa.
+/* Sementeira — a tela da esposa.
  *
  * Um campo, um botão. Cada semente é um evento `semeou` no diário dela
  * (`pe_esposa`), que a sincronização leva até a mesa, onde vira semente do
