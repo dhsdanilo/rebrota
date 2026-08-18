@@ -1,0 +1,17 @@
+{
+  "name": "Sementes",
+  "short_name": "Sementes",
+  "description": "Uma ideia para o sítio. Ele lapida depois.",
+  "id": "./semear.html",
+  "start_url": "./semear.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0F1A17",
+  "theme_color": "#0F1A17",
+  "lang": "pt-BR",
+  "icons": [
+    { "src": "./icone-semente.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "./icone-semente.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

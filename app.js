@@ -425,7 +425,7 @@
     if (!naMesa()) {
       return '<div class="abertura">' + frase +
         '<button type="button" class="c-acao porta-unica" data-acao="ir-executar">encontrar tarefa</button>' +
-        vagasDaAbertura() +
+        vagasDaAbertura() + avisoDeNuvem() +
         '</div>';
     }
 
@@ -442,7 +442,15 @@
           '<span class="porta-nome">organizar</span>' +
           '<span class="porta-sub">mexer nos projetos e no plano</span>' +
         '</button>' +
-      '</div>' + vagasDaAbertura() + avisoDeCopia() + '</div>';
+      '</div>' + vagasDaAbertura() + avisoDeNuvem() + avisoDeCopia() + '</div>';
+  }
+
+  /* Aparelho sem sincronização diz isso na entrada, uma linha, sem alarme —
+     é onde se descobre que a semente plantada no pasto não chegou na mesa. */
+  function avisoDeNuvem() {
+    if (typeof Sync === 'undefined' || Sync.ligado()) return '';
+    return '<p class="aviso-copia">Este aparelho não sincroniza com os outros. ' +
+      '<button type="button" class="bt-linha bt-mini" data-acao="nuvem">ligar</button></p>';
   }
 
   function vagasDaAbertura() {
@@ -1917,6 +1925,7 @@
       return desenhar();
     }
     if (acao === 'semear') return alternarSemear();
+    if (acao === 'nuvem')  return alternarNuvem();
 
     if (acao === 'editar-projeto')  { projetoEditando = tid; return desenharPalco(); }
     if (acao === 'salvar-projeto')  { projetoEditando = null; return desenhar(); }
@@ -2441,7 +2450,9 @@
   document.getElementById('btGuardarSemente').addEventListener('click', function () {
     var texto = $semearTexto.value.trim();
     if (!texto) return ($semearAviso.textContent = 'nada escrito ainda');
-    var s = M.inserirSemente(texto);
+    // nasce como evento no diário (viaja pela sincronização); a mesa absorve
+    var s = M.semear('pe_eu', texto);
+    if (naMesa()) M.absorverSementes();
     $semearTexto.value = '';
     $semearAviso.textContent = 'guardada: ' + s.nome;
     // a coluna conta as sementes; a página de sementes, se aberta, ganha a nova
@@ -2467,11 +2478,76 @@
     }).catch(function () {});
   }
 
+  // ── sincronização ─────────────────────────────────────────────────
+  /* A mesa escreve o catálogo; a bota só lê. O papel muda com a largura, como
+     tudo o mais. Quando algo chega de fora, a mesa absorve as sementes que
+     nasceram como evento e a tela se redesenha. */
+
+  var $nuvem = document.getElementById('nuvem');
+  var $nuvemToken = document.getElementById('nuvemToken');
+  var $nuvemEstado = document.getElementById('nuvemEstado');
+
+  function textoDaNuvem(s) {
+    if (!s.ligado) return 'Este aparelho não sincroniza. Cole o token e ligue.';
+    if (s.ocupado) return 'sincronizando…';
+    if (s.erro) return 'não consegui: ' + s.erro;
+    if (s.ultimo) return 'sincronizado às ' + M.horaDe(new Date(s.ultimo));
+    return 'ligado';
+  }
+
+  function desenharNuvem() {
+    var s = Sync.situacao();
+    $nuvemEstado.textContent = textoDaNuvem(s);
+    document.getElementById('btLigarNuvem').hidden = s.ligado;
+    document.getElementById('btDesligarNuvem').hidden = !s.ligado;
+    document.getElementById('btSincronizarAgora').hidden = !s.ligado;
+    $nuvemToken.hidden = s.ligado;
+    document.getElementById('nuvemComo').hidden = s.ligado;
+    document.body.classList.toggle('sem-nuvem', !s.ligado);
+  }
+
+  function alternarNuvem() {
+    if (!$nuvem.hidden) { $nuvem.hidden = true; return; }
+    $bilhete.hidden = true; $semear.hidden = true;
+    desenharNuvem();
+    $nuvem.hidden = false;
+    if (!Sync.ligado()) $nuvemToken.focus();
+  }
+
+  document.getElementById('btFecharNuvem').addEventListener('click', function () { $nuvem.hidden = true; });
+  document.getElementById('btLigarNuvem').addEventListener('click', function () {
+    var t = $nuvemToken.value.trim();
+    if (!t) return ($nuvemEstado.textContent = 'cole o token primeiro');
+    $nuvemToken.value = '';
+    Sync.ligar(t);
+  });
+  document.getElementById('btDesligarNuvem').addEventListener('click', function () {
+    Sync.desligar(); desenharNuvem(); desenhar();
+  });
+  document.getElementById('btSincronizarAgora').addEventListener('click', function () { Sync.sincronizar(); });
+
+  Sync.configurar({ escreveCatalogo: naMesa(), pessoa: 'pe_eu' });
+  window.matchMedia('(min-width: 721px)').addEventListener('change', function () {
+    Sync.configurar({ escreveCatalogo: naMesa(), pessoa: 'pe_eu' });
+  });
+  M.quandoSalvar(function () { Sync.marcarSujo(); });
+  Sync.ouvir(function (s, mudouLocal) {
+    desenharNuvem();
+    if (!mudouLocal) return;
+    if (naMesa()) M.absorverSementes();
+    M.cascatearVagas(); colherAvisos();
+    // a frente de campo lê o estado a cada toque; a mesa precisa redesenhar
+    if ($campo.hidden) desenhar(); else desenharLista();
+  });
+
   ligarArraste();
   M.carregar();
   M.cascatearVagas();   // o que a regra já decidiu, aplicado antes de desenhar
   colherAvisos();       // ... e dito, não engolido
   conferirProposta();
   desenharProposta();
+  if (naMesa()) M.absorverSementes();
   desenhar();
+  Sync.iniciar();
+  desenharNuvem();
 })();

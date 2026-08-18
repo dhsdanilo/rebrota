@@ -143,7 +143,9 @@ var Modelo = (function () {
         // tudo que depende de terceiro e tem data prevista
         pendencias: [],
         // absorveram a caixa de entrada: o que entra pelo ( + ) já nasce semente
-        sementes: []
+        sementes: [],
+        // ids de sementes que nasceram como evento e a mesa já trouxe para cá
+        absorvidas: []
       },
       diarios: { pe_eu: { pessoa: 'pe_eu', eventos: [] } }
     };
@@ -182,6 +184,9 @@ var Modelo = (function () {
   /* Gravar o catálogo refaz a vista: uma tarefa recém-criada precisa existir
      para o motor com o restante certo antes de qualquer evento — senão ela
      entrava no páreo com restante zero e "cabia" em qualquer janela. */
+  var aoSalvar = null;      // quem quer saber que algo foi gravado (a sincronização)
+  var silencio = false;     // gravação vinda de fora não avisa de volta
+
   function salvar() {
     try {
       localStorage.setItem(CHAVE, JSON.stringify(estado));
@@ -189,6 +194,76 @@ var Modelo = (function () {
       console.warn('Não consegui gravar. Use exportar como paraquedas.', e);
     }
     derivar();
+    if (aoSalvar && !silencio) aoSalvar();
+  }
+
+  function quandoSalvar(fn) { aoSalvar = fn; }
+
+  // ── sincronização: o que o modelo oferece ao Sync ────────────────
+
+  /* O catálogo que veio de fora substitui o daqui: só a mesa escreve, e este
+     aparelho não é a mesa. Devolve se mudou algo. */
+  function receberCatalogo(remoto) {
+    var novo = costurar({ catalogo: remoto, diarios: estado.diarios, bilhete: estado.bilhete });
+    if (JSON.stringify(novo.catalogo) === JSON.stringify(estado.catalogo)) return false;
+    estado.catalogo = novo.catalogo;
+    silencio = true; salvar(); silencio = false;
+    return true;
+  }
+
+  /* União por id: entra o que ainda não tinha, nada sai. Devolve quantos
+     entraram aqui e quantos daqui faltam lá — quem chamou decide subir. */
+  function unirDiario(quem, eventosDeLa) {
+    var d = diarioDe(quem);
+    var tenho = {};
+    d.eventos.forEach(function (ev) { tenho[ev.id] = true; });
+    var la = {};
+    var entraram = 0;
+    (eventosDeLa || []).forEach(function (ev) {
+      if (!ev || !ev.id) return;
+      la[ev.id] = true;
+      if (!tenho[ev.id]) { d.eventos.push(ev); tenho[ev.id] = true; entraram++; }
+    });
+    var faltamLa = d.eventos.filter(function (ev) { return !la[ev.id]; }).length;
+    if (entraram) {
+      d.eventos.sort(function (a, b) { return a.quando < b.quando ? -1 : 1; });
+      silencio = true; salvar(); silencio = false;
+    }
+    return { entraram: entraram, faltamLa: faltamLa };
+  }
+
+  /* Semente plantada é EVENTO no diário de quem plantou — bota, esposa, mesa.
+     Assim a bota nunca escreve no catálogo, e o diário dela viaja como sempre. */
+  function semear(quem, texto) {
+    var s = novaSemente(texto);
+    s.autor = quem === 'pe_eu' ? 'eu' : 'esposa';
+    registrar(quem, 'semeou', { semente: s });
+    return s;
+  }
+
+  /* A mesa traz para o catálogo o que nasceu como evento, uma vez só. Depois
+     disso a semente é do catálogo — editar, promover e descartar valem. */
+  function absorverSementes() {
+    var vistas = {};
+    cat().sementes.forEach(function (s) { vistas[s.id] = true; });
+    (cat().absorvidas || []).forEach(function (id) { vistas[id] = true; });
+    var novas = 0;
+    eventosEmOrdem().forEach(function (ev) {
+      if (ev.tipo !== 'semeou' || !ev.semente || vistas[ev.semente.id]) return;
+      cat().sementes.push(costurarSemente(JSON.parse(JSON.stringify(ev.semente))));
+      cat().absorvidas.push(ev.semente.id);
+      vistas[ev.semente.id] = true;
+      novas++;
+    });
+    if (novas) salvar();
+    return novas;
+  }
+
+  // sementes de evento ainda não absorvidas: para a tela da esposa listar as dela
+  function sementesDe(quem) {
+    return (diarioDe(quem).eventos || [])
+      .filter(function (ev) { return ev.tipo === 'semeou' && ev.semente; })
+      .map(function (ev) { return ev.semente; });
   }
 
   /* Preenche o que faltar num JSON vindo de fora ou de uma versão anterior,
@@ -1560,6 +1635,10 @@ var Modelo = (function () {
     historicoDe: historicoDe, periodica: periodica, diaDe: diaDe, diaLocal: diaLocal,
     recusadaHaPouco: recusadaHaPouco, avisosDeCascata: avisosDeCascata,
     temTarefaAtiva: temTarefaAtiva,
+
+    // sincronização
+    quandoSalvar: quandoSalvar, receberCatalogo: receberCatalogo, unirDiario: unirDiario,
+    semear: semear, absorverSementes: absorverSementes, sementesDe: sementesDe,
 
     // diário
     derivar: derivar, tarefasVivas: tarefasVivas, desimpedida: desimpedida,

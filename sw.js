@@ -16,13 +16,19 @@ var CASCO = [
   './index.html',
   './app.css',
   './modelo.js',
+  './sync.js',
   './motor.js',
   './dados.js',
   './campo.js',
   './app.js',
   './manifest.json',
   './icone.svg',
-  './icone-mascara.svg'
+  './icone-mascara.svg',
+  // a tela de sementes, que é outro app instalável sobre os mesmos arquivos
+  './semear.html',
+  './semear.js',
+  './semear.webmanifest',
+  './icone-semente.svg'
 ];
 
 self.addEventListener('install', function (e) {

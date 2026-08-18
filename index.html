@@ -14,7 +14,7 @@
 <link rel="apple-touch-icon" href="icone.svg">
 <!-- ?v= sobe a cada mudança: sem isso o navegador serve o arquivo velho do
      cache e a correção parece não ter funcionado -->
-<link rel="stylesheet" href="app.css?v=39">
+<link rel="stylesheet" href="app.css?v=40">
 </head>
 <body>
 
@@ -136,6 +136,13 @@
     </svg>
   </button>
   <input type="file" id="arquivoImportar" accept="application/json" hidden>
+  <button type="button" class="bt-icone" data-acao="nuvem" aria-label="sincronização"
+          title="Sincronizar este aparelho com os outros — celular, mesa e a tela de sementes.">
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"
+         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M6 15.5h8.5a3 3 0 0 0 .4-6 4.5 4.5 0 0 0-8.7-1.2A3.6 3.6 0 0 0 6 15.5z"/>
+    </svg>
+  </button>
   <!-- bancada provisória: ver o app em tamanho de celular sem celular -->
   <a class="bt-icone" href="celular.html" target="_blank" aria-label="prova de celular"
      title="Abrir o app em tamanho de celular, para lapidar o desenho.">
@@ -145,6 +152,25 @@
     </svg>
   </a>
   <button type="button" class="bilhete-bt" id="btBilhete" aria-label="anotar sobre o app">✎</button>
+</div>
+
+<!-- sincronização: um token do GitHub, colado uma vez por aparelho. Fica só
+     aqui, no localStorage — nunca no repositório, nunca no export. -->
+<div class="bilhete nuvem" id="nuvem" hidden>
+  <div class="bilhete-topo">
+    <strong>Sincronização</strong>
+    <button type="button" class="bilhete-x" id="btFecharNuvem" aria-label="fechar">×</button>
+  </div>
+  <p class="nuvem-como" id="nuvemComo">Um Gist privado na sua conta do GitHub guarda o catálogo e os diários.
+    Crie um token em <em>github.com → Settings → Developer settings → Personal access tokens</em>
+    com permissão só de <em>Gist</em> e cole aqui. Ele fica só neste aparelho.</p>
+  <input type="password" id="nuvemToken" placeholder="cole o token" autocomplete="off">
+  <div class="bilhete-baixo">
+    <button type="button" class="bt-forte" id="btLigarNuvem">ligar</button>
+    <button type="button" class="bt-fraco" id="btSincronizarAgora" hidden>sincronizar agora</button>
+    <button type="button" class="bt-linha" id="btDesligarNuvem" hidden>desligar</button>
+  </div>
+  <p class="aviso nuvem-estado" id="nuvemEstado"></p>
 </div>
 
 <div class="bilhete" id="bilhete" hidden>
@@ -161,10 +187,11 @@
   </div>
 </div>
 
-<script src="modelo.js?v=39"></script>
-<script src="motor.js?v=39"></script>
-<script src="dados.js?v=39"></script>
-<script src="campo.js?v=39"></script>
-<script src="app.js?v=39"></script>
+<script src="modelo.js?v=40"></script>
+<script src="sync.js?v=40"></script>
+<script src="motor.js?v=40"></script>
+<script src="dados.js?v=40"></script>
+<script src="campo.js?v=40"></script>
+<script src="app.js?v=40"></script>
 </body>
 </html>

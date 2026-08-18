@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sementes</title>
+<meta name="theme-color" content="#0F1A17">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Sementes">
+<link rel="manifest" href="semear.webmanifest">
+<link rel="icon" href="icone-semente.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icone-semente.svg">
+<link rel="stylesheet" href="app.css?v=40">
+</head>
+<body class="so-semear">
+<!-- A tela da esposa: só plantar sementes. Ela não executa nada, não vê
+     projeto, não vê tarefa — cada ideia que ela escrever aqui vira um evento
+     no diário dela e aparece na mesa dele como semente. -->
+
+<header class="topo">
+  <h1><span class="topo-nome">
+    <svg class="marca-rebrota" viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M4.6 25V13.4a3.6 3.6 0 0 1 7.2 0V25" fill="none"
+            stroke="var(--casca)" stroke-width="2.1" stroke-linecap="round"/>
+      <path d="M11.9 16.4c.8-3.9 1.9-6.1 3.5-8.2" fill="none"
+            stroke="var(--rebrota)" stroke-width="2" stroke-linecap="round"/>
+      <path d="M15.5 8.4c-2.7-.5-4.1-2.2-4.2-5 2.7.2 4.1 1.9 4.2 5z" fill="var(--rebrota)"/>
+      <path d="M15.5 8.4c.4-3.1 2.1-4.8 5-5.1.1 3-1.6 4.7-5 5.1z" fill="var(--rebrota)"/>
+    </svg>
+    Sementes</span></h1>
+</header>
+
+<main class="semear-pagina">
+  <p class="semear-frase" id="frase"></p>
+
+  <textarea id="texto" class="semear-texto" rows="6"
+    placeholder="a ideia, e tudo que você pensou sobre ela — pode ditar"></textarea>
+  <button type="button" class="c-acao" id="btPlantar">plantar</button>
+  <p class="aviso semear-aviso" id="aviso"></p>
+
+  <section class="semear-lista">
+    <h2>Plantadas por aqui</h2>
+    <ul id="lista"></ul>
+  </section>
+
+  <section class="semear-nuvem" id="nuvemCaixa">
+    <h2>Sincronização</h2>
+    <p class="nuvem-como" id="nuvemComo">Para as sementes chegarem na mesa, cole aqui o token que ele te passar. Fica só neste aparelho.</p>
+    <input type="password" id="nuvemToken" placeholder="cole o token" autocomplete="off">
+    <div class="bilhete-baixo">
+      <button type="button" class="bt-forte" id="btLigarNuvem">ligar</button>
+      <button type="button" class="bt-fraco" id="btSincronizarAgora" hidden>sincronizar agora</button>
+      <button type="button" class="bt-linha" id="btDesligarNuvem" hidden>desligar</button>
+    </div>
+    <p class="aviso nuvem-estado" id="nuvemEstado"></p>
+  </section>
+</main>
+
+<script src="modelo.js?v=40"></script>
+<script src="sync.js?v=40"></script>
+<script src="semear.js?v=40"></script>
+</body>
+</html>
