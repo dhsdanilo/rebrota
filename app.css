@@ -425,6 +425,7 @@ button, input, select, textarea {
 .folha-metade input { background: var(--mata); border: 1px solid var(--musgo); border-radius: var(--raio); color: var(--neblina); padding: 5px 8px; font-size: 14px; }
 .folha-metade input[type="number"] { width: 80px; }
 .aviso-diarista { color: var(--casca); }
+.passo-diarista { display: flex; align-items: center; gap: 10px; padding: 4px 0 6px 40px; }
 @media print {
   .coluna-projetos, .ferramentas, .topo, .folha-acoes, .rodape-acoes, .folha-cabeca button, .bilhete-bt { display: none !important; }
   body { background: #fff; color: #000; }
@@ -487,8 +488,12 @@ button, input, select, textarea {
    evitar. Ela volta assim que você escolhe organizar. */
 .sem-coluna .quadro { grid-template-columns: 1fr; }
 .sem-coluna .coluna-projetos { display: none; }
-.sem-coluna .palco { display: flex; justify-content: center; padding-top: 40px; }
+.sem-coluna .palco { display: flex; flex-direction: column; align-items: center; padding-top: 40px; }
 .sem-coluna .abertura { width: 100%; max-width: 620px; }
+/* o aviso da cascata na entrada alinha com a abertura, em cima dela — antes
+   virava uma coluna ao lado, com a barra esticada de alto a baixo */
+.sem-coluna .aviso-cascata { width: 100%; max-width: 620px; margin-top: 24px; align-self: center; }
+.sem-coluna .aviso-cascata + .abertura { padding-top: 20px; }
 
 .coluna-projetos {
   border-right: 1px solid var(--musgo);

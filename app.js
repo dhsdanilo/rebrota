@@ -1366,6 +1366,16 @@
           ? '<button type="button" class="bt-forte bt-mini" data-acao="salvar-passo">salvar</button>'
           : '<button type="button" class="bt-linha bt-mini" data-acao="editar-passo" data-id="' + t.id + '">editar</button>') +
       '</div>' +
+      /* o diarista (§39): com a ficha aberta, a linha oferece separar — não
+         precisa entrar em editar para isso, que é decisão de véspera */
+      (aberto && !solto && !emConsulta(t.projetoId) && (M.podeSeparar(t) || t.separada)
+        ? '<div class="passo-diarista">' +
+          (t.separada
+            ? '<span class="aviso-linha aviso-diarista">separada para o diarista · ' + esc(M.formatarData(t.separada.dia)) + '</span>' +
+              '<button type="button" class="bt-linha bt-mini" data-acao="desfazer-separacao" data-id="' + t.id + '">tirar da folha</button>'
+            : '<button type="button" class="bt-linha bt-mini" data-acao="separar-diarista" data-id="' + t.id + '">separar para o diarista</button>') +
+          '</div>'
+        : '') +
       (t.separada && !aberto
         ? '<div class="passo-avisos"><span class="aviso-linha aviso-diarista">separada para o diarista · ' + esc(M.formatarData(t.separada.dia)) + '</span></div>' : '') +
       (avisos.length && !aberto
@@ -2370,7 +2380,7 @@
     if (!movidos.length) return;
     avisoCascata = movidos.map(function (m) {
       return m.vaga === 'planejadas'
-        ? (m.projeto.nome || 'O projeto') + ' terminou o planejamento e entrou nas planejadas. A vaga de planejamento está livre.'
+        ? (m.projeto.nome || 'O projeto') + ' terminou o planejamento e entrou nas planejadas.'
         : (m.projeto.nome || 'Um projeto') + ' assume a vaga de ' + m.vaga + '.';
     }).join(' ');
   }
