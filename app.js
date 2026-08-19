@@ -2223,18 +2223,23 @@
 
   /* A folha da rua (§43): o que tem para fazer fora, na ordem que você quiser
      — a rota. Nome, lugar, materiais como lista de compras, detalhes. Feita
-     registra em seu nome; o resto volta para a lista. */
+     registra em seu nome; o resto volta para a lista.
+     A ordem se monta SEGURANDO E ARRASTANDO o cartão (ligarArrasteRua) — os
+     ↑ ↓ saíram. Na bota a folha é clara, como papel: no carro, com sol, tela
+     escura vira espelho; e tudo ali é grande, porque é lida de relance. */
   function marcacaoRua() {
     var lista = M.tarefasDaRua();
+    var voltar = '<button type="button" class="voltar-lista rua-voltar" data-acao="voltar-inicio">← voltar</button>';
     return [
-      '<button type="button" class="voltar-lista" data-acao="voltar-inicio">← voltar</button>',
+      voltar,
       '<h2>Na rua</h2>',
-      '<p class="palco-sub">O que dá para resolver nesta saída. Arrume a ordem como a rota; o que não der, fica.</p>',
+      '<p class="palco-sub">O que dá para resolver nesta saída. Segure e arraste para montar a rota; o que não der, fica.</p>',
       lista.length
         ? '<ol class="folha folha-rua">' + lista.map(function (t, i) {
             var p = t.projetoId ? M.projeto(t.projetoId) : null;
-            return '<li class="folha-item">' +
+            return '<li class="folha-item rua-item" data-rua="' + t.id + '">' +
               '<div class="folha-linha">' +
+                '<span class="rua-alca" aria-hidden="true">⋮⋮</span>' +
                 '<span class="folha-n">' + (i + 1) + '</span>' +
                 '<div class="folha-texto"><strong>' + esc(t.texto || 'tarefa sem texto') + '</strong>' +
                   (p ? '<em>' + esc(p.nome) + '</em>' : '') +
@@ -2244,14 +2249,26 @@
                   (M.recadoDe(t.id) ? '<span class="folha-recado"><b>Detalhes:</b> ' + esc(M.recadoDe(t.id)) + '</span>' : '') +
                 '</div>' +
                 '<span class="folha-acoes">' +
-                  '<button type="button" class="bt-linha bt-mini" data-acao="rua-mover" data-valor="-1" data-id="' + t.id + '" aria-label="subir">↑</button>' +
-                  '<button type="button" class="bt-linha bt-mini" data-acao="rua-mover" data-valor="1" data-id="' + t.id + '" aria-label="descer">↓</button>' +
-                  '<button type="button" class="bt-fraco bt-mini" data-acao="rua-feita" data-id="' + t.id + '">feita</button>' +
+                  '<button type="button" class="bt-fraco bt-mini rua-feita" data-acao="rua-feita" data-id="' + t.id + '">feita</button>' +
                 '</span>' +
               '</div></li>';
           }).join('') + '</ol>'
-        : '<p class="aviso" style="margin-top:24px">Nada para a rua agora.</p>'
+        : '<p class="aviso rua-nada" style="margin-top:24px">Nada para a rua agora.</p>',
+      // no celular a lista é longa: voltar também no pé, grande
+      lista.length ? '<div class="rua-pe">' + voltar + '</div>' : ''
     ].join('');
+  }
+
+  /* "VAI SAIR" É UM ESTADO, não uma tela de passagem: na bota, recarregar o
+     app no carro voltava para a entrada. Agora a rua fica até você tocar em
+     voltar — ou até o dia virar, para não amanhecer na rua por esquecimento. */
+  var CHAVE_RUA = 'app-sitio-na-rua';
+  function entrarNaRua() { try { localStorage.setItem(CHAVE_RUA, M.hoje()); } catch (e) {} }
+  function sairDaRua()   { try { localStorage.removeItem(CHAVE_RUA); } catch (e) {} }
+  function aindaNaRua() {
+    var dia = null;
+    try { dia = localStorage.getItem(CHAVE_RUA); } catch (e) {}
+    return dia === M.hoje() && M.tarefasDaRua().length > 0;
   }
 
   function textoDaFolha() {
@@ -2469,7 +2486,12 @@
     document.body.classList.toggle('modo-consulta', criar);
     // na entrada a coluna sai de cena: ali a pergunta é uma só, e a lista de
     // projetos ao lado é exatamente a distração que a pergunta existe para evitar
-    document.body.classList.toggle('sem-coluna', tela.tipo === null);
+    /* Na bota, a folha da rua também fica sozinha: a coluna do catálogo
+       empilhada em cima dela era a "lista de projetos" que o celular não
+       deveria ter (§13) — e o que se quer no carro é só o que é de rua. */
+    var naRua = tela.tipo === 'rua' && !naMesa();
+    document.body.classList.toggle('sem-coluna', tela.tipo === null || naRua);
+    document.body.classList.toggle('na-rua', naRua);
     // "mesa" e "bota" são as duas posturas que a spec descreve, e o topo diz
     // qual delas está valendo — nunca o que você vai fazer nela
     document.body.classList.toggle('na-bota', !naMesa());
@@ -2826,6 +2848,7 @@
     var tid = el.getAttribute('data-id');
 
     if (acao === 'voltar-inicio') {
+      if (tela.tipo === 'rua') sairDaRua();
       tela = { tipo: null, id: null };
       fecharFicha();
       return desenhar();
@@ -3046,16 +3069,12 @@
       M.tirarTag(alvoTag, el.getAttribute('data-valor'));
       return desenharPalco();
     }
-    if (acao === 'ir-rua') { tela = { tipo: 'rua', id: null }; return desenhar(); }
-    if (acao === 'rua-mover') {
-      var idsR = M.tarefasDaRua().map(function (t) { return t.id; });
-      var iR = idsR.indexOf(tid), jR = iR + Number(el.getAttribute('data-valor'));
-      if (iR < 0 || jR < 0 || jR >= idsR.length) return;
-      idsR.splice(jR, 0, idsR.splice(iR, 1)[0]);
-      M.reordenarRua(idsR);
-      return desenharPalco();
+    if (acao === 'ir-rua') { tela = { tipo: 'rua', id: null }; entrarNaRua(); return desenhar(); }
+    if (acao === 'rua-feita') {
+      M.terminar('pe_eu', tid, ''); M.limparKit(tid); colherAvisos();
+      if (!M.tarefasDaRua().length) sairDaRua();   // acabou a rua: o próximo abrir é a entrada
+      return desenhar();
     }
-    if (acao === 'rua-feita') { M.terminar('pe_eu', tid, ''); M.limparKit(tid); colherAvisos(); return desenhar(); }
     if (acao === 'diarista-copiar') {
       var texto = textoDaFolha();
       function feito() { var b = el; b.textContent = 'copiado'; setTimeout(function () { b.textContent = 'copiar a folha'; }, 1500); }
@@ -3220,6 +3239,80 @@
       }));
       desenhar();
     });
+  }
+
+  // ── a rota da rua: segurar e arrastar ─────────────────────────────
+  /* O arraste nativo (dragstart/dragover) não existe no dedo, e a rota se
+     monta no carro. Aqui é por pointer events, que valem para dedo e mouse:
+     segura o cartão meio segundo (pela alça, o mouse pega na hora), ele
+     levanta, vai para cima ou para baixo acompanhando o dedo, e ao soltar a
+     ordem grava. Mover o dedo antes do meio segundo é rolagem, e a rolagem
+     segue livre. Enquanto o cartão está no ar, a página não rola — é o
+     touchmove com preventDefault, que precisa ser não-passivo. */
+  var rua = null;   // { li, id, x0, y0, timer, pego, offset }
+
+  function ligarArrasteRua() {
+    $palco.addEventListener('pointerdown', function (e) {
+      var li = e.target.closest('.rua-item');
+      if (!li || e.target.closest('button') || e.button) return;
+      rua = { li: li, id: e.pointerId, x0: e.clientX, y0: e.clientY, pego: false, timer: null };
+      var pelaAlca = !!e.target.closest('.rua-alca');
+      var demora = (e.pointerType === 'mouse' && pelaAlca) ? 0 : 350;
+      var y = e.clientY;
+      rua.timer = setTimeout(function () { pegarRua(y); }, demora);
+    });
+
+    function pegarRua(y) {
+      if (!rua) return;
+      var li = rua.li;
+      rua.pego = true;
+      try { li.setPointerCapture(rua.id); } catch (x) {}
+      rua.offset = y - li.getBoundingClientRect().top;
+      li.classList.add('rua-pegando');
+      document.body.classList.add('rua-arrastando');
+      if (navigator.vibrate) { try { navigator.vibrate(15); } catch (x) {} }
+    }
+
+    $palco.addEventListener('pointermove', function (e) {
+      if (!rua || e.pointerId !== rua.id) return;
+      if (!rua.pego) {
+        // mexeu antes de segurar: é rolagem, não arraste
+        if (Math.abs(e.clientY - rua.y0) > 8 || Math.abs(e.clientX - rua.x0) > 8) { clearTimeout(rua.timer); rua = null; }
+        return;
+      }
+      e.preventDefault();
+      var li = rua.li, ol = li.parentNode;
+      var irmaos = Array.prototype.filter.call(ol.children, function (x) { return x !== li; });
+      var antes = null;
+      for (var i = 0; i < irmaos.length; i++) {
+        var r = irmaos[i].getBoundingClientRect();
+        if (e.clientY < r.top + r.height / 2) { antes = irmaos[i]; break; }
+      }
+      // muda de lugar na lista enquanto arrasta: o buraco mostra onde vai cair
+      if (antes ? li.nextSibling !== antes : ol.lastElementChild !== li) ol.insertBefore(li, antes);
+      li.style.transform = '';
+      var topo = li.getBoundingClientRect().top;
+      li.style.transform = 'translateY(' + Math.round(e.clientY - rua.offset - topo) + 'px)';
+    });
+
+    function soltarRua(e) {
+      if (!rua || (e && e.pointerId !== rua.id)) return;
+      clearTimeout(rua.timer);
+      var estava = rua.pego, li = rua.li;
+      rua = null;
+      if (!estava) return;
+      li.style.transform = '';
+      li.classList.remove('rua-pegando');
+      document.body.classList.remove('rua-arrastando');
+      var ids = Array.prototype.map.call(li.parentNode.querySelectorAll('.rua-item'), function (x) { return x.getAttribute('data-rua'); });
+      M.reordenarRua(ids);
+      desenharPalco();
+    }
+    $palco.addEventListener('pointerup', soltarRua);
+    $palco.addEventListener('pointercancel', soltarRua);
+    document.addEventListener('touchmove', function (e) { if (rua && rua.pego) e.preventDefault(); }, { passive: false });
+    // segurar o dedo abre o menu do navegador por cima do cartão: aqui não
+    $palco.addEventListener('contextmenu', function (e) { if (e.target.closest('.rua-item')) e.preventDefault(); });
   }
 
   // ── arquivo ───────────────────────────────────────────────────────
@@ -3760,6 +3853,7 @@
   });
 
   ligarArraste();
+  ligarArrasteRua();
   M.carregar();
   M.cascatearVagas();   // o que a regra já decidiu, aplicado antes de desenhar
   colherAvisos();       // ... e dito, não engolido
@@ -3767,6 +3861,8 @@
   desenharProposta();
   if (naMesa()) M.absorverSementes();
   voltarAoLugar();
+  // a bota abre na entrada, de propósito — salvo se você disse que ia sair e a rua ainda tem coisa
+  if (!naMesa() && aindaNaRua()) tela = { tipo: 'rua', id: null };
   // a nuvem carrega o token ANTES do primeiro desenho: senão a entrada dizia
   // "não sincroniza" com o painel dizendo "sincronizado às…"
   Sync.iniciar();

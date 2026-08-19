@@ -491,10 +491,57 @@ select option { background: var(--mata); color: var(--neblina); }
 .rua-link { margin: -22px 0 30px; text-align: center; }
 .rua-link .bt-linha { font-size: 14px; }
 .folha-rua .folha-texto em { font-family: var(--mono); font-style: normal; font-size: 11px; color: var(--neblina-fraca); }
+/* a rota se monta segurando e arrastando o cartão; a alça é onde o mouse pega na hora */
+.rua-item { user-select: none; -webkit-user-select: none; }
+.rua-alca { font-size: 14px; line-height: 1.2; color: var(--neblina-fraca); padding: 2px 2px 0 0;
+  cursor: grab; touch-action: none; }
+.rua-pegando { position: relative; z-index: 5; background: var(--mata); box-shadow: 0 10px 28px rgba(0, 0, 0, .55);
+  border-top-color: transparent; cursor: grabbing; }
+body.rua-arrastando, body.rua-arrastando * { cursor: grabbing; }
+.rua-pe { display: none; }
 @media (max-width: 720px) {
   .rua-link { margin: -26px 0 28px; }
   .folha-linha { flex-wrap: wrap; }
   .folha-acoes { width: 100%; justify-content: flex-start; padding-left: 32px; }
+
+  /* NA BOTA A FOLHA DA RUA É PAPEL. No carro, com sol batendo, a tela escura
+     vira espelho; preto no branco é o que se lê. E tudo grande: número da rota,
+     nome, o que comprar, e um "feita" de 54 px — é lida de relance, com o
+     celular no porta-copos. Só aqui: o resto do app continua escuro. */
+  body.na-rua { background: #F3EFE6; color: #151515; }
+  /* body. na frente: a regra da entrada (.sem-coluna .palco, flex centrado) vem depois no arquivo */
+  body.na-rua .palco { display: block; padding: 14px 14px 110px; color: #151515; }
+  .na-rua .topo { color: var(--neblina); }   /* o topo continua escuro: a marca precisa ler clara */
+  .na-rua .palco h2 { color: #111; font-size: 30px; margin-bottom: 6px; }
+  .na-rua .palco-sub { color: #4A4A4A; font-size: 15px; margin-bottom: 14px; }
+  .na-rua .aviso-cascata { color: #333; border-color: #B9B2A4; }
+  .na-rua .voltar-lista {
+    display: inline-flex; align-items: center; min-height: 48px; padding: 0 20px; margin: 0 0 16px;
+    font-family: var(--corpo); font-size: 17px; letter-spacing: 0; color: #222;
+    background: #fff; border: 2px solid #8E877A; border-radius: 8px;
+  }
+  .na-rua .rua-pe { display: block; margin-top: 26px; }
+  .na-rua .rua-pe .voltar-lista { width: 100%; justify-content: center; margin: 0; }
+  .na-rua .folha { max-width: none; }
+  .na-rua .folha-item { border-top: 2px solid #CFC8BA; padding: 14px 0 16px; }
+  .na-rua .folha-linha { gap: 10px; align-items: flex-start; }
+  .na-rua .rua-alca { font-size: 24px; color: #8A8378; padding: 3px 4px 0 0; }
+  .na-rua .folha-n { font-family: var(--display); font-size: 28px; line-height: 1.1; color: #111; min-width: 34px; padding-top: 0; letter-spacing: 0; }
+  .na-rua .folha-texto { gap: 6px; }
+  .na-rua .folha-texto strong { font-size: 21px; line-height: 1.25; font-weight: 600; color: #0E0E0E; }
+  .na-rua .folha-rua .folha-texto em { font-family: var(--corpo); font-size: 14px; color: #5C5C5C; letter-spacing: 0; }
+  .na-rua .folha-texto span { font-family: var(--corpo); font-size: 16px; line-height: 1.35; color: #222; letter-spacing: 0; }
+  .na-rua .folha-texto span b { color: #111; font-weight: 700; }
+  .na-rua .folha-recado { color: #5A3B1F !important; font-style: italic; }
+  .na-rua .folha-acoes { padding-left: 0; margin-top: 10px; }
+  .na-rua .rua-feita {
+    width: 100%; min-height: 54px; padding: 10px 16px;
+    font-size: 19px; font-weight: 600;
+    background: var(--rebrota); color: #0F1A17; border: 2px solid #8EA22C; border-radius: 8px;
+  }
+  .na-rua .rua-pegando { background: #fff; border-radius: 10px; border-top-color: transparent;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, .28); padding-left: 8px; padding-right: 8px; }
+  .na-rua .rua-nada { color: #444; font-size: 17px; }
 }
 
 /* ── tags (§44) ──────────────────────────────────────── */
