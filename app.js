@@ -1539,7 +1539,9 @@
     var m = [];
     var local = M.LOCAIS.filter(function (l) { return l.v === t.ondePrecisaEstar; })[0];
 
-    m.push(['⚑', (local ? local.t : '') + (t.onde ? ' · ' + t.onde : '')]);
+    // o ícone diz o local: bandeira no sítio, carrinho na rua, tela no computador
+    m.push([t.ondePrecisaEstar === 'fora' ? '🛒' : t.ondePrecisaEstar === 'computador' ? '🖥' : '⚑',
+      (local ? local.t : '') + (t.onde ? ' · ' + t.onde : '')]);
     // só o que é notável: "pode parar" é o caso comum e não merece etiqueta
     if (!t.podeParar) m.push(['⏱', 'não pode parar']);
 
