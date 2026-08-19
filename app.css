@@ -430,11 +430,28 @@ button, input, select, textarea {
 .folha-metade input[type="number"] { width: 80px; }
 .aviso-diarista { color: var(--casca); }
 .passo-delegada { font-family: var(--mono); font-size: 11px; color: var(--casca); white-space: nowrap; }
+.folha-papel { display: none; }
+/* No papel a folha é DELE: só o que ele lê. Some o nosso título, a ajuda, os
+   botões, a coluna, a nuvem; fica a data, a lista numerada, grande e preta,
+   com uma caixa para riscar. */
 @media print {
-  .coluna-projetos, .ferramentas, .topo, .folha-acoes, .rodape-acoes, .folha-cabeca button, .bilhete-bt { display: none !important; }
-  body { background: #fff; color: #000; }
-  .palco { padding: 0; }
-  .folha-texto em, .folha-texto span, .folha-n, .folha-total { color: #333; }
+  @page { margin: 18mm; }
+  .coluna-projetos, .ferramentas, .topo, .folha-acoes, .rodape-acoes, .folha-cabeca, .bilhete-bt,
+  .bilhete, .nuvem, #palco > h2, #palco > .palco-sub, .aviso-cascata, .voltar-lista { display: none !important; }
+  html, body { background: #fff !important; color: #000 !important; }
+  .quadro { display: block !important; }
+  .palco { padding: 0 !important; max-width: none !important; }
+  .folha-papel { display: block; margin: 0 0 10mm; }
+  .folha-papel h1 { font-family: Georgia, serif; font-size: 24pt; font-weight: normal; margin: 0 0 4pt; color: #000; }
+  .folha-papel p { font-size: 11pt; color: #333; margin: 0; }
+  .folha { max-width: none; }
+  .folha-item { border-top: 1px solid #999; padding: 6mm 0; page-break-inside: avoid; }
+  .folha-linha { gap: 6mm; align-items: flex-start; }
+  .folha-n { font-family: Georgia, serif; font-size: 14pt; color: #000; min-width: 8mm; padding-top: 0;
+    border: 1.5px solid #000; width: 8mm; height: 8mm; border-radius: 2px; text-align: center; line-height: 7.5mm; }
+  .folha-texto strong { font-size: 15pt; font-weight: 600; color: #000; }
+  .folha-texto em, .folha-texto span { font-family: Georgia, serif; font-size: 11.5pt; color: #222; line-height: 1.35; }
+  .folha-recado { color: #000 !important; font-style: italic; }
 }
 
 /* ── espera vinculada (§40) ───────────────────────────── */

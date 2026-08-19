@@ -1422,7 +1422,8 @@
         (emConsulta(t.projetoId) || solto ? ''
           : pronta
           ? '<button type="button" class="bt-linha bt-mini" data-acao="reabrir-tarefa" data-id="' + t.id + '">reabrir</button>'
-          : '<button type="button" class="bt-linha bt-mini bt-concluir" data-acao="concluir-tarefa" data-id="' + t.id + '">concluir</button>') +
+          : '<button type="button" class="bt-linha bt-mini bt-concluir" data-acao="concluir-tarefa" data-id="' + t.id + '">' +
+              (t.separada ? 'feita pelo diarista' : 'concluir') + '</button>') +
         (emConsulta(t.projetoId) ? ''
           : solto
           ? '<button type="button" class="bt-forte bt-mini" data-acao="salvar-passo">salvar</button>'
@@ -2008,6 +2009,9 @@
     }
     var dia = lista[0].separada.dia;
     return [
+      // o que só sai no papel: o título que ELE lê, não o nosso
+      '<div class="folha-papel"><h1>Tarefas de ' + esc(M.formatarData(dia)) + '</h1>' +
+        '<p>Na ordem. Faça até onde der; o que sobrar fica para a próxima.</p></div>',
       '<h2>Folha do diarista</h2>',
       '<p class="palco-sub">Só o que ele precisa para fazer sem perguntar. Separada, a tarefa sai do seu páreo até você fechar o dia.</p>',
       '<div class="folha-cabeca">',
@@ -2718,7 +2722,14 @@
     if (acao === 'novo-projeto') return criarProjeto();
 
     // concluir e reabrir também pelo PC: nem tudo é feito com o celular na mão
-    if (acao === 'concluir-tarefa') { M.terminar('pe_eu', tid, ''); M.limparKit(tid); return apurarVagas(); }
+    if (acao === 'concluir-tarefa') {
+      // delegada: concluir fora da folha também é "ele fez" — senão o registro mentia
+      var tarefaDel = M.tarefa(tid);
+      if (tarefaDel && tarefaDel.separada) M.fecharDiarista(tid, 'feita');
+      else M.terminar('pe_eu', tid, '');
+      M.limparKit(tid);
+      return apurarVagas();
+    }
     if (acao === 'reabrir-tarefa')  { M.reabrir('pe_eu', tid); return apurarVagas(); }
 
     if (acao === 'remover-passo') {
