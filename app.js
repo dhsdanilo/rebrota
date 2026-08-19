@@ -3119,18 +3119,34 @@
   }
   function estadoDaCopiaLocal() {
     var caixa = document.getElementById('copiaLocal');
-    if (!temApiDePasta()) { caixa.hidden = true; return; }
+    if (!naMesa()) { caixa.hidden = true; return; }
     caixa.hidden = false;
     var ultima = localStorage.getItem(CHAVE_COPIA_LOCAL);
+    /* Sem a API de pastas (Firefox): a cópia local é um download por dia, para
+       a pasta de Downloads — silencioso se o navegador estiver configurado para
+       salvar sem perguntar; senão, a janela de salvar aparece uma vez por dia. */
+    if (!temApiDePasta()) {
+      document.getElementById('copiaLocalEstado').textContent = 'Cópia local diária: este navegador não deixa escolher pasta, então ' +
+        'o arquivo vai para Downloads uma vez por dia' + (ultima ? ' · última ' + M.formatarData(ultima) : ' · ainda nenhuma hoje') + '.';
+      document.getElementById('btPastaCopias').textContent = 'baixar a cópia de hoje';
+      return;
+    }
     document.getElementById('copiaLocalEstado').textContent = pastaCopias
       ? 'cópia local em "' + pastaCopias.name + '"' + (ultima ? ' · última ' + M.formatarData(ultima) : ' · ainda nenhuma')
       : 'Cópia local diária: escolha uma pasta (pode ser do OneDrive) e o resto é automático.';
     document.getElementById('btPastaCopias').textContent = pastaCopias ? 'trocar a pasta' : 'escolher a pasta das cópias';
   }
   function copiarLocal(forcar) {
-    if (!pastaCopias) return Promise.resolve(false);
     var hoje = M.hoje();
     if (!forcar && localStorage.getItem(CHAVE_COPIA_LOCAL) === hoje) return Promise.resolve(false);
+    if (!temApiDePasta()) {
+      if (!naMesa()) return Promise.resolve(false);
+      exportar();   // marca a cópia de hoje e baixa
+      localStorage.setItem(CHAVE_COPIA_LOCAL, hoje);
+      estadoDaCopiaLocal();
+      return Promise.resolve(true);
+    }
+    if (!pastaCopias) return Promise.resolve(false);
     return pastaCopias.queryPermission({ mode: 'readwrite' }).then(function (p) {
       if (p === 'granted') return p;
       // só pede de novo com gesto do usuário; sem gesto, fica para o próximo clique
@@ -3155,7 +3171,7 @@
       });
   }
   document.getElementById('btPastaCopias').addEventListener('click', function () {
-    if (!temApiDePasta()) return;
+    if (!temApiDePasta()) { copiarLocal(true); return; }
     var estadoEl = document.getElementById('copiaLocalEstado');
     estadoEl.textContent = 'abrindo a escolha da pasta…';
     var pedido;
