@@ -512,7 +512,9 @@ button, input, select, textarea {
 .cofre-saldo { margin: 0; font-family: var(--display); font-size: 22px; color: var(--neblina); }
 .valor-dinheiro { font-family: var(--display); font-size: 22px; }
 .cofre-historico { max-height: 180px; overflow-y: auto; }
-.bt-icone-mini { width: 28px; height: 28px; }
+.cofre-acoes { align-items: stretch; }
+.bt-icone-mini { width: 30px; height: auto; }
+.bt-icone-mini svg { width: 15px; height: 15px; }
 .bt-icone-mini svg { width: 15px; height: 15px; }
 .bt-icone-on { border-color: var(--rebrota); color: var(--neblina); }
 .cofre-saldo span { font-size: 13px; color: var(--neblina-fraca); font-family: var(--corpo); margin-left: 4px; }
@@ -761,7 +763,9 @@ button, input, select, textarea {
   color: var(--neblina-fraca);
 }
 
-.envelope-largo { max-width: 420px; margin-bottom: 16px; }
+/* a barra vai até onde vai a grade das duas colunas (custo · cofre). `.palco *`
+   põe max-width 100% em tudo e vencia pela ordem; daí o seletor mais específico */
+.palco .envelope-largo { max-width: 620px; margin-bottom: 16px; }
 .envelope-largo .envelope { margin-top: 0; }
 
 /* o custo de um projeto rodando é curiosidade, não decisão: uma linha, quieta */
