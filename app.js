@@ -625,7 +625,7 @@
 
       // a muda que esta obra foi: guardada, fechada, para ler quando a vontade acabar
       (p.estado !== 'fila' && p.estado !== 'descartado' && M.cadeiasVivas(p.muda.vantagens).length)
-        ? grupoRecolhido('A muda que isto foi', p.id, resumoMuda(p)) : '',
+        ? grupoRecolhido('Muda de origem', p.id, resumoMuda(p)) : '',
 
       /* O envelope é gatilho de entrada: dispara uma vez e some. Num projeto já
          rodando ele não decide mais nada, e ficar mostrando dinheiro no meio da
