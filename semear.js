@@ -138,7 +138,7 @@
      de olhar para dinheiro (§3) e sobra só o "orçado em". */
   function envelope(p) {
     if (p.custoEstimado === null || p.custoEstimado === undefined) return '';
-    if (p.estado === 'preparo' && !p.papel) {
+    if (p.estado === 'preparo') {
       return '<p class="sitio-envelope">' + esc(M.moeda(p.guardado)) + ' de ' + esc(M.moeda(p.custoEstimado)) + '</p>';
     }
     // rodando ou concluído: só quanto foi orçado — o envelope já disparou

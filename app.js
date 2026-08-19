@@ -248,7 +248,8 @@
      custa e ainda não se começou. Na fila é chute; em planejamento está sendo
      levantado; rodando, já disparou. Só o "orçado em" sobrevive na obra. */
   function mostraEnvelope(p) {
-    return p.estado === 'preparo' && !p.papel &&
+    // em planejamento ou planejada, com custo definido: a barra é informação honesta (§36 revista)
+    return p.estado === 'preparo' &&
       p.custoEstimado !== null && p.custoEstimado !== undefined;
   }
 
