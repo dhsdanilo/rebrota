@@ -1634,6 +1634,7 @@
     var avisos = M.avisosDe(t);
     var noSitio = t.ondePrecisaEstar === 'sitio';
     var noPc = t.ondePrecisaEstar === 'computador';
+    var naRua = t.ondePrecisaEstar === 'fora';
 
     return [
       // o local mora na linha da tarefa (§46); aqui fica só o ponto exato
@@ -1661,6 +1662,10 @@
         (M.juntandoDinheiro(t) ? '<p class="aviso" style="margin:8px 0 0">juntando dinheiro — faltam ' + esc(M.moeda(M.faltaDinheiro(t))) + '</p>' : ''),
         'A avulsa que custa dinheiro espera o dinheiro, não o app. Mesmo desenho do envelope, em tamanho de tarefa.')) +
 
+      /* Fora não tem condições (§42): sair é planejado, não sorteado — a folha
+         da rua é a lista, e ele decide. O que sobra para a rua: o que é, o
+         lugar, o que comprar, quando precisa, dependência, tags, nota. */
+      naRua ? '' :
       grupo('Condições', '',
         (noPc ? '' :
         linhaCond('Clima',
@@ -2554,10 +2559,12 @@
     // o local decide o resto (§42): trocou, o que não se aplica volta ao neutro e a ficha redesenha
     if (chave === 'ondePrecisaEstar') {
       if (valor !== 'sitio') { obj.guardadaParaChuva = false; obj.esforco = 'leve'; }
-      if (valor === 'computador') {
+      if (valor === 'computador' || valor === 'fora') {
         obj.exigeClima = 'indiferente'; obj.podeNoCalor = true; obj.exigeSoloFirme = false;
-        obj.precisaAjuda = false; obj.boaComCriancas = false; obj.perigosaComCriancas = false; obj.onde = '';
+        obj.precisaAjuda = false; obj.boaComCriancas = false; obj.perigosaComCriancas = false;
+        obj.podeParar = true; obj.peso = 2;
       }
+      if (valor === 'computador') obj.onde = '';
       obj.ultimoToque = M.agora(); M.salvar();
       return desenharPalco();
     }
