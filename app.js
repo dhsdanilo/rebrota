@@ -651,9 +651,10 @@
               : '<div class="campo"><label>Custo estimado</label><p class="valor-lido valor-dinheiro">' +
                 (p.custoEstimado !== null && p.custoEstimado !== undefined
                   ? esc(M.moeda(p.custoEstimado)) : '<span class="aviso">sem orçamento ainda</span>') +
-                (consulta ? '' : ' <button type="button" class="bt-linha bt-mini" data-acao="custo-editar" data-id="' + p.id + '">' +
+                '</p>' +
+                (consulta ? '' : '<button type="button" class="bt-linha bt-mini custo-bt" data-acao="custo-editar" data-id="' + p.id + '">' +
                   (p.custoEstimado !== null && p.custoEstimado !== undefined ? 'editar' : 'definir') + '</button>') +
-                '</p></div>') +
+                '</div>') +
             // o cofre ao lado do custo, na segunda coluna da mesma grade
             '<div class="campo campo-cofre"><label>Cofre</label>' + cofre(p, consulta) + '</div>' +
             '</div>',
@@ -883,7 +884,7 @@
     var aportes = M.aportesDe(p.id);
     var aberto = cofreAberto && cofreAberto.pid === p.id ? cofreAberto.modo : null;
     return '<div class="cofre">' +
-      '<p class="cofre-saldo">' + esc(M.moeda(saldo)) + ' <span>no cofre</span></p>' +
+      '<p class="cofre-saldo">' + esc(M.moeda(saldo)) + '</p>' +
       (consulta ? '' :
         aberto
           ? '<div class="cofre-caixa">' +
