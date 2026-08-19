@@ -433,6 +433,7 @@ var Modelo = (function () {
       custoEstimado: null,   // null = ainda não orçado
       guardado: 0,
       muda: novaMuda(),
+      tags: [],              // assuntos (§44)
       criadoEm: agora(),
       ultimoToque: agora()
     };
@@ -506,6 +507,7 @@ var Modelo = (function () {
       // separada para o diarista (§39): { para, dia, ordem } — sai do páreo dele
       separada: null,
       rua: 0,                // ordem na folha da rua (§43) — a rota dele
+      tags: [],              // assuntos (§44): só cadastro por ora; análise vem depois
       dependeDe: [],
 
       // sem atribuição = do proprietário. Ninguém novo enxerga por acidente.
@@ -549,6 +551,40 @@ var Modelo = (function () {
   function chao(s) {
     return String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   }
+  /* TAGS (§44) — assuntos para a análise de depois. Só cadastro por ora.
+     Uma grafia por assunto: "Sítio", "sitio" e "sítio" são a mesma tag — a
+     primeira grafia que ele usou é a que fica. */
+  function todasAsTags() {
+    var vistas = {}, lista = [];
+    function junta(t) { (t || []).forEach(function (x) { var k = chao(x); if (!vistas[k]) { vistas[k] = true; lista.push(x); } }); }
+    cat().projetos.forEach(function (p) { junta(p.tags); });
+    cat().tarefas.forEach(function (t) { junta(t.tags); });
+    return lista.sort(function (a, b) { return chao(a) < chao(b) ? -1 : 1; });
+  }
+  function normalizarTag(texto) {
+    var limpo = String(texto || '').trim().replace(/^#/, '').replace(/\s+/g, ' ');
+    if (!limpo) return '';
+    var k = chao(limpo);
+    var existente = todasAsTags().filter(function (x) { return chao(x) === k; })[0];
+    return existente || limpo;
+  }
+  function porTag(obj, texto) {
+    var tag = normalizarTag(texto);
+    if (!tag || !obj) return null;
+    obj.tags = obj.tags || [];
+    if (obj.tags.some(function (x) { return chao(x) === chao(tag); })) return tag;
+    obj.tags.push(tag);
+    obj.ultimoToque = agora();
+    salvar();
+    return tag;
+  }
+  function tirarTag(obj, tag) {
+    if (!obj || !obj.tags) return;
+    obj.tags = obj.tags.filter(function (x) { return chao(x) !== chao(tag); });
+    obj.ultimoToque = agora();
+    salvar();
+  }
+
   // palavras que aparecem em qualquer frase e não dizem do que se trata
   var VAZIAS = ('para como mais coisa coisas fazer feito ficar deixar colocar botar novo nova novos novas ' +
     'perto longe aqui onde quando depois antes ainda entao talvez porque sobre entre tudo nada algo ' +
@@ -2171,6 +2207,7 @@ var Modelo = (function () {
     inserirSemente: inserirSemente, semente: semente,
     classificarSemente: classificarSemente, promoverSemente: promoverSemente,
     semearTarefa: semearTarefa, sementesParaTarefa: sementesParaTarefa, buscar: buscar,
+    todasAsTags: todasAsTags, normalizarTag: normalizarTag, porTag: porTag, tirarTag: tirarTag,
     ESTADOS_SEMENTE: ESTADOS_SEMENTE,
 
     exportar: exportar,

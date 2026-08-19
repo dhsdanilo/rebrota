@@ -107,6 +107,22 @@
       opcoes(lista, atual) + '</select></div>';
   }
 
+  /* Tags (§44): chips + uma caixa com autocompletar. Enter ou vírgula fecha a
+     tag; a grafia existente vence a nova. Só cadastro — a análise vem depois. */
+  function campoTags(alvo, id, tags, travado) {
+    var chips = (tags || []).map(function (t) {
+      return '<span class="tag">' + esc(t) +
+        (travado ? '' : '<button type="button" class="tag-x" data-acao="tirar-tag" data-alvo="' + alvo + '" data-id="' + id + '" data-valor="' + esc(t) + '" aria-label="tirar">×</button>') +
+        '</span>';
+    }).join('');
+    if (travado) return '<div class="tags">' + (chips || '<span class="aviso">—</span>') + '</div>';
+    return '<div class="tags">' + chips +
+      '<input type="text" class="tag-caixa" list="tagsLista_' + id + '" placeholder="assunto — Enter ou vírgula" autocomplete="off"' +
+      ' data-tags="' + alvo + '" data-id="' + id + '">' +
+      '<datalist id="tagsLista_' + id + '">' + M.todasAsTags().map(function (t) { return '<option value="' + esc(t) + '">'; }).join('') + '</datalist>' +
+      '</div>';
+  }
+
   function campoMarca(alvo, id, chave, rotulo, ligado, travado, ajuda) {
     return '<div class="campo campo-marca' + (ligado ? ' campo-marca-on' : '') + '">' +
       '<input type="checkbox" id="c_' + id + '_' + chave + '"' +
@@ -582,6 +598,10 @@
 
       // a confirmação da ação fica colada na barra que a abriu — não no meio da ficha
       caixaAcao(p),
+
+      // tags (§44): assuntos do projeto; as tarefas dele herdam na análise
+      grupo('Tags', '', campoTags('projeto', p.id, p.tags, consulta),
+        'Assuntos deste projeto — as tarefas dele herdam. Só cadastro por ora; a análise por assunto vem depois.'),
 
       /* A MUDA (§37): enquanto o projeto espera vaga, o trabalho é lapidar a
          ideia — e a ficha é essa lapidação. Depois de virar obra, a muda fica
@@ -1500,6 +1520,7 @@
     if (t.guardadaParaChuva) cond.push('guardada para a chuva');
     if (noSitioL) cond.push(t.esforco === 'pesado' ? 'pesado' : 'leve');
     if (cond.length) m.push(['☁', cond.join(' · ')]);
+    if ((t.tags || []).length) m.push(['#', t.tags.join(' · ')]);
 
     var gente = [];
     if (t.precisaAjuda) gente.push('precisa ajuda');
@@ -1694,6 +1715,11 @@
         'Tarefas que precisam terminar antes desta. A ordem da lista é preferência sua e muda ' +
         'arrastando; isto aqui é lei, e o app segura a tarefa até as outras ficarem prontas. ' +
         'Usar demais engessa o projeto — vincule só o que é impossível fora de ordem.'),
+
+      grupo('Tags', '',
+        campoTags('tarefa', t.id, t.tags, travado),
+        'Assuntos desta tarefa — galpão, madeira, galinhas. Por ora é só cadastro: a análise por ' +
+        'assunto vem depois. Uma grafia por assunto: o app junta "sítio" e "Sitio".'),
 
       grupo('Nota', 'grade',
         campoArea('tarefa', t.id, 'recado', '', t.recado, travado,
@@ -2867,6 +2893,11 @@
       M.reordenarSeparadas(ids);
       return desenharPalco();
     }
+    if (acao === 'tirar-tag') {
+      var alvoTag = el.getAttribute('data-alvo') === 'projeto' ? M.projeto(tid) : M.tarefa(tid);
+      M.tirarTag(alvoTag, el.getAttribute('data-valor'));
+      return desenharPalco();
+    }
     if (acao === 'ir-rua') { tela = { tipo: 'rua', id: null }; return desenhar(); }
     if (acao === 'rua-mover') {
       var idsR = M.tarefasDaRua().map(function (t) { return t.id; });
@@ -3223,7 +3254,23 @@
     if (e.target.hasAttribute('data-muda')) return escreverMuda(e.target, false);
     if (e.target.hasAttribute('data-campo')) escrever(e.target);
   });
+  // a caixa de tags fecha no Enter, na vírgula ou ao sair
+  function fecharTag(caixa) {
+    var partes = caixa.value.split(',').map(function (x) { return x.trim(); }).filter(Boolean);
+    if (!partes.length) { caixa.value = ''; return; }
+    var alvo = caixa.getAttribute('data-tags') === 'projeto' ? M.projeto(caixa.getAttribute('data-id')) : M.tarefa(caixa.getAttribute('data-id'));
+    partes.forEach(function (x) { M.porTag(alvo, x); });
+    caixa.value = '';
+    desenharPalco();
+    var nova = $palco.querySelector('.tag-caixa[data-id="' + caixa.getAttribute('data-id') + '"]');
+    if (nova) nova.focus();
+  }
+  $palco.addEventListener('keydown', function (e) {
+    if (!e.target.classList.contains('tag-caixa')) return;
+    if (e.key === 'Enter' || e.key === ',') { e.preventDefault(); fecharTag(e.target); }
+  });
   $palco.addEventListener('change', function (e) {
+    if (e.target.classList.contains('tag-caixa')) return fecharTag(e.target);
     if (e.target.id === 'diaDiarista' && e.target.value) { M.definirDiaDiarista(e.target.value); return desenhar(); }
     if (e.target.hasAttribute('data-muda')) return escreverMuda(e.target, true);
     if (e.target.hasAttribute('data-campo')) return escrever(e.target);

@@ -479,6 +479,21 @@ button, input, select, textarea {
   .folha-acoes { width: 100%; justify-content: flex-start; padding-left: 32px; }
 }
 
+/* ── tags (§44) ──────────────────────────────────────── */
+.tags { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  font-family: var(--mono); font-size: 11px; letter-spacing: .04em;
+  padding: 2px 8px; border: 1px solid var(--musgo); border-radius: 999px; color: var(--neblina);
+}
+.tag-x { background: none; border: 0; color: var(--neblina-fraca); cursor: pointer; padding: 0 0 0 2px; font-size: 13px; line-height: 1; }
+.tag-x:hover { color: var(--passou); }
+.tag-caixa {
+  background: var(--mata); border: 1px solid var(--musgo); border-radius: 999px; color: var(--neblina);
+  padding: 3px 10px; font-size: 13px; min-width: 220px;
+}
+.tag-caixa:focus { border-color: var(--rebrota); outline: none; }
+
 /* ── botões ─────────────────────────────────────────── */
 
 .bt-forte, .bt-fraco, .bt-linha {
