@@ -14,7 +14,7 @@
 <link rel="apple-touch-icon" href="icone.svg">
 <!-- ?v= sobe a cada mudança: sem isso o navegador serve o arquivo velho do
      cache e a correção parece não ter funcionado -->
-<link rel="stylesheet" href="app.css?v=77">
+<link rel="stylesheet" href="app.css?v=78">
 </head>
 <body>
 
@@ -185,25 +185,26 @@
   <p class="aviso nuvem-estado" id="nuvemEstado"></p>
 </div>
 
+<!-- o ✎ (§45): caderno de anotações — qualquer coisa, de qualquer lugar. Cada
+     anotação é evento no diário, então o que tem aqui tem lá. -->
 <div class="bilhete" id="bilhete" hidden>
   <div class="bilhete-topo">
-    <strong>Anotações sobre o app</strong>
+    <strong>Anotações</strong>
     <button type="button" class="bilhete-x" id="btFecharBilhete" aria-label="fechar">×</button>
   </div>
-  <textarea id="bilheteTexto" rows="10"
-    placeholder="o que incomodou, o que faltou, o que você mudaria&#10;&#10;grava sozinho"></textarea>
+  <textarea id="bilheteTexto" rows="3" placeholder="anotar qualquer coisa — Ctrl+Enter grava"></textarea>
   <div class="bilhete-baixo">
-    <button type="button" class="bt-forte" id="btCopiarBilhete">copiar para a conversa</button>
-    <button type="button" class="bt-fraco" id="btApagarBilhete">apagar</button>
+    <button type="button" class="bt-forte" id="btAnotar">anotar</button>
     <span class="aviso" id="bilheteAviso"></span>
   </div>
+  <ul class="bilhete-lista" id="bilheteLista"></ul>
 </div>
 
-<script src="modelo.js?v=77"></script>
-<script src="sync.js?v=77"></script>
-<script src="motor.js?v=77"></script>
-<script src="dados.js?v=77"></script>
-<script src="campo.js?v=77"></script>
-<script src="app.js?v=77"></script>
+<script src="modelo.js?v=78"></script>
+<script src="sync.js?v=78"></script>
+<script src="motor.js?v=78"></script>
+<script src="dados.js?v=78"></script>
+<script src="campo.js?v=78"></script>
+<script src="app.js?v=78"></script>
 </body>
 </html>

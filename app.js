@@ -3289,73 +3289,54 @@
   var $bilhete = document.getElementById('bilhete');
   var $bilheteTexto = document.getElementById('bilheteTexto');
   var $bilheteAviso = document.getElementById('bilheteAviso');
+  var $bilheteLista = document.getElementById('bilheteLista');
+
+  /* O ✎ (§45): caderno, não documento. Escrever acrescenta; riscar tira da
+     lista e fica no registro. Tudo é evento no diário — sincroniza sozinho. */
+  function desenharAnotacoes() {
+    var lista = M.anotacoes();
+    $bilheteLista.innerHTML = lista.length ? lista.map(function (a) {
+      return '<li><p>' + esc(a.texto) + '</p><em>' +
+        esc(M.formatarData(M.diaDe(a.quando))) + ' ' + esc(M.horaDe(new Date(a.quando))) +
+        (a.app ? ' · ' + esc(a.app) : '') +
+        ' <button type="button" class="bt-linha bt-mini" data-riscar="' + a.id + '">riscar</button></em></li>';
+    }).join('') : '<li class="aviso">Nada anotado.</li>';
+  }
 
   function abrirBilhete() {
-    $bilheteTexto.value = M.lerBilhete();
     $bilhete.hidden = false;
     $bilheteAviso.textContent = '';
+    desenharAnotacoes();
+    $bilheteTexto.focus();
+  }
+
+  function anotarAgora() {
+    var texto = $bilheteTexto.value.trim();
+    if (!texto) return ($bilheteAviso.textContent = 'escreva alguma coisa');
+    M.anotar('pe_eu', texto, naMesa() ? 'mesa' : 'bota');
+    $bilheteTexto.value = '';
+    $bilheteAviso.textContent = 'anotado';
+    desenharAnotacoes();
     $bilheteTexto.focus();
   }
 
   document.getElementById('btBilhete').addEventListener('click', function () {
     if ($bilhete.hidden) abrirBilhete(); else $bilhete.hidden = true;
   });
-
-  document.getElementById('btFecharBilhete').addEventListener('click', function () {
-    $bilhete.hidden = true;
+  document.getElementById('btFecharBilhete').addEventListener('click', function () { $bilhete.hidden = true; });
+  document.getElementById('btAnotar').addEventListener('click', anotarAgora);
+  $bilheteTexto.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) { e.preventDefault(); anotarAgora(); }
+  });
+  $bilheteLista.addEventListener('click', function (e) {
+    var b = e.target.closest('[data-riscar]');
+    if (!b) return;
+    M.riscarAnotacao('pe_eu', b.getAttribute('data-riscar'));
+    desenharAnotacoes();
   });
 
-  $bilheteTexto.addEventListener('input', function () {
-    M.escreverBilhete($bilheteTexto.value);
-    $bilheteAviso.textContent = 'gravado';
-  });
-
-  /* Apagar não pergunta: o desfazer fica na tela por um tempo, e desfazer é
-     mais barato que uma confirmação. Passado o tempo, some sem ruído. */
-  var bilheteApagado = null;
-  var relogioDesfazer = null;
-
-  document.getElementById('btApagarBilhete').addEventListener('click', function () {
-    if (!$bilheteTexto.value.trim()) return ($bilheteAviso.textContent = 'já está vazio');
-
-    bilheteApagado = $bilheteTexto.value;
-    $bilheteTexto.value = '';
-    M.escreverBilhete('');
-
-    $bilheteAviso.innerHTML = 'apagado — <button type="button" class="bt-linha bt-mini" ' +
-      'id="btDesfazerBilhete">desfazer</button>';
-    document.getElementById('btDesfazerBilhete').addEventListener('click', function () {
-      if (bilheteApagado === null) return;
-      $bilheteTexto.value = bilheteApagado;
-      M.escreverBilhete(bilheteApagado);
-      bilheteApagado = null;
-      $bilheteAviso.textContent = 'de volta';
-    });
-
-    clearTimeout(relogioDesfazer);
-    relogioDesfazer = setTimeout(function () {
-      bilheteApagado = null;
-      if (document.getElementById('btDesfazerBilhete')) $bilheteAviso.textContent = '';
-    }, 12000);
-  });
-
-  document.getElementById('btCopiarBilhete').addEventListener('click', function () {
-    var texto = $bilheteTexto.value;
-    if (!texto.trim()) return ($bilheteAviso.textContent = 'nada escrito ainda');
-
-    function avisar() { $bilheteAviso.textContent = 'copiado — pode colar na conversa'; }
-
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(texto).then(avisar, copiarNaMao);
-    } else {
-      copiarNaMao();
-    }
-    function copiarNaMao() {
-      $bilheteTexto.select();
-      try { document.execCommand('copy'); avisar(); }
-      catch (e) { $bilheteAviso.textContent = 'selecionei o texto — copie com Ctrl+C'; }
-    }
-  });
+  // o texto antigo do bilhete vira a primeira anotação: nada se perde
+  if (M.lerBilhete().trim()) { M.anotar('pe_eu', M.lerBilhete(), 'mesa'); M.escreverBilhete(''); }
 
   // ── semente: o (+) da §14 ─────────────────────────────────────────
   /* Captura em um toque, nos dois modos e por cima da frente de campo: a ideia
@@ -3494,6 +3475,7 @@
   });
   Sync.ouvir(function (s, mudouLocal) {
     desenharNuvem();
+    if (mudouLocal && !$bilhete.hidden) desenharAnotacoes();
     // a linha da nuvem na entrada acompanha o estado (hora, erro), sem mexer no resto
     if (!mudouLocal && tela.tipo === null && $campo.hidden && !s.ocupado) return desenhar();
     if (!mudouLocal) return;

@@ -494,6 +494,12 @@ button, input, select, textarea {
 }
 .tag-caixa:focus { border-color: var(--rebrota); outline: none; }
 
+/* ── anotações (§45) ─────────────────────────────────── */
+.bilhete-lista { list-style: none; margin: 12px 0 0; padding: 0; max-height: 46vh; overflow-y: auto; }
+.bilhete-lista li { padding: 8px 0; border-top: 1px solid var(--musgo); }
+.bilhete-lista li p { margin: 0 0 3px; font-size: 14px; line-height: 1.4; white-space: pre-wrap; }
+.bilhete-lista li em { font-family: var(--mono); font-style: normal; font-size: 11px; color: var(--neblina-fraca); display: flex; gap: 8px; align-items: center; }
+
 /* ── botões ─────────────────────────────────────────── */
 
 .bt-forte, .bt-fraco, .bt-linha {

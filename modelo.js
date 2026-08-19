@@ -1949,6 +1949,25 @@ var Modelo = (function () {
     return separadas().reduce(function (s, t) { return s + (restanteDe(t.id) || t.duracaoTotal || 0); }, 0);
   }
 
+  /* ANOTAÇÕES (§45) — o ✎. Caderno, não documento: cada anotação é um evento
+     no diário (`anotou`), então sincroniza como tudo, por união, sem conflito.
+     Riscar é outro evento (`riscou`): some da lista, fica no registro. */
+  function anotar(quem, texto, app) {
+    texto = String(texto || '').trim();
+    if (!texto) return null;
+    return registrar(quem, 'anotou', { texto: texto, app: app || '' });
+  }
+  function riscarAnotacao(quem, anotacaoId) {
+    return registrar(quem, 'riscou', { anotacaoId: anotacaoId });
+  }
+  function anotacoes() {
+    var riscadas = {};
+    eventosEmOrdem().forEach(function (ev) { if (ev.tipo === 'riscou') riscadas[ev.anotacaoId] = true; });
+    return eventosEmOrdem()
+      .filter(function (ev) { return ev.tipo === 'anotou' && !riscadas[ev.id]; })
+      .reverse();
+  }
+
   function registrarClima(quem, tempo, barro) {
     return registrar(quem, 'clima', { dia: hoje(), tempo: tempo, barro: !!barro });
   }
@@ -2155,6 +2174,7 @@ var Modelo = (function () {
     definirDiaDiarista: definirDiaDiarista, fecharDiarista: fecharDiarista, minutosSeparados: minutosSeparados,
     tarefasDaRua: tarefasDaRua, reordenarRua: reordenarRua,
     semear: semear, absorverSementes: absorverSementes, sementesDe: sementesDe,
+    anotar: anotar, riscarAnotacao: riscarAnotacao, anotacoes: anotacoes,
     apelido: apelido,
     nomeDe: nomeDe,
 
