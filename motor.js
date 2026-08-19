@@ -112,7 +112,7 @@ var Motor = (function () {
     if (t.exigeSoloFirme && s.barro) return false;
 
     // calor é o tempo de hoje, não a hora: nublado e fresco às 13 h pode (§41)
-    if (t.evitaCalor && s.tempo === 'calor') return false;
+    if (t.podeNoCalor === false && s.tempo === 'calor') return false;
 
     if (t.exigeClima === 'firme' && chovendo(s)) return false;
     if (t.exigeClima === 'tolera_chuva_fina') {

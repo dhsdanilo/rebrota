@@ -1482,7 +1482,7 @@
 
     var cond = [];
     if (t.exigeClima !== 'indiferente') cond.push(t.exigeClima === 'firme' ? 'tempo firme' : 'tolera chuva fina');
-    if (t.evitaCalor) cond.push('não no calor');
+    if (t.podeNoCalor === false) cond.push('não no calor');
     if (t.exigeSoloFirme) cond.push('solo firme');
     if (t.guardadaParaChuva) cond.push('guardada para a chuva');
     cond.push(t.esforco === 'pesado' ? 'pesado' : 'leve');
@@ -1601,10 +1601,10 @@
         /* Estas duas eram caixas de marca empilhadas embaixo do valor do clima,
            e liam-se como uma lista em que o primeiro item tinha perdido a
            caixinha. Viraram pergunta com resposta, como todas as outras. */
-        linhaCond('Não no calor?',
-          'Some nos dias em que você responde "sol forte · calor" na consulta. É o tempo de hoje, ' +
+        linhaCond('Pode no calor?',
+          '"Não" some nos dias em que você responde "sol forte · calor" na consulta. É o tempo de hoje, ' +
           'não a hora: nublado e fresco às 13 h continua valendo.',
-          campoBooleano('tarefa', t.id, 'evitaCalor', t.evitaCalor, travado)) +
+          campoBooleano('tarefa', t.id, 'podeNoCalor', t.podeNoCalor !== false, travado)) +
 
         linhaCond('Precisa de chão firme?',
           'Para o que exige pisar sem atolar ou rodar carrinho de mão. Some nos dias em que você ' +

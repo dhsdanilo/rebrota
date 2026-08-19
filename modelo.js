@@ -358,6 +358,8 @@ var Modelo = (function () {
   }
 
   function costurarTarefa(t) {
+    // a pergunta virou "pode no calor?" (era "não no calor"); arquivos do meio-dia de 19/08
+    if (t.evitaCalor !== undefined) { if (t.podeNoCalor === undefined) t.podeNoCalor = !t.evitaCalor; delete t.evitaCalor; }
     // zona + ponto diziam a mesma coisa e viraram um campo só
     if (t.zona || t.ponto) {
       t.onde = t.onde || [t.zona, t.ponto].filter(Boolean).join(' · ');
@@ -470,7 +472,7 @@ var Modelo = (function () {
       blocoMinimo: null,     // null = derivado da duração
 
       exigeClima: 'indiferente',
-      evitaCalor: false,     // some nos dias em que a consulta diz "calor" (§41)
+      podeNoCalor: true,     // "não" some nos dias em que a consulta diz "calor" (§41)
       guardadaParaChuva: false,
       exigeSoloFirme: false,
       // só avulsa (§41): custo por cima e o que já está separado — enquanto
