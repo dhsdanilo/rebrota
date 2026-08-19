@@ -608,24 +608,18 @@
          guardada num grupo fechado no pé: registro, não formulário. */
       (p.estado === 'fila' || p.estado === 'descartado') ? fichaMuda(p, consulta) : '',
 
-      /* A motivação é o argumento do projeto, não um campo de cadastro: fica
-         numa caixa citada, em itálico, para se ler como lembrete e não como
-         mais uma linha de formulário. Na muda ela ainda não existe — as
-         vantagens é que viram motivação quando a muda entra em planejamento. */
+      /* MOTIVAÇÃO = a muda (§37). Toda a motivação da obra foi lapidada na muda —
+         vantagens, desvantagens, despesas por cima, sentimento, o que inviabiliza —
+         então aqui ela aparece fechada, para ler quando a vontade acabar e você
+         precisar lembrar por que começou. Obra antiga sem muda mostra os ganhos
+         que tinha. Na muda viva isto não existe: a ficha da muda é a motivação. */
       (p.estado === 'fila' || p.estado === 'descartado') ? '' :
-      grupo('Motivação', '',
-        '<div class="caixa-motivacao">' +
-          '<textarea class="area-motivacao" rows="' + Math.max(2, (p.ganhos || []).length) + '"' +
-          ' id="c_' + p.id + '_ganhos" data-alvo="projeto" data-id="' + p.id + '" data-campo="ganhos"' +
-          (solto ? ' placeholder="um ganho por linha"' : ' readonly placeholder="—"') + '>' +
-          esc((p.ganhos || []).join('\n')) + '</textarea>' +
-        '</div>',
-        'Um ganho por linha: o que esta obra compra para você em troca do trabalho. É o que se ' +
-        'lê meses depois, quando a vontade acabou e você precisa lembrar por que começou.'),
-
-      // a muda que esta obra foi: guardada, fechada, para ler quando a vontade acabar
-      (p.estado !== 'fila' && p.estado !== 'descartado' && mudaTemConteudo(p))
-        ? grupoRecolhido('Muda de origem', p.id, resumoMuda(p)) : '',
+      mudaTemConteudo(p)
+        ? grupoRecolhido('Motivação', p.id, resumoMuda(p))
+        : (p.ganhos || []).length
+        ? grupoRecolhido('Motivação', p.id, '<div class="caixa-motivacao"><p class="area-motivacao">' +
+            (p.ganhos || []).map(esc).join('<br>') + '</p></div>')
+        : '',
 
       /* O envelope é gatilho de entrada: dispara uma vez e some. Num projeto já
          rodando ele não decide mais nada, e ficar mostrando dinheiro no meio da
