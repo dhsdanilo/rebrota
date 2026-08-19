@@ -1398,6 +1398,14 @@ input[type="number"][readonly] { -moz-appearance: textfield; }
   text-align: right;
 }
 .passo-tempo-edita:focus { border-color: var(--neblina-fraca); outline: none; }
+.passo-tempos { display: inline-flex; align-items: center; gap: 3px; }
+.tempo {
+  font-family: var(--mono); font-size: 12px; padding: 5px 8px; cursor: pointer;
+  background: var(--mata); border: 1px solid var(--musgo); border-radius: var(--raio); color: var(--neblina-fraca);
+}
+.tempo:hover { color: var(--neblina); }
+.tempo-on { border-color: var(--rebrota); color: var(--neblina); }
+.passo-tempos .passo-tempo-edita { width: 72px; margin-left: 4px; }
 .passo-local-edita {
   background: var(--mata); border: 1px solid var(--musgo); border-radius: var(--raio);
   padding: 6px 9px; color: var(--neblina); font-family: var(--corpo); font-size: 15px;
@@ -1565,8 +1573,11 @@ input[type="number"][readonly] { -moz-appearance: textfield; }
   user-select: none;
 }
 
-.caixinha input { accent-color: var(--rebrota); margin: 0; }
-.caixinha-on { border-color: var(--rebrota); }
+/* Ligado é o estado comum (doze meses ligados = o ano todo), então é QUIETO:
+   moldura normal, texto normal. O que se destaca é o desligado, apagado. */
+.caixinha input { accent-color: var(--neblina-fraca); margin: 0; }
+.caixinha-on { border-color: var(--musgo); color: var(--neblina); }
+.caixinha:not(.caixinha-on) { opacity: .55; }
 
 .separador-fino { border-top: 1px solid var(--musgo); margin: 18px 0; }
 
@@ -1596,7 +1607,14 @@ input[type="number"][readonly] { -moz-appearance: textfield; }
 .ficha button:hover { color: var(--neblina); }
 
 .junta { display: flex; gap: 6px; }
-.junta input { flex: 1 1 auto; }
+.junta input, .junta select { flex: 1 1 auto; }
+.junta select {
+  background: var(--mata); border: 1px solid var(--musgo); border-radius: var(--raio);
+  color: var(--neblina); padding: 8px 10px; font-size: 15px; font-family: var(--corpo);
+}
+/* o menu que o navegador abre segue o tema escuro — no Firefox ele vinha claro com texto claro */
+select, select option { color-scheme: dark; }
+select option { background: var(--mata); color: var(--neblina); }
 
 /* ── pendências ─────────────────────────────────────── */
 

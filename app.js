@@ -1388,6 +1388,27 @@
     return '<ul class="passos" data-etapa="' + esc(etapa || '') + '">' + html + '</ul>';
   }
 
+  /* A duração em edição é um seletor: 15 · 30 · 60 · 90 · +. Quase toda tarefa
+     cai numa dessas; o "+" abre o número para as outras (e fica marcado quando
+     o valor não é nenhum dos quatro). Tocar é mais rápido que digitar. */
+  var TEMPOS = [15, 30, 60, 90];
+  function seletorDeTempo(t) {
+    var atual = Number(t.duracaoTotal) || 0;
+    var fora = TEMPOS.indexOf(atual) === -1 || tempoLivre === t.id;
+    return '<span class="passo-tempos" title="' + esc(AJUDA_DURACAO) + '">' +
+      TEMPOS.map(function (m) {
+        return '<button type="button" class="tempo' + (!fora && atual === m ? ' tempo-on' : '') + '"' +
+          ' data-acao="tempo" data-id="' + t.id + '" data-valor="' + m + '">' + (m < 60 ? m : m === 60 ? '1h' : '1h30') + '</button>';
+      }).join('') +
+      '<button type="button" class="tempo' + (fora ? ' tempo-on' : '') + '" data-acao="tempo-livre" data-id="' + t.id + '">+</button>' +
+      (fora
+        ? '<input type="number" class="passo-tempo passo-tempo-edita" min="5"' +
+          ' data-alvo="tarefa" data-id="' + t.id + '" data-campo="duracaoTotal" value="' + esc(t.duracaoTotal) + '">'
+        : '') +
+      '</span>';
+  }
+  var tempoLivre = null;   // tarefa com o "+" aberto
+
   function executandoObra(pid) {
     var p = M.projeto(pid);
     return !!p && (p.papel === 'titular' || p.papel === 'reserva');
@@ -1447,10 +1468,7 @@
           : '') +
         (t.ondePrecisaEstar === 'fora' ? ''
           : solto
-          ? '<input type="number" class="passo-tempo passo-tempo-edita" min="5"' +
-            ' title="' + esc(AJUDA_DURACAO) + '"' +
-            ' data-alvo="tarefa" data-id="' + t.id + '" data-campo="duracaoTotal"' +
-            ' value="' + esc(t.duracaoTotal) + '">'
+          ? seletorDeTempo(t)
           : '<span class="passo-tempo" title="' + esc(AJUDA_DURACAO) + '">' +
             '<i aria-hidden="true">⏱</i>' + esc(M.duracao(t.duracaoTotal)) + '</span>') +
         // delegar ao diarista (§39): decisão de véspera, na própria linha.
@@ -2902,6 +2920,18 @@
       ids.splice(j, 0, ids.splice(i, 1)[0]);
       M.reordenarSeparadas(ids);
       return desenharPalco();
+    }
+    if (acao === 'tempo') {
+      var tt = M.tarefa(tid); if (!tt) return;
+      tt.duracaoTotal = Number(el.getAttribute('data-valor'));
+      if (M.estadoDe(tid) === 'aberta') tt.restanteEstimado = tt.duracaoTotal;
+      tt.ultimoToque = M.agora(); M.salvar(); tempoLivre = null;
+      return desenharPalco();
+    }
+    if (acao === 'tempo-livre') {
+      tempoLivre = tid; desenharPalco();
+      var caixa = $palco.querySelector('.passo-tempo-edita[data-id="' + tid + '"]'); if (caixa) { caixa.focus(); caixa.select(); }
+      return;
     }
     if (acao === 'tirar-tag') {
       var alvoTag = el.getAttribute('data-alvo') === 'projeto' ? M.projeto(tid) : M.tarefa(tid);
