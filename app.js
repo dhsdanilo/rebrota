@@ -1540,7 +1540,8 @@
     var local = M.LOCAIS.filter(function (l) { return l.v === t.ondePrecisaEstar; })[0];
 
     // o ícone diz o local: bandeira no sítio, carrinho na rua, tela no computador
-    m.push([t.ondePrecisaEstar === 'fora' ? '🚗' : t.ondePrecisaEstar === 'computador' ? '💻' : '⚑',
+    // ícone monocromático, na cor do texto — emoji vinha colorido e gritava
+    m.push([t.ondePrecisaEstar === 'fora' ? '<svg class="marca-svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12.5 4.6 8a1.5 1.5 0 0 1 1.4-1h8a1.5 1.5 0 0 1 1.4 1l1.6 4.5"/><rect x="2.5" y="12.5" width="15" height="3.5" rx="1"/><circle cx="6" cy="16.5" r="1.3"/><circle cx="14" cy="16.5" r="1.3"/></svg>' : t.ondePrecisaEstar === 'computador' ? '<svg class="marca-svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="4" width="15" height="9.5" rx="1.2"/><path d="M7 17h6M10 13.5V17"/></svg>' : '⚑',
       (local ? local.t : '') + (t.onde ? ' · ' + t.onde : '')]);
     // só o que é notável: "pode parar" é o caso comum e não merece etiqueta
     if (!t.podeParar) m.push(['⏱', 'não pode parar']);
@@ -1857,7 +1858,8 @@
   function campoLista(alvo, id, chave, rotulo, valores, dica, travado, ajuda) {
     return '<div class="campo campo-largo">' +
       rotuloDe(id, chave, rotulo, ajuda) +
-      '<textarea id="c_' + id + '_' + chave + '" rows="3"' +
+      // a lista aparece inteira: nada de barra de rolagem própria escondendo o último item
+      '<textarea id="c_' + id + '_' + chave + '" rows="' + Math.max(3, (valores || []).length + (travado ? 0 : 1)) + '"' +
       (travado ? ' readonly placeholder="—"' : ' placeholder="' + esc(dica) + '"') +
       ' data-alvo="' + alvo + '" data-id="' + id + '" data-campo="' + chave + '">' +
       esc((valores || []).join('\n')) + '</textarea></div>';
@@ -3401,6 +3403,8 @@
   });
 
   $palco.addEventListener('input',  function (e) {
+    // caixas de lista crescem com o texto, para nunca esconder uma linha
+    if (e.target.tagName === 'TEXTAREA') e.target.rows = Math.max(3, e.target.value.split('\n').length + 1);
     if (e.target.hasAttribute('data-muda')) return escreverMuda(e.target, false);
     if (e.target.hasAttribute('data-campo')) escrever(e.target);
   });
