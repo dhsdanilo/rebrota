@@ -505,6 +505,7 @@ var Modelo = (function () {
       disparadaPor: null,
       // separada para o diarista (§39): { para, dia, ordem } — sai do páreo dele
       separada: null,
+      rua: 0,                // ordem na folha da rua (§43) — a rota dele
       dependeDe: [],
 
       // sem atribuição = do proprietário. Ninguém novo enxerga por acidente.
@@ -1890,6 +1891,24 @@ var Modelo = (function () {
     }
     return ev;
   }
+  /* A FOLHA DA RUA (§43): tudo que é "fora" e está em jogo — avulsa ou projeto
+     em vaga (planejamento inclusive: orçar na loja é rua). Aproveitar a viagem,
+     não cobrança: só aparece quando ele diz que vai sair. Ordem é a rota dele. */
+  function tarefasDaRua() {
+    return tarefasVivas().filter(function (t) {
+      if (t.ondePrecisaEstar !== 'fora' || t.separada) return false;
+      if (estadoDe(t.id) !== 'aberta') return false;
+      if (!desimpedida(t)) return false;
+      if (!t.projetoId) return true;
+      var p = projeto(t.projetoId);
+      return !!p && (p.papel === 'titular' || p.papel === 'reserva' || p.papel === 'planejamento');
+    }).sort(function (a, b) { return (a.rua || 0) - (b.rua || 0) || a.ordem - b.ordem; });
+  }
+  function reordenarRua(ids) {
+    ids.forEach(function (id, i) { var t = tarefa(id); if (t) t.rua = i + 1; });
+    salvar();
+  }
+
   function minutosSeparados() {
     return separadas().reduce(function (s, t) { return s + (restanteDe(t.id) || t.duracaoTotal || 0); }, 0);
   }
@@ -2098,6 +2117,7 @@ var Modelo = (function () {
     DIARISTA: DIARISTA, podeSeparar: podeSeparar, separadas: separadas, separarTarefa: separarTarefa,
     desfazerSeparacao: desfazerSeparacao, reordenarSeparadas: reordenarSeparadas,
     definirDiaDiarista: definirDiaDiarista, fecharDiarista: fecharDiarista, minutosSeparados: minutosSeparados,
+    tarefasDaRua: tarefasDaRua, reordenarRua: reordenarRua,
     semear: semear, absorverSementes: absorverSementes, sementesDe: sementesDe,
     apelido: apelido,
     nomeDe: nomeDe,

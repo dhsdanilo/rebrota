@@ -469,6 +469,16 @@ button, input, select, textarea {
 .aviso-espera.espera-vermelho { color: var(--passou); }
 .pendencia-nota em { color: var(--neblina); font-style: normal; }
 
+/* ── a folha da rua (§43) ──────────────────────────────── */
+.rua-link { margin: -22px 0 30px; text-align: center; }
+.rua-link .bt-linha { font-size: 14px; }
+.folha-rua .folha-texto em { font-family: var(--mono); font-style: normal; font-size: 11px; color: var(--neblina-fraca); }
+@media (max-width: 720px) {
+  .rua-link { margin: -26px 0 28px; }
+  .folha-linha { flex-wrap: wrap; }
+  .folha-acoes { width: 100%; justify-content: flex-start; padding-left: 32px; }
+}
+
 /* ── botões ─────────────────────────────────────────── */
 
 .bt-forte, .bt-fraco, .bt-linha {

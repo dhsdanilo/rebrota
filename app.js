@@ -196,6 +196,15 @@
       '</button></li>';
   }
 
+  /* "Vai sair?" (§43): só quando há coisa de rua em jogo. Não é cobrança —
+     é aproveitar a viagem. */
+  function linkDaRua() {
+    var n = M.tarefasDaRua().length;
+    if (!n) return '';
+    return '<p class="rua-link"><button type="button" class="bt-linha" data-acao="ir-rua">vai sair? · ' +
+      n + (n === 1 ? ' coisa' : ' coisas') + ' na rua</button></p>';
+  }
+
   /* Vaga vazia é convite, não buraco: leva direto para a escolha. */
   function itemVagaAberta(v) {
     var prontas = M.planejadas().filter(M.aptaParaExecucao).length;
@@ -251,6 +260,7 @@
     pendencias: marcacaoPendencias,
     sementes:   marcacaoSementes,
     diarista:   marcacaoDiarista,
+    rua:        marcacaoRua,
     proposta:   marcacaoProposta
   };
 
@@ -458,6 +468,7 @@
     if (!naMesa()) {
       return '<div class="abertura">' + frase +
         '<button type="button" class="c-acao porta-unica" data-acao="ir-executar">encontrar tarefa</button>' +
+        linkDaRua() +
         vagasDaAbertura() + avisoDeNuvem() +
         '</div>';
     }
@@ -475,7 +486,7 @@
           '<span class="porta-nome">organizar</span>' +
           '<span class="porta-sub">mexer nos projetos e no plano</span>' +
         '</button>' +
-      '</div>' + vagasDaAbertura() + avisoDeNuvem() + avisoDeCopia() + '</div>';
+      '</div>' + linkDaRua() + vagasDaAbertura() + avisoDeNuvem() + avisoDeCopia() + '</div>';
   }
 
   /* Aparelho sem sincronização diz isso na entrada, uma linha, sem alarme —
@@ -2072,6 +2083,39 @@
     ].join('');
   }
 
+  /* A folha da rua (§43): o que tem para fazer fora, na ordem que você quiser
+     — a rota. Nome, lugar, materiais como lista de compras, detalhes. Feita
+     registra em seu nome; o resto volta para a lista. */
+  function marcacaoRua() {
+    var lista = M.tarefasDaRua();
+    return [
+      '<button type="button" class="voltar-lista" data-acao="voltar-inicio">← voltar</button>',
+      '<h2>Na rua</h2>',
+      '<p class="palco-sub">O que dá para resolver nesta saída. Arrume a ordem como a rota; o que não der, fica.</p>',
+      lista.length
+        ? '<ol class="folha folha-rua">' + lista.map(function (t, i) {
+            var p = t.projetoId ? M.projeto(t.projetoId) : null;
+            return '<li class="folha-item">' +
+              '<div class="folha-linha">' +
+                '<span class="folha-n">' + (i + 1) + '</span>' +
+                '<div class="folha-texto"><strong>' + esc(t.texto || 'tarefa sem texto') + '</strong>' +
+                  (p ? '<em>' + esc(p.nome) + '</em>' : '') +
+                  (t.onde ? '<span><b>Onde:</b> ' + esc(t.onde) + '</span>' : '') +
+                  ((t.materiais || []).length ? '<span><b>Comprar:</b> ' + esc(t.materiais.join(', ')) + '</span>' : '') +
+                  ((t.ferramentas || []).length ? '<span><b>Levar:</b> ' + esc(t.ferramentas.join(', ')) + '</span>' : '') +
+                  (M.recadoDe(t.id) ? '<span class="folha-recado"><b>Detalhes:</b> ' + esc(M.recadoDe(t.id)) + '</span>' : '') +
+                '</div>' +
+                '<span class="folha-acoes">' +
+                  '<button type="button" class="bt-linha bt-mini" data-acao="rua-mover" data-valor="-1" data-id="' + t.id + '" aria-label="subir">↑</button>' +
+                  '<button type="button" class="bt-linha bt-mini" data-acao="rua-mover" data-valor="1" data-id="' + t.id + '" aria-label="descer">↓</button>' +
+                  '<button type="button" class="bt-fraco bt-mini" data-acao="rua-feita" data-id="' + t.id + '">feita</button>' +
+                '</span>' +
+              '</div></li>';
+          }).join('') + '</ol>'
+        : '<p class="aviso" style="margin-top:24px">Nada para a rua agora.</p>'
+    ].join('');
+  }
+
   function textoDaFolha() {
     var lista = M.separadas();
     var linhas = ['Rebrota — folha do diarista · ' + M.formatarData(lista[0].separada.dia), ''];
@@ -2823,6 +2867,16 @@
       M.reordenarSeparadas(ids);
       return desenharPalco();
     }
+    if (acao === 'ir-rua') { tela = { tipo: 'rua', id: null }; return desenhar(); }
+    if (acao === 'rua-mover') {
+      var idsR = M.tarefasDaRua().map(function (t) { return t.id; });
+      var iR = idsR.indexOf(tid), jR = iR + Number(el.getAttribute('data-valor'));
+      if (iR < 0 || jR < 0 || jR >= idsR.length) return;
+      idsR.splice(jR, 0, idsR.splice(iR, 1)[0]);
+      M.reordenarRua(idsR);
+      return desenharPalco();
+    }
+    if (acao === 'rua-feita') { M.terminar('pe_eu', tid, ''); M.limparKit(tid); colherAvisos(); return desenhar(); }
     if (acao === 'diarista-copiar') {
       var texto = textoDaFolha();
       function feito() { var b = el; b.textContent = 'copiado'; setTimeout(function () { b.textContent = 'copiar a folha'; }, 1500); }
