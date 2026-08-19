@@ -260,6 +260,7 @@ select option { background: var(--mata); color: var(--neblina); }
 }
 .semente-estado-projeto, .semente-estado-tarefa { border-color: var(--rebrota); color: var(--rebrota); }
 .semente-estado-virou { border-color: var(--dentro); color: var(--dentro); }
+.semente-estado-futuro { border-color: var(--casca); color: var(--casca); }
 .semente-estado-descartada { border-color: var(--passou); color: var(--passou); }
 .semente-destinos { justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; }
 .semente-seletor { display: flex; flex-wrap: wrap; gap: 6px; margin-left: auto; }
@@ -2273,6 +2274,12 @@ input[type="number"][readonly] { -moz-appearance: textfield; }
   margin-top: 16px;
   text-align: center;
 }
+
+/* a segunda consulta do dia: a situação de há pouco, uma frase e dois botões */
+.c-confirma { text-align: center; }
+.c-confirma .c-titulo { margin-bottom: 10px; }
+.c-confirma-resumo { margin: 0 0 28px; }
+.c-confirma .c-bt-largo { margin-top: 10px; width: 100%; min-height: 52px; font-size: 16px; }
 
 /* o que a cascata moveu, dito uma vez, em cima da próxima resposta */
 .c-aviso {

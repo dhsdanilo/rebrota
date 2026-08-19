@@ -33,8 +33,59 @@ var Campo = (function () {
     cena.resp = null;
     cena.rascunho = {};
     cena.aviso = '';
+    /* Segunda consulta do dia (§5 da spec, enfim): a situação de há pouco vira
+       UMA frase e dois botões — "mesma coisa" consulta na hora; "mudou" abre a
+       pergunta limpa. Só na bota: na mesa o local já vem pronto e a pergunta é
+       curta. Não fere o "sem pré-seleção" (§5): nada vem marcado — a resposta
+       inteira é relida antes de valer de novo. */
+    if (!(pronto && pronto.local) && ultimaConsulta()) cena.fase = 'confirma';
     responder();
     desenhar();
+  }
+
+  /* A última situação respondida, guardada por aparelho (rascunho, como o
+     kit): vale só no dia, e fora do export. */
+  var CHAVE_ULTIMA = 'app-sitio-ultima-consulta';
+  function guardarConsulta(s) {
+    try {
+      localStorage.setItem(CHAVE_ULTIMA, JSON.stringify({
+        dia: M.hoje(), local: s.local, minutos: s.minutos,
+        criancas: s.criancas, ajuda: s.ajuda, energia: s.energia
+      }));
+    } catch (e) {}
+  }
+  function ultimaConsulta() {
+    var u = null;
+    try { u = JSON.parse(localStorage.getItem(CHAVE_ULTIMA)); } catch (e) {}
+    return (u && u.dia === M.hoje() && u.local && u.minutos) ? u : null;
+  }
+
+  function resumoSituacao(u) {
+    var s = cena.sit;
+    var local = M.LOCAIS.filter(function (l) { return l.v === u.local; })[0];
+    var tempo = Mo.temposDe().filter(function (t) { return t.v === u.minutos; })[0];
+    var partes = [local ? local.t : u.local];
+    partes.push(tempo ? tempo.t : M.duracao(u.minutos));
+    if (u.local === 'sitio' && s.tempo) {
+      partes.push({ sol: 'sol', calor: 'sol forte', nublado: 'nublado',
+        chuva_fina: 'chuva fina', chuva_forte: 'chuva forte' }[s.tempo] || s.tempo);
+      if (s.barro !== null) partes.push(s.barro ? 'barro' : 'chão firme');
+      partes.push(u.criancas && u.ajuda ? 'crianças e ajuda'
+        : u.criancas ? 'crianças' : u.ajuda ? 'com ajuda' : 'sozinho');
+    }
+    if (u.energia === 'pouca') partes.push('pouca energia');
+    return partes.join(' · ');
+  }
+
+  function marcacaoConfirma() {
+    var u = ultimaConsulta();
+    if (!u) { cena.fase = 'pergunta'; return marcacaoPergunta(); }
+    return '<div class="c-pergunta c-confirma">' +
+      '<p class="c-titulo">Há pouco:</p>' +
+      '<p class="c-frase-media c-confirma-resumo">' + esc(resumoSituacao(u)) + '</p>' +
+      '<button type="button" class="c-acao" data-acao="mesma-coisa">mesma coisa</button>' +
+      '<button type="button" class="c-bt c-bt-largo" data-acao="mudou">mudou</button>' +
+      '</div>';
   }
 
   /* Voltar para a tela inicial — não para a pergunta. Depois de um "não dá"
@@ -464,6 +515,7 @@ var Campo = (function () {
     M.usoTela('campo:' + cena.fase);
     var html =
       cena.fase === 'pergunta'  ? marcacaoPergunta()
+    : cena.fase === 'confirma'  ? marcacaoConfirma()
     : cena.fase === 'resposta'  ? marcacaoResposta()
     : cena.fase === 'ativa'     ? marcacaoAtiva()
     : cena.fase === 'parar'     ? marcacaoParar()
@@ -507,6 +559,7 @@ var Campo = (function () {
       if (!c || c.tempo !== s.tempo || !!c.barro !== !!s.barro) M.registrarClima(EU, s.tempo, s.barro);
     }
     cena.aviso = '';
+    guardarConsulta(s);
     cena.resp = Mo.escolher(s);
     // a segunda chamada vale para UMA resposta: a próxima volta a ser limpa
     s.segundaChamada = false;
@@ -526,6 +579,15 @@ var Campo = (function () {
     var ativa = M.tarefaAtivaDe(EU);
 
     if (acao === 'consultar') return consultar();
+    if (acao === 'mesma-coisa') {
+      var u = ultimaConsulta();
+      if (!u) { cena.fase = 'pergunta'; return desenhar(); }
+      var s2 = cena.sit;
+      s2.local = u.local; s2.minutos = u.minutos;
+      s2.criancas = !!u.criancas; s2.ajuda = !!u.ajuda; s2.energia = u.energia || 'normal';
+      return consultar();
+    }
+    if (acao === 'mudou') { cena.fase = 'pergunta'; return desenhar(); }
     if (acao === 'reabrir')   { cena.fase = 'pergunta'; return desenhar(); }
     if (acao === 'cancelar')  { cena.rascunho = {}; cena.fase = ativa ? 'ativa' : 'resposta'; return desenhar(); }
 

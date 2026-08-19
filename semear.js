@@ -62,7 +62,8 @@
      Nada some: descartada vem com o motivo que ele escreveu — é o combinado. */
   var ESTADO = {
     nova: 'nova', descartada: 'descartada', projeto: 'pode virar muda',
-    tarefa: 'pode virar tarefa', virou_projeto: 'virou muda', virou_tarefa: 'virou tarefa'
+    tarefa: 'pode virar tarefa', futuro: 'plantar futuramente',
+    virou_projeto: 'virou muda', virou_tarefa: 'virou tarefa'
   };
 
   function estadoDela(s) {

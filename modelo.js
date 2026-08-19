@@ -675,8 +675,9 @@ var Modelo = (function () {
        nova            — como nasce, de quem quer que tenha plantado
        descartada      — com motivo obrigatório: quem plantou tem que poder ler
        projeto/tarefa  — aprovada: pode virar pré-projeto / tarefa avulsa
+       futuro          — aprovada mas não para agora (§51): "plantar futuramente"
        virou_projeto / virou_tarefa — terminais, com o id do que nasceu dela */
-  var ESTADOS_SEMENTE = ['nova', 'descartada', 'projeto', 'tarefa', 'virou_projeto', 'virou_tarefa'];
+  var ESTADOS_SEMENTE = ['nova', 'descartada', 'projeto', 'tarefa', 'futuro', 'virou_projeto', 'virou_tarefa'];
 
   function novaSemente(texto) {
     var bruto = (texto || '').trim();

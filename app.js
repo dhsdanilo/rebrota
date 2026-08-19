@@ -2353,12 +2353,15 @@
     { chave: 'nova',       t: 'novas',              vazio: 'Nada novo. A caixa está limpa.' },
     { chave: 'projeto',    t: 'pode virar muda',    vazio: 'Nenhuma aprovada para muda.' },
     { chave: 'tarefa',     t: 'pode virar tarefa',  vazio: 'Nenhuma aprovada para tarefa.' },
+    // a casa da ideia aprovada mas não para agora — as cabras (§38, §51)
+    { chave: 'futuro',     t: 'futuras',            vazio: 'Nenhuma guardada para o futuro.' },
     { chave: 'descartada', t: 'descartadas',        vazio: 'Nenhuma descartada.' },
     { chave: 'virou',      t: 'viraram',            vazio: 'Nenhuma virou projeto ou tarefa ainda.' }
   ];
   var ROTULO_ESTADO_SEMENTE = {
     nova: 'nova', descartada: 'descartada', projeto: 'pode virar muda',
-    tarefa: 'pode virar tarefa', virou_projeto: 'virou muda', virou_tarefa: 'virou tarefa'
+    tarefa: 'pode virar tarefa', futuro: 'plantar futuramente',
+    virou_projeto: 'virou muda', virou_tarefa: 'virou tarefa'
   };
 
   function grupoDaSemente(s) { return s.estado.indexOf('virou_') === 0 ? 'virou' : s.estado; }
@@ -2449,6 +2452,7 @@
             destino('nova', 'nova') +
             destino('projeto', 'pode virar muda') +
             destino('tarefa', 'pode virar tarefa') +
+            destino('futuro', 'plantar futuramente') +
             '<button type="button" class="filtro' + (s.estado === 'descartada' ? ' filtro-on' : '') +
               '" data-acao="pedir-descarte" data-id="' + s.id + '">descartar</button>' +
           '</span>' +
