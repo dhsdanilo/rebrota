@@ -1540,7 +1540,7 @@
     var local = M.LOCAIS.filter(function (l) { return l.v === t.ondePrecisaEstar; })[0];
 
     // o ícone diz o local: bandeira no sítio, carrinho na rua, tela no computador
-    m.push([t.ondePrecisaEstar === 'fora' ? '🛒' : t.ondePrecisaEstar === 'computador' ? '🖥' : '⚑',
+    m.push([t.ondePrecisaEstar === 'fora' ? '🚗' : t.ondePrecisaEstar === 'computador' ? '💻' : '⚑',
       (local ? local.t : '') + (t.onde ? ' · ' + t.onde : '')]);
     // só o que é notável: "pode parar" é o caso comum e não merece etiqueta
     if (!t.podeParar) m.push(['⏱', 'não pode parar']);
@@ -1667,7 +1667,7 @@
       /* Fora não tem condições (§42): sair é planejado, não sorteado — a folha
          da rua é a lista, e ele decide. O que sobra para a rua: o que é, o
          lugar, o que comprar, quando precisa, dependência, tags, nota. */
-      naRua ? '' :
+      (naRua ? '' :
       grupo('Condições', '',
         (noPc ? '' :
         linhaCond('Clima',
@@ -1731,7 +1731,7 @@
 
         'Tudo que precisa ser verdade no dia para esta tarefa aparecer. Se uma só destas linhas ' +
         'não bater com a situação que você informou, ela não é oferecida — e você nem fica sabendo ' +
-        'que ela existia, que é justamente o alívio.'),
+        'que ela existia, que é justamente o alívio.')),
 
       noPc ? '' :
       grupo('Levar', 'grade',
