@@ -1191,6 +1191,12 @@ var Modelo = (function () {
       }
     }
 
+    // as duas se contradizem: guardada para a chuva, mas não pode chuva nenhuma
+    if (t.guardadaParaChuva && t.exigeClima === 'firme') {
+      avisos.push('Guardada para a chuva, mas só com tempo firme: num dia de chuva ela não passa, ' +
+        'e num dia seco fica guardada — escolha um dos dois.');
+    }
+
     if (t.podeParar === false && t.duracaoTotal > 480) {
       avisos.push('Não pode parar e leva mais de 8 h: nenhuma janela de tempo vai comportar.');
     }
