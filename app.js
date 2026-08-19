@@ -569,7 +569,7 @@
           '<span class="porta-nome">organizar</span>' +
           '<span class="porta-sub">mexer nos projetos e no plano</span>' +
         '</button>' +
-      '</div>' + linkDaRua() + vagasDaAbertura() + previsaoDaSemana() + avisoDeNuvem() + avisoDeCopia() + '</div>';
+      '</div>' + linkDaRua() + vagasDaAbertura() + avisoDeNuvem() + avisoDeCopia() + '</div>';
   }
 
   /* Aparelho sem sincronização diz isso na entrada, uma linha, sem alarme —
@@ -597,17 +597,21 @@
     chuva_forte: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 11.5h8.7a3 3 0 0 0 .4-6 4.5 4.5 0 0 0-8.7-1.2 3.6 3.6 0 0 0-.4 7.2z"/><path d="M6.5 13.5v2.2M10 14v2.2M13.5 13.5v2.2"/></svg>'
   };
 
-  function previsaoDaSemana() {
-    if (typeof Tempo === 'undefined' || !naMesa()) return '';
-    var dias = Tempo.semana();
-    if (!dias) return '';
-    return '<div class="previsao-semana">' + dias.map(function (d, i) {
+  /* Na BARRA SUPERIOR, sempre à vista (pedido de 19/08) — miúda de propósito.
+     No celular a temperatura sai, para caber ao lado do nome. */
+  function desenharPrevisaoTopo() {
+    var caixa = document.getElementById('topoPrevisao');
+    if (!caixa) return;
+    var dias = (typeof Tempo !== 'undefined') ? Tempo.semana() : null;
+    if (!dias) { caixa.innerHTML = ''; return; }
+    caixa.innerHTML = dias.map(function (d, i) {
       var dt = new Date(d.dia + 'T00:00:00');
       var nome = i === 0 ? 'hoje' : M.NOMES_DIA[dt.getDay()];
-      return '<span class="previsao-dia"><b>' + esc(nome) + '</b>' +
+      return '<span class="previsao-dia" title="' + esc(nome + ' · ' + Tempo.rotulo(Tempo.tempoDe(d.code)) +
+          ' · ' + d.min + '–' + d.max + '°') + '"><b>' + esc(nome) + '</b>' +
         (ICONES_TEMPO[Tempo.tempoDe(d.code)] || '') +
         '<i>' + d.max + '°</i></span>';
-    }).join('') + '</div>';
+    }).join('');
   }
 
   function vagasDaAbertura() {
@@ -4079,11 +4083,10 @@
   // "não sincroniza" com o painel dizendo "sincronizado às…"
   Sync.iniciar();
   if (typeof Tempo !== 'undefined') {
-    Tempo.ouvir(function () {
-      if (tela.tipo === null && $campo.hidden) desenhar();
-    });
+    Tempo.ouvir(desenharPrevisaoTopo);
     Tempo.buscar();
   }
   desenhar();
+  desenharPrevisaoTopo();
   desenharNuvem();
 })();

@@ -2282,19 +2282,23 @@ input[type="number"][readonly] { -moz-appearance: textfield; }
   font-family: var(--mono); font-size: 12px; letter-spacing: .03em;
   color: var(--casca); margin: 0 0 8px; text-align: left;
 }
-.previsao-semana {
-  display: flex; gap: 6px; justify-content: center; flex-wrap: wrap;
-  margin: 26px 0 0;
-}
+/* na barra superior, sempre à vista — miúda de propósito */
+.topo-previsao { display: flex; gap: 2px; margin-left: auto; }
 .previsao-dia {
-  display: flex; flex-direction: column; align-items: center; gap: 4px;
-  min-width: 58px; padding: 8px 6px;
-  border: 1px solid var(--musgo); border-radius: var(--raio);
+  display: flex; flex-direction: column; align-items: center; gap: 1px;
+  min-width: 38px; padding: 2px 3px;
 }
-.previsao-dia b { font-family: var(--mono); font-size: 10px; letter-spacing: .06em;
+.previsao-dia b { font-family: var(--mono); font-size: 8.5px; letter-spacing: .06em;
   font-weight: 500; color: var(--neblina-fraca); text-transform: uppercase; }
-.previsao-dia svg { width: 20px; height: 20px; color: var(--neblina); }
-.previsao-dia i { font-family: var(--mono); font-style: normal; font-size: 11px; color: var(--neblina-fraca); }
+.previsao-dia svg { width: 15px; height: 15px; color: var(--neblina); }
+.previsao-dia i { font-family: var(--mono); font-style: normal; font-size: 9.5px; color: var(--neblina-fraca); }
+@media (max-width: 720px) {
+  /* no celular a temperatura sai, para caber ao lado do nome */
+  .topo-previsao { gap: 0; }
+  .previsao-dia { min-width: 30px; padding: 2px 1px; }
+  .previsao-dia i { display: none; }
+  .previsao-dia svg { width: 14px; height: 14px; }
+}
 
 /* a segunda consulta do dia: a situação de há pouco, uma frase e dois botões */
 .c-confirma { text-align: center; }
