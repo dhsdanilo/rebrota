@@ -628,7 +628,8 @@
 
       /* Projeto que já está executando passou por todas as portas: listar o que
          um dia o segurou é história, não restrição. */
-      (p.papel === 'titular' || p.papel === 'reserva' ||
+      // muda não tem Depende: dependência entre projetos é "como e quando" — planejamento
+      (p.papel === 'titular' || p.papel === 'reserva' || p.estado === 'fila' || p.estado === 'descartado' ||
        p.estado === 'concluido' || p.estado === 'encerrado')
         ? ''
         : grupo('Depende', '', fichasPrerequisitos(p, outros, !solto),
@@ -756,13 +757,13 @@
         'A semente refinada numa coisa concreta: "criar cabras" vira "construir um capril". É o nome da obra.'),
 
       grupo('Vantagens', '',
-        contagem(m.vantagens, 3, 'vantagem', 'vantagens') +
+        contagem(m.vantagens, 2, 'vantagem', 'vantagens') +
         cadeias(p, 'vantagens', m.vantagens, 'e isso, para quê?', 'por que você quer isso? — uma razão', editavel) +
         (centro ? '<p class="muda-centro">centro: <b>' + esc(centro.texto) + '</b> — ' + centro.n + ' razões chegam aqui</p>' : ''),
         'Uma razão por linha, e cada razão puxada até o fim: "e isso, para quê?" Deixou a caixa vazia, a cadeia acabou. Quando duas cadeias terminam no mesmo lugar, o app aponta o centro.'),
 
       grupo('Desvantagens', '',
-        contagem(m.desvantagens, 3, 'desvantagem', 'desvantagens') +
+        contagem(m.desvantagens, 2, 'desvantagem', 'desvantagens') +
         cadeias(p, 'desvantagens', m.desvantagens, 'e isso causa o quê?', 'uma desvantagem', editavel),
         'Uma por linha, cada uma puxada até o fim: "e isso causa o quê?" Cuidado diário → menos tempo de manhã. O custo por cima, em palavras, cabe aqui também.'),
 
@@ -2331,7 +2332,7 @@
       if (conta && conta.classList.contains('cadeias-conta')) {
         var n = M.cadeiasVivas(p.muda[campo]).length;
         var sing = campo === 'vantagens' ? 'vantagem' : 'desvantagem';
-        conta.textContent = n + ' ' + (n === 1 ? sing : campo) + (n < 3 ? ' · pronta pede 3' : '');
+        conta.textContent = n + ' ' + (n === 1 ? sing : campo) + (n < 2 ? ' · pronta pede 2' : '');
       }
     });
   }

@@ -982,15 +982,15 @@ var Modelo = (function () {
     return (lista || []).filter(function (c) { return c.length && c[0]; });
   }
 
-  /* Pronta exige TUDO (decisão dele): o que é, 3 vantagens, 3 desvantagens,
+  /* Pronta exige TUDO (decisão dele): o que é, 2 vantagens, 2 desvantagens,
      as quatro despesas (0 vale; "não sei" vira estimativa por cima), o
      sentimento e o que inviabiliza. O que falta vem em texto, para a tela. */
   function faltaParaPronta(p) {
     var m = p.muda, d = m.despesas, falta = [];
     var v = cadeiasVivas(m.vantagens).length, dv = cadeiasVivas(m.desvantagens).length;
     if (!(p.nome || '').trim()) falta.push('o que é');
-    if (v < 3) falta.push((3 - v) + (3 - v === 1 ? ' vantagem' : ' vantagens'));
-    if (dv < 3) falta.push((3 - dv) + (3 - dv === 1 ? ' desvantagem' : ' desvantagens'));
+    if (v < 2) falta.push((2 - v) + (2 - v === 1 ? ' vantagem' : ' vantagens'));
+    if (dv < 2) falta.push((2 - dv) + (2 - dv === 1 ? ' desvantagem' : ' desvantagens'));
     if (d.inicial === null || d.inicial === undefined) falta.push('o valor inicial');
     if (d.fixaMensal === null || d.fixaMensal === undefined) falta.push('o valor fixo mensal');
     if (d.geraProduto === null || d.geraProduto === undefined) falta.push('se gera produto ou serviço');
