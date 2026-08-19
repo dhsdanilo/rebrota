@@ -1389,6 +1389,10 @@ input[type="number"][readonly] { -moz-appearance: textfield; }
   text-align: right;
 }
 .passo-tempo-edita:focus { border-color: var(--neblina-fraca); outline: none; }
+.passo-local-edita {
+  background: var(--mata); border: 1px solid var(--musgo); border-radius: var(--raio);
+  padding: 6px 9px; color: var(--neblina); font-family: var(--corpo); font-size: 15px;
+}
 
 /* o que já foi desce para o pé da seção e sai do caminho da leitura */
 .passos-divisor {

@@ -14,7 +14,7 @@
 <link rel="apple-touch-icon" href="icone.svg">
 <!-- ?v= sobe a cada mudança: sem isso o navegador serve o arquivo velho do
      cache e a correção parece não ter funcionado -->
-<link rel="stylesheet" href="app.css?v=78">
+<link rel="stylesheet" href="app.css?v=79">
 </head>
 <body>
 
@@ -121,6 +121,8 @@
 <!-- as três ferramentas de arquivo, juntas e fora do caminho: entrar, sair e
      anotar sobre o próprio app. Nenhuma delas é trabalho do sítio. -->
 <div class="ferramentas">
+  <!-- carimbo da última sincronização: texto, antes dos botões -->
+  <span class="nuvem-carimbo" id="nuvemCarimbo" hidden></span>
   <button type="button" class="bt-icone" id="btExportar" aria-label="exportar"
           title="Baixar tudo em JSON — o paraquedas: você nunca fica refém do app.">
     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"
@@ -136,8 +138,6 @@
     </svg>
   </button>
   <input type="file" id="arquivoImportar" accept="application/json" hidden>
-  <!-- carimbo da última sincronização: sempre à vista, miúdo -->
-  <span class="nuvem-carimbo" id="nuvemCarimbo" hidden></span>
   <button type="button" class="bt-icone" data-acao="nuvem" aria-label="sincronização"
           title="Sincronizar este aparelho com os outros — celular, mesa e a tela de sementes.">
     <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"
@@ -200,11 +200,11 @@
   <ul class="bilhete-lista" id="bilheteLista"></ul>
 </div>
 
-<script src="modelo.js?v=78"></script>
-<script src="sync.js?v=78"></script>
-<script src="motor.js?v=78"></script>
-<script src="dados.js?v=78"></script>
-<script src="campo.js?v=78"></script>
-<script src="app.js?v=78"></script>
+<script src="modelo.js?v=79"></script>
+<script src="sync.js?v=79"></script>
+<script src="motor.js?v=79"></script>
+<script src="dados.js?v=79"></script>
+<script src="campo.js?v=79"></script>
+<script src="app.js?v=79"></script>
 </body>
 </html>

@@ -1433,7 +1433,16 @@
           : t.etapa === etapaDaSecao || !t.projetoId ? ''
           : '<span class="passo-etapa" title="' + esc(AJUDA_ETAPA) + '">' +
             esc(t.etapa === 'planejamento' ? 'planejamento' : 'execução') + '</span>') +
+        /* O LOCAL vem antes do tempo, na própria linha (§46): é ele que decide o
+           resto da ficha, e escondido no fim ele era esquecido. Fora, o tempo
+           não entra — coisa de rua é rápida e o tempo serve ao sorteio do dia. */
         (solto
+          ? '<select class="passo-local-edita" title="Onde esta tarefa precisa ser feita — decide o resto da ficha."' +
+            ' data-alvo="tarefa" data-id="' + t.id + '" data-campo="ondePrecisaEstar">' +
+            opcoes(M.LOCAIS, t.ondePrecisaEstar) + '</select>'
+          : '') +
+        (t.ondePrecisaEstar === 'fora' ? ''
+          : solto
           ? '<input type="number" class="passo-tempo passo-tempo-edita" min="5"' +
             ' title="' + esc(AJUDA_DURACAO) + '"' +
             ' data-alvo="tarefa" data-id="' + t.id + '" data-campo="duracaoTotal"' +
@@ -1605,13 +1614,10 @@
     var noPc = t.ondePrecisaEstar === 'computador';
 
     return [
+      // o local mora na linha da tarefa (§46); aqui fica só o ponto exato
+      noPc ? '' :
       grupo('Onde', 'grade',
-        campoSelect('tarefa', t.id, 'ondePrecisaEstar', 'Precisa estar', M.LOCAIS, t.ondePrecisaEstar, travado,
-          'No sítio, no computador ou fora. Telefonema e encomenda cabem nos vinte minutos ' +
-          'da sala de espera do dentista, e por isso não disputam o dia seco com o trabalho de fora. ' +
-          'O local decide o resto da ficha: no computador não há clima, chão, esforço nem companhia.') +
-        (noPc ? '' :
-        campoTexto('tarefa', t.id, 'onde', 'Lugar', t.onde,
+        (campoTexto('tarefa', t.id, 'onde', 'Lugar', t.onde,
           { dica: 'trecho rente à estrada', travado: travado,
             ajuda: 'O ponto exato. Vem junto da tarefa na hora de sair, para você não ' +
                    'atravessar o sítio e descobrir lá que era do outro lado.' })),

@@ -100,7 +100,8 @@ var Motor = (function () {
   function passaNaSituacao(t, s, agora) {
     if (t.ondePrecisaEstar !== s.local) return false;
     if (!cabeNaJanela(t, agora)) return false;
-    if (!cabeNoTempo(t, s.minutos)) return false;
+    // fora, o tempo não decide (§46): coisa de rua é rápida e se encaixa na viagem
+    if (s.local !== 'fora' && !cabeNoTempo(t, s.minutos)) return false;
 
     if (s.energia === 'pouca' && t.esforco !== 'leve') return false;
     if (t.precisaAjuda && !s.ajuda) return false;
