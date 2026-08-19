@@ -14,7 +14,7 @@
 <link rel="apple-touch-icon" href="icone.svg">
 <!-- ?v= sobe a cada mudança: sem isso o navegador serve o arquivo velho do
      cache e a correção parece não ter funcionado -->
-<link rel="stylesheet" href="app.css?v=81">
+<link rel="stylesheet" href="app.css?v=82">
 </head>
 <body>
 
@@ -184,6 +184,11 @@
     <button type="button" class="bt-linha" id="btVoltarFoto" hidden title="Junta ao catálogo de agora o que ele tinha antes da última sincronização — nada do que veio depois se perde.">voltar ao de antes</button>
   </div>
   <p class="aviso nuvem-estado" id="nuvemEstado"></p>
+    <!-- cópia local diária (§47): uma pasta escolhida uma vez; o resto é automático -->
+    <div class="nuvem-local" id="copiaLocal" hidden>
+      <p class="aviso" id="copiaLocalEstado"></p>
+      <button type="button" class="bt-fraco bt-mini" id="btPastaCopias">escolher a pasta das cópias</button>
+    </div>
 </div>
 
 <!-- o ✎ (§45): caderno de anotações — qualquer coisa, de qualquer lugar. Cada
@@ -201,11 +206,11 @@
   <ul class="bilhete-lista" id="bilheteLista"></ul>
 </div>
 
-<script src="modelo.js?v=81"></script>
-<script src="sync.js?v=81"></script>
-<script src="motor.js?v=81"></script>
-<script src="dados.js?v=81"></script>
-<script src="campo.js?v=81"></script>
-<script src="app.js?v=81"></script>
+<script src="modelo.js?v=82"></script>
+<script src="sync.js?v=82"></script>
+<script src="motor.js?v=82"></script>
+<script src="dados.js?v=82"></script>
+<script src="campo.js?v=82"></script>
+<script src="app.js?v=82"></script>
 </body>
 </html>

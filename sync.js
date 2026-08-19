@@ -153,11 +153,11 @@ var Sync = (function () {
     });
   }
   function fazerCopiaDoDia() {
-    var hoje = M.hoje();
+    var hoje = Modelo.hoje();
     return acharGistCopias().then(function (id) {
       return pedir('GET', '/gists/' + id).then(function (g) {
         var files = {};
-        files['copia-' + hoje + '.json'] = { content: M.exportar() };
+        files['copia-' + hoje + '.json'] = { content: Modelo.exportar() };
         Object.keys(g.files || {}).filter(function (n) { return /^copia-\d{4}-\d{2}-\d{2}\.json$/.test(n) && n !== 'copia-' + hoje + '.json'; })
           .sort().reverse().slice(6).forEach(function (n) { files[n] = null; });   // fica com 7
         return pedir('PATCH', '/gists/' + id, { files: files });
@@ -230,7 +230,7 @@ var Sync = (function () {
       return null;
     }).then(function () {
       // a cópia do dia vai num Gist à parte, para não pesar a sincronização de 2 em 2 min
-      if (papel.escreveCatalogo && cfg.ultimaCopia !== M.hoje()) return fazerCopiaDoDia();
+      if (papel.escreveCatalogo && cfg.ultimaCopia !== Modelo.hoje()) return fazerCopiaDoDia();
     }).then(function () {
       estado.ultimo = new Date().toISOString();
       estado.ocupado = false;

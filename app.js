@@ -3089,7 +3089,79 @@
   var CHAVE_COPIA = 'app-sitio-ultima-copia';
 
   // a cópia automática na nuvem conta como cópia: o aviso só cobra quem não tem nuvem
-  Sync.quandoCopiar(function () { localStorage.setItem(CHAVE_COPIA, M.hoje()); desenhar(); });
+  Sync.quandoCopiar(function () { localStorage.setItem(CHAVE_COPIA, M.hoje()); copiarLocal(); desenhar(); });
+
+  /* CÓPIA LOCAL DIÁRIA (§47): uma pasta escolhida uma vez (pode ser do
+     OneDrive — aí fica no PC e fora dele), e a mesa grava sozinha
+     rebrota-AAAA-MM-DD.json uma vez por dia, guardando as últimas 30. A
+     permissão da pasta mora no IndexedDB (localStorage não guarda handle).
+     Só existe onde a API de pastas existe: Edge/Chrome no PC — a mesa. */
+  var CHAVE_COPIA_LOCAL = 'app-sitio-copia-local';
+  var pastaCopias = null;
+  function bdPasta(modo, valor) {
+    return new Promise(function (ok, falha) {
+      var req = indexedDB.open('rebrota', 1);
+      req.onupgradeneeded = function () { req.result.createObjectStore('chaves'); };
+      req.onerror = function () { falha(req.error); };
+      req.onsuccess = function () {
+        var db = req.result, tx = db.transaction('chaves', modo === 'ler' ? 'readonly' : 'readwrite');
+        var loja = tx.objectStore('chaves');
+        var r = modo === 'ler' ? loja.get('pastaCopias') : loja.put(valor, 'pastaCopias');
+        r.onsuccess = function () { ok(r.result); db.close(); };
+        r.onerror = function () { falha(r.error); db.close(); };
+      };
+    });
+  }
+  function temApiDePasta() { return typeof window.showDirectoryPicker === 'function' && naMesa(); }
+  function carregarPastaCopias() {
+    if (!temApiDePasta()) return Promise.resolve(null);
+    return bdPasta('ler').then(function (h) { pastaCopias = h || null; return pastaCopias; }).catch(function () { return null; });
+  }
+  function estadoDaCopiaLocal() {
+    var caixa = document.getElementById('copiaLocal');
+    if (!temApiDePasta()) { caixa.hidden = true; return; }
+    caixa.hidden = false;
+    var ultima = localStorage.getItem(CHAVE_COPIA_LOCAL);
+    document.getElementById('copiaLocalEstado').textContent = pastaCopias
+      ? 'cópia local em "' + pastaCopias.name + '"' + (ultima ? ' · última ' + M.formatarData(ultima) : ' · ainda nenhuma')
+      : 'Cópia local diária: escolha uma pasta (pode ser do OneDrive) e o resto é automático.';
+    document.getElementById('btPastaCopias').textContent = pastaCopias ? 'trocar a pasta' : 'escolher a pasta das cópias';
+  }
+  function copiarLocal(forcar) {
+    if (!pastaCopias) return Promise.resolve(false);
+    var hoje = M.hoje();
+    if (!forcar && localStorage.getItem(CHAVE_COPIA_LOCAL) === hoje) return Promise.resolve(false);
+    return pastaCopias.queryPermission({ mode: 'readwrite' }).then(function (p) {
+      if (p === 'granted') return p;
+      // só pede de novo com gesto do usuário; sem gesto, fica para o próximo clique
+      return forcar ? pastaCopias.requestPermission({ mode: 'readwrite' }) : p;
+    }).then(function (p) {
+      if (p !== 'granted') throw new Error('sem permissão');
+      return pastaCopias.getFileHandle('rebrota-' + hoje + '.json', { create: true });
+    }).then(function (fh) {
+      return fh.createWritable().then(function (w) { return w.write(M.exportar()).then(function () { return w.close(); }); });
+    }).then(function () {
+      localStorage.setItem(CHAVE_COPIA_LOCAL, hoje);
+      // guarda as últimas 30
+      var nomes = [];
+      return (async function () {
+        for await (var [nome] of pastaCopias.entries()) { if (/^rebrota-\d{4}-\d{2}-\d{2}\.json$/.test(nome)) nomes.push(nome); }
+        nomes.sort().reverse().slice(30).forEach(function (n) { pastaCopias.removeEntry(n).catch(function () {}); });
+      })();
+    }).then(function () { estadoDaCopiaLocal(); return true; })
+      .catch(function (e) {
+        document.getElementById('copiaLocalEstado').textContent = 'cópia local parada: ' + (e.message || e) + ' — clique em trocar a pasta para renovar a permissão.';
+        return false;
+      });
+  }
+  document.getElementById('btPastaCopias').addEventListener('click', function () {
+    if (!temApiDePasta()) return;
+    window.showDirectoryPicker({ mode: 'readwrite', id: 'rebrota-copias' }).then(function (h) {
+      pastaCopias = h;
+      return bdPasta('gravar', h).then(function () { return copiarLocal(true); });
+    }).then(function () { estadoDaCopiaLocal(); }).catch(function () { /* cancelou */ });
+  });
+  carregarPastaCopias().then(function () { estadoDaCopiaLocal(); copiarLocal(); });
 
   function avisoDeCopia() {
     var quando = localStorage.getItem(CHAVE_COPIA);
@@ -3421,6 +3493,7 @@
   function desenharNuvem() {
     var s = Sync.situacao();
     $nuvemEstado.textContent = textoDaNuvem(s);
+    if (typeof estadoDaCopiaLocal === 'function') estadoDaCopiaLocal();
     // o carimbo na barra: a última sincronização, sem abrir painel nenhum
     var carimbo = document.getElementById('nuvemCarimbo');
     carimbo.hidden = !s.ligado;

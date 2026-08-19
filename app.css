@@ -174,6 +174,7 @@ button, input, select, textarea {
 .nuvem-como { font-size: 12px; color: var(--neblina-fraca); line-height: 1.5; margin: 0 0 10px; }
 .nuvem-como em { color: var(--neblina); font-style: normal; }
 .nuvem-estado { margin: 10px 0 0; }
+.nuvem-local { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--musgo); display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
 
 /* quem plantou a semente, e quando — em mono, como toda escrituração */
 .semente-autor {
