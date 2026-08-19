@@ -2027,12 +2027,14 @@
         return '<li class="folha-item">' +
           '<div class="folha-linha">' +
             '<span class="folha-n">' + (i + 1) + '</span>' +
+            // palavras, não ícones: a folha é lida por ele, no papel. O tempo só
+            // na tela (ritmos diferentes — no papel não entra).
             '<div class="folha-texto"><strong>' + esc(t.texto || 'tarefa sem texto') + '</strong>' +
-              '<em>' + (p ? esc(p.nome) + ' · ' : '') + esc(M.duracao(M.restanteDe(t.id) || t.duracaoTotal)) +
-                (t.onde ? ' · ' + esc(t.onde) : '') + '</em>' +
-              ((t.ferramentas || []).length ? '<span>⚒ ' + esc(t.ferramentas.join(', ')) + '</span>' : '') +
-              ((t.materiais || []).length ? '<span>▤ ' + esc(t.materiais.join(', ')) + '</span>' : '') +
-              (M.recadoDe && M.recadoDe(t.id) ? '<span class="folha-recado">' + esc(M.recadoDe(t.id)) + '</span>' : '') +
+              '<em class="folha-tempo">' + (p ? esc(p.nome) + ' · ' : '') + esc(M.duracao(M.restanteDe(t.id) || t.duracaoTotal)) + '</em>' +
+              (t.onde ? '<span><b>Onde:</b> ' + esc(t.onde) + '</span>' : '') +
+              ((t.ferramentas || []).length ? '<span><b>Ferramentas:</b> ' + esc(t.ferramentas.join(', ')) + '</span>' : '') +
+              ((t.materiais || []).length ? '<span><b>Materiais:</b> ' + esc(t.materiais.join(', ')) + '</span>' : '') +
+              (M.recadoDe && M.recadoDe(t.id) ? '<span class="folha-recado"><b>Detalhes:</b> ' + esc(M.recadoDe(t.id)) + '</span>' : '') +
             '</div>' +
             '<span class="folha-acoes">' +
               '<button type="button" class="bt-linha bt-mini" data-acao="diarista-mover" data-valor="-1" data-id="' + t.id + '" aria-label="subir">↑</button>' +
@@ -2062,14 +2064,12 @@
     lista.forEach(function (t, i) {
       var p = t.projetoId ? M.projeto(t.projetoId) : null;
       linhas.push((i + 1) + '. ' + (t.texto || 'tarefa sem texto') + (p ? ' (' + p.nome + ')' : ''));
-      var det = [];
-      if (t.onde) det.push('onde: ' + t.onde);
-      det.push('~' + M.duracao(M.restanteDe(t.id) || t.duracaoTotal));
-      if ((t.ferramentas || []).length) det.push('ferramentas: ' + t.ferramentas.join(', '));
-      if ((t.materiais || []).length) det.push('material: ' + t.materiais.join(', '));
-      linhas.push('   ' + det.join(' · '));
+      if (t.onde) linhas.push('   Onde: ' + t.onde);
+      if ((t.ferramentas || []).length) linhas.push('   Ferramentas: ' + t.ferramentas.join(', '));
+      if ((t.materiais || []).length) linhas.push('   Materiais: ' + t.materiais.join(', '));
+      if (M.recadoDe && M.recadoDe(t.id)) linhas.push('   Detalhes: ' + M.recadoDe(t.id));
+      linhas.push('');
     });
-    linhas.push('', 'total ~' + M.duracao(M.minutosSeparados()));
     return linhas.join('\n');
   }
 

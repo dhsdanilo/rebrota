@@ -452,7 +452,10 @@ button, input, select, textarea {
   .folha-texto strong { font-size: 15pt; font-weight: 600; color: #000; }
   .folha-texto em, .folha-texto span { font-family: Georgia, serif; font-size: 11.5pt; color: #222; line-height: 1.35; }
   .folha-recado { color: #000 !important; font-style: italic; }
+  .folha-tempo { display: none; }
+  .folha-texto span b { font-weight: 600; color: #000; }
 }
+.folha-texto span b { font-weight: 500; color: var(--neblina); }
 
 /* ── espera vinculada (§40) ───────────────────────────── */
 .passo-espera { padding: 6px 0 4px 40px; display: flex; flex-direction: column; gap: 6px; }
