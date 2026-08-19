@@ -2275,6 +2275,27 @@ input[type="number"][readonly] { -moz-appearance: textfield; }
   text-align: center;
 }
 
+.compra-vias { display: flex; gap: 6px; flex-wrap: wrap; }
+
+/* a previsão (§53): leitura, nunca registro */
+.c-previsao {
+  font-family: var(--mono); font-size: 12px; letter-spacing: .03em;
+  color: var(--casca); margin: 0 0 8px; text-align: left;
+}
+.previsao-semana {
+  display: flex; gap: 6px; justify-content: center; flex-wrap: wrap;
+  margin: 26px 0 0;
+}
+.previsao-dia {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  min-width: 58px; padding: 8px 6px;
+  border: 1px solid var(--musgo); border-radius: var(--raio);
+}
+.previsao-dia b { font-family: var(--mono); font-size: 10px; letter-spacing: .06em;
+  font-weight: 500; color: var(--neblina-fraca); text-transform: uppercase; }
+.previsao-dia svg { width: 20px; height: 20px; color: var(--neblina); }
+.previsao-dia i { font-family: var(--mono); font-style: normal; font-size: 11px; color: var(--neblina-fraca); }
+
 /* a segunda consulta do dia: a situação de há pouco, uma frase e dois botões */
 .c-confirma { text-align: center; }
 .c-confirma .c-titulo { margin-bottom: 10px; }

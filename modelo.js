@@ -430,6 +430,7 @@ var Modelo = (function () {
     // ferramenta e material viraram lista
     t.ferramentas = comoLista(t.ferramentas);
     t.materiais = comoLista(t.materiais);
+    t.compras = comoLista(t.compras);
 
     // janelaHora + janela.meses viraram o bloco `quando`
     if (!t.quando) {
@@ -543,6 +544,12 @@ var Modelo = (function () {
       custo: null,
       guardado: 0,
       peso: 2,               // 1 baixa · 2 normal · 3 alta — desempate
+
+      /* COMPRA (§52): "como vai comprar?" — rua ou internet. A via decide o
+         local sozinha (rua = fora, internet = computador), e a lista do que
+         comprar é própria: comprar não é levar. */
+      compra: '',            // '' (não é compra) | 'rua' | 'internet'
+      compras: [],           // o que comprar, um por linha
 
       ondePrecisaEstar: 'sitio',
       onde: '',              // texto livre; era zona + ponto, que diziam o mesmo
@@ -806,7 +813,7 @@ var Modelo = (function () {
       ondePrecisaEstar: 'sitio', duracaoTotal: 45, exigeClima: 'tolera_chuva_fina' },
     { texto: 'Orçar o que falta',
       ondePrecisaEstar: 'computador', duracaoTotal: 60, quando: COMERCIAL },
-    { texto: 'Comprar o que falta',
+    { texto: 'Comprar o que falta', compra: 'rua',
       ondePrecisaEstar: 'fora', duracaoTotal: 180, podeParar: false, quando: COMERCIAL }
   ];
 
@@ -1400,6 +1407,31 @@ var Modelo = (function () {
     return cat().pendencias.filter(function (x) { return x.tarefaId === tid && !x.resolvida; });
   }
 
+  /* COMPRA PELA INTERNET CONCLUÍDA (§52): cada item da lista vira uma espera
+     PRÓPRIA — entregas chegam em datas diferentes e cada uma se acompanha no
+     semáforo do Aguardando. Se alguma tarefa dependia da compra, as esperas
+     nascem vinculadas a ela: o material que falta segura quem precisa dele,
+     não a compra já feita. Só a mesa chama isto (pendência é catálogo). */
+  function abrirEsperasDaCompra(tid) {
+    var t = tarefa(tid);
+    if (!t || t.compra !== 'internet' || !(t.compras || []).length) return [];
+    var dependente = tarefasVivas().filter(function (o) {
+      return (o.dependeDe || []).indexOf(tid) !== -1 && estadoDe(o.id) === 'aberta';
+    })[0] || null;
+    var d = new Date(); d.setDate(d.getDate() + 7);   // chute honesto; a data se ajusta no Aguardando
+    var previsto = diaLocal(d);
+    var novas = t.compras.map(function (item) {
+      var x = novaPendencia(item);
+      x.projetoId = t.projetoId || null;
+      x.tarefaId = dependente ? dependente.id : null;
+      x.previsto = previsto;
+      cat().pendencias.push(x);
+      return x;
+    });
+    salvar();
+    return novas;
+  }
+
   /* Chegou: destrava a tarefa vinculada. Cancelada: gera a tarefa de resolver,
      porque o projeto não pode ficar esperando para sempre uma coisa que não vem. */
   function resolverPendencia(xid, como) {
@@ -1867,8 +1899,15 @@ var Modelo = (function () {
       var d = novaTarefa(t ? t.projetoId : null, 0);
       if (t && t.etapa) d.etapa = t.etapa;   // mesma razão da tarefa de pensar
       d.texto = regra.destrave + (nota || (t ? t.texto : ''));
+      /* Destrave de compra nasce COMPRA NA RUA (§52): a maioria se resolve na
+         cidade e cai na folha da rua com o item na lista; virar internet é um
+         toque na mesa. Procurar ferramenta continua sendo no sítio. */
+      if (motivo === 'sem_ferramenta' || motivo === 'faltou_material') {
+        d.compra = 'rua';
+        if (nota) d.compras = [nota];
+      }
       d.ondePrecisaEstar = (motivo === 'terceiro') ? 'fora'
-                         : (motivo === 'sem_ferramenta' || motivo === 'faltou_material') ? 'computador'
+                         : (motivo === 'sem_ferramenta' || motivo === 'faltou_material') ? 'fora'
                          : 'sitio';
       d.duracaoTotal = d.restanteEstimado = 20;
       d.esforco = 'leve';
@@ -2305,7 +2344,7 @@ var Modelo = (function () {
     blocoDe: blocoDe, janelaDoPreset: janelaDoPreset,
 
     pendenciasAbertas: pendenciasAbertas, nivelPendencia: nivelPendencia,
-    esperarPara: esperarPara, esperasDe: esperasDe,
+    esperarPara: esperarPara, esperasDe: esperasDe, abrirEsperasDaCompra: abrirEsperasDaCompra,
     textoPendencia: textoPendencia, inserirPendencia: inserirPendencia,
     resolverPendencia: resolverPendencia,
 

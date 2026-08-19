@@ -41,6 +41,11 @@ var Campo = (function () {
     if (!(pronto && pronto.local) && ultimaConsulta()) cena.fase = 'confirma';
     responder();
     desenhar();
+    if (typeof Tempo !== 'undefined') {
+      Tempo.buscar().then(function () {
+        if (cena.fase === 'pergunta' || cena.fase === 'confirma') desenhar();
+      });
+    }
   }
 
   /* A última situação respondida, guardada por aparelho (rascunho, como o
@@ -145,6 +150,13 @@ var Campo = (function () {
        energia não mudam nada quando o trabalho é um telefonema. */
     if (s.local === 'sitio') {
       var jaTem = !!M.climaDeHoje();
+      /* A previsão MOSTRA e ele confirma (§41, §53): informar o clima continua
+         sendo escolha consciente — confirmar é tocar o botão de sempre. */
+      var la = (typeof Tempo !== 'undefined') ? Tempo.agora() : null;
+      if (la) {
+        partes.push('<p class="c-previsao">lá fora: ' + la.temp + '° · ' +
+          esc(la.calor && la.tempo === 'sol' ? 'sol forte' : la.rotulo) + ' — é isso?</p>');
+      }
       partes.push(linha(jaTem ? 'O tempo mudou?' : 'Como está o tempo?',
         [['sol', 'sol'], ['calor', 'sol forte · calor'], ['nublado', 'nublado'], ['chuva_fina', 'chuva fina'], ['chuva_forte', 'chuva forte']]
           .map(function (p) { return botao('tempo', p[0], p[1], s.tempo === p[0]); }).join('')));
@@ -280,6 +292,7 @@ var Campo = (function () {
 
         '<div class="c-ficha">',
           fichaLinha('onde', [local ? local.t : '', t.onde].filter(Boolean).join(' · ')),
+          t.compra ? fichaLista('comprar', t.compras, t.id) : '',
           fichaLista('ferramentas', t.ferramentas, t.id),
           fichaLista('materiais', t.materiais, t.id),
           fichaLinha('condições', condicoesDe(t)),
@@ -373,6 +386,7 @@ var Campo = (function () {
     return '<div class="pegada-ficha">' +
       fichaLinha('onde', [local ? local.t : '', t.onde].filter(Boolean).join(' · ')) +
       fichaLinha('levou', M.duracao(t.duracaoTotal)) +
+      (t.compra && (t.compras || []).length ? fichaLista('comprou', t.compras) : '') +
       ((t.ferramentas || []).length ? fichaLista('ferramentas', t.ferramentas) : fichaLinha('ferramentas', '—')) +
       ((t.materiais || []).length ? fichaLista('materiais', t.materiais) : fichaLinha('materiais', '—')) +
       fichaLinha('condições', condicoesDe(t)) +
@@ -635,8 +649,19 @@ var Campo = (function () {
     if (acao === 'terminei' && ativa) { cena.fase = 'terminar'; return desenhar(); }
     if (acao === 'confirmar-terminei' && ativa) {
       var nota = ($.querySelector('#cAnotacao') || {}).value || '';
+      var eraCompra = ativa.compra === 'internet' && (ativa.compras || []).length;
       M.terminar(EU, ativa.id, nota.trim());
       M.limparKit(ativa.id);
+      /* Compra pela internet: uma espera por item (§52) — só na mesa, porque
+         pendência é catálogo e a bota não escreve catálogo. As datas se
+         acertam no Aguardando. */
+      if (eraCompra && window.matchMedia('(min-width: 721px)').matches) {
+        var novas = M.abrirEsperasDaCompra(ativa.id);
+        if (novas.length) {
+          cena.avisoPendente = 'Abri ' + novas.length + (novas.length === 1 ? ' espera' : ' esperas') +
+            ', uma por item comprado. Acerte as datas de entrega no Aguardando.';
+        }
+      }
       return depoisDeFechar();
     }
 
@@ -704,8 +729,11 @@ var Campo = (function () {
      janela de trinta segundos em que a saída seria automática. */
   function depoisDeFechar() {
     cena.rascunho = {};
-    // o que a tarefa fechada moveu de vaga é dito uma vez, na próxima tela
-    cena.aviso = M.avisosDeCascata().map(function (m) {
+    // o que a tarefa fechada moveu de vaga é dito uma vez, na próxima tela —
+    // somado ao que já ia ser dito (as esperas da compra), não por cima
+    var aviso = cena.avisoPendente || '';
+    cena.avisoPendente = '';
+    cena.aviso = aviso + (aviso ? ' ' : '') + M.avisosDeCascata().map(function (m) {
       return m.vaga === 'planejadas'
         ? (m.projeto.nome || 'O projeto') + ' fechou o planejamento e espera você pôr em execução.'
         : (m.projeto.nome || 'Um projeto') + ' assume a vaga de ' + m.vaga + '.';

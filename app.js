@@ -424,13 +424,48 @@
     'Segunda-feira, que para o sítio é terça, quarta e domingo também.'
   ];
 
-  // sorteada uma vez por abertura: redesenhar a tela não pode trocar a frase
+  /* Temperos de clima (§53): entram no sorteio só quando a previsão diz que
+     são verdade. XX vira a temperatura. Voz seca, sem cobrança. */
+  var CHUVA_FRASES = [
+    'Chove lá fora. O sítio agradece; a bota reclama.',
+    'Chuva. A água está fazendo o trabalho dela.',
+    'Chovendo lá fora. Dia de teto.',
+    'Chuva lá fora. O barro de amanhã está sendo preparado agora.'
+  ];
+  var CALOR_FRASES = [
+    'XX° lá fora. A sombra virou ferramenta.',
+    'XX° lá fora. O que for pesado, cedo ou nunca.',
+    'XX°. Até o mato parou para descansar.',
+    'XX° lá fora. As cabras já escolheram a sombra delas.'
+  ];
+  var FRIO_FRASES = [
+    'XX° lá fora. Café primeiro.',
+    'XX°. O mato cresce devagar — aproveite a vantagem.',
+    'XX° lá fora. Dia bom para trabalho que esquenta.'
+  ];
+  var FIRME_FRASES = [
+    'Tempo firme lá fora.',
+    'Sol e chão decidido: o dia está do seu lado.',
+    'Firme lá fora. O que precisa de tempo seco agradece.'
+  ];
+
+  /* Sorteada uma vez por abertura: redesenhar a tela não pode trocar a frase.
+     O clima entra pelo cache da última busca — se não houver, a frase fica
+     sem clima e a próxima abertura terá. */
   var saudacao = (function () {
     var agora = new Date();
     var h = agora.getHours(), d = agora.getDay();
     var pool = SAUDACOES[h < 5 ? 'madrugada' : h < 12 ? 'manha' : h < 18 ? 'tarde' : 'noite'];
     if (d === 0 || d === 6) pool = pool.concat(FIM_DE_SEMANA);
     if (d === 1) pool = pool.concat(SEGUNDA);
+    var la = (typeof Tempo !== 'undefined') ? Tempo.agora() : null;
+    if (la) {
+      var extra = (la.tempo === 'chuva_fina' || la.tempo === 'chuva_forte') ? CHUVA_FRASES
+        : la.calor ? CALOR_FRASES
+        : la.temp <= 13 ? FRIO_FRASES
+        : la.tempo === 'sol' ? FIRME_FRASES : [];
+      pool = pool.concat(extra.map(function (f) { return f.replace('XX', la.temp); }));
+    }
     return pool[Math.floor(Math.random() * pool.length)];
   })();
 
@@ -534,7 +569,7 @@
           '<span class="porta-nome">organizar</span>' +
           '<span class="porta-sub">mexer nos projetos e no plano</span>' +
         '</button>' +
-      '</div>' + linkDaRua() + vagasDaAbertura() + avisoDeNuvem() + avisoDeCopia() + '</div>';
+      '</div>' + linkDaRua() + vagasDaAbertura() + previsaoDaSemana() + avisoDeNuvem() + avisoDeCopia() + '</div>';
   }
 
   /* Aparelho sem sincronização diz isso na entrada, uma linha, sem alarme —
@@ -551,6 +586,28 @@
       : s.ultimo ? 'nuvem · sincronizado às ' + M.horaDe(new Date(s.ultimo)) : 'nuvem ligada';
     return '<p class="aviso-copia' + (s.erro ? ' aviso-erro' : '') + '">' + esc(texto) +
       ' <button type="button" class="bt-linha bt-mini" data-acao="sincronizar-agora">sincronizar agora</button></p>';
+  }
+
+  /* A SEMANA (§53): cinco dias, um ícone e a máxima — leitura, nunca registro.
+     Só na mesa; a bota pergunta o tempo na consulta, que é onde ele decide. */
+  var ICONES_TEMPO = {
+    sol: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"><circle cx="10" cy="10" r="3.6"/><path d="M10 2.2v2M10 15.8v2M2.2 10h2M15.8 10h2M4.5 4.5l1.4 1.4M14.1 14.1l1.4 1.4M15.5 4.5l-1.4 1.4M5.9 14.1l-1.4 1.4"/></svg>',
+    nublado: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 14.5h8.7a3 3 0 0 0 .4-6 4.5 4.5 0 0 0-8.7-1.2 3.6 3.6 0 0 0-.4 7.2z"/></svg>',
+    chuva_fina: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 12h8.7a3 3 0 0 0 .4-6 4.5 4.5 0 0 0-8.7-1.2A3.6 3.6 0 0 0 5.5 12z"/><path d="M7.5 14.5v2M12.5 14.5v2"/></svg>',
+    chuva_forte: '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 11.5h8.7a3 3 0 0 0 .4-6 4.5 4.5 0 0 0-8.7-1.2 3.6 3.6 0 0 0-.4 7.2z"/><path d="M6.5 13.5v2.2M10 14v2.2M13.5 13.5v2.2"/></svg>'
+  };
+
+  function previsaoDaSemana() {
+    if (typeof Tempo === 'undefined' || !naMesa()) return '';
+    var dias = Tempo.semana();
+    if (!dias) return '';
+    return '<div class="previsao-semana">' + dias.map(function (d, i) {
+      var dt = new Date(d.dia + 'T00:00:00');
+      var nome = i === 0 ? 'hoje' : M.NOMES_DIA[dt.getDay()];
+      return '<span class="previsao-dia"><b>' + esc(nome) + '</b>' +
+        (ICONES_TEMPO[Tempo.tempoDe(d.code)] || '') +
+        '<i>' + d.max + '°</i></span>';
+    }).join('') + '</div>';
   }
 
   function vagasDaAbertura() {
@@ -1547,7 +1604,7 @@
         /* O LOCAL vem antes do tempo, na própria linha (§46): é ele que decide o
            resto da ficha, e escondido no fim ele era esquecido. Fora, o tempo
            não entra — coisa de rua é rápida e o tempo serve ao sorteio do dia. */
-        (solto
+        (solto && !t.compra
           ? '<select class="passo-local-edita" title="Onde esta tarefa precisa ser feita — decide o resto da ficha."' +
             ' data-alvo="tarefa" data-id="' + t.id + '" data-campo="ondePrecisaEstar">' +
             opcoes(M.LOCAIS, t.ondePrecisaEstar) + '</select>'
@@ -1648,6 +1705,8 @@
     if (t.perigosaComCriancas) gente.push('perigosa com crianças');
     if (gente.length) m.push(['☻', gente.join(' · ')]);
 
+    if (t.compra) m.push(['▤', 'comprar' + (t.compra === 'internet' ? ' pela internet' : '') +
+      ((t.compras || []).length ? ': ' + t.compras.join(', ') : '')]);
     if ((t.ferramentas || []).length) m.push(['⚒', t.ferramentas.join(', ')]);
     if ((t.materiais || []).length) m.push(['▤', t.materiais.join(', ')]);
 
@@ -1726,6 +1785,27 @@
     var naRua = t.ondePrecisaEstar === 'fora';
 
     return [
+      /* COMPRA (§52): "como vai comprar?" decide a via — e a via decide o
+         local sozinha (rua = fora, internet = computador). A lista do que
+         comprar é própria: comprar não é levar. */
+      grupo('Compra', '',
+        linhaCond('Como vai comprar?',
+          'Tarefa de compra: "na rua" cai na folha da rua com a lista; "pela internet" é ' +
+          'trabalho de computador — e, concluída, cada item vira uma espera própria no ' +
+          'Aguardando, porque as entregas chegam em datas diferentes.',
+          '<span class="compra-vias">' +
+          chipCompra(t, '', 'não é compra', travado) +
+          chipCompra(t, 'rua', 'na rua', travado) +
+          chipCompra(t, 'internet', 'pela internet', travado) + '</span>') +
+        (t.compra
+          ? campoLista('tarefa', t.id, 'compras', 'O que comprar', t.compras,
+              '90 m de tela soldada\n2 kg de grampo', travado,
+              'Um item por linha, com a quantidade. Na rua vira a lista de compras da folha; ' +
+              'pela internet, cada item vira uma espera quando a compra é concluída.')
+          : ''),
+        'Se esta tarefa é uma compra, e por onde. A via decide o resto: rua entra na folha ' +
+        'da rua; internet é computador.'),
+
       // o local mora na linha da tarefa (§46); aqui fica só o ponto exato
       noPc ? '' :
       grupo('Onde', 'grade',
@@ -1820,7 +1900,7 @@
         'não bater com a situação que você informou, ela não é oferecida — e você nem fica sabendo ' +
         'que ela existia, que é justamente o alívio.')),
 
-      noPc ? '' :
+      (noPc || t.compra) ? '' :
       grupo('Levar', 'grade',
         campoLista('tarefa', t.id, 'ferramentas', 'Ferramentas', t.ferramentas, 'cavadeira\nmarreta\nEPI', travado,
           'Uma por linha. O que precisa estar na mão para começar, incluindo o EPI — que é ' +
@@ -1928,6 +2008,17 @@
     return '<div class="cond">' +
       '<span class="cond-rotulo tem-ajuda" title="' + esc(ajuda) + '">' + esc(rotulo) + '</span>' +
       '<div class="cond-corpo">' + corpo + '</div></div>';
+  }
+
+  // os três chips da compra: o marcado aceso; travado vira texto lido
+  function chipCompra(t, via, texto, travado) {
+    if (travado) {
+      if (t.compra === via && via) return '<span class="valor-lido">' + esc(texto) + '</span>';
+      if (!via && !t.compra) return '<span class="valor-lido aviso">não é compra</span>';
+      return '';
+    }
+    return '<button type="button" class="filtro' + (t.compra === via ? ' filtro-on' : '') +
+      '" data-acao="compra-via" data-id="' + t.id + '" data-valor="' + via + '">' + esc(texto) + '</button>';
   }
 
   /* Sim/não com palavra, não caixa de marca: trancado, "[ ] sim" não diz se a
@@ -2287,7 +2378,7 @@
                   // o mapa é opcional e discreto: ele conhece os lugares (§51)
                   (t.onde ? '<span><b>Onde:</b> ' + esc(t.onde) +
                     ' <a class="rua-mapa" href="https://maps.google.com/?q=' + encodeURIComponent(t.onde) + '" target="_blank" rel="noopener">mapa</a></span>' : '') +
-                  itensRiscaveis(t.id, 'Comprar', t.materiais) +
+                  itensRiscaveis(t.id, 'Comprar', t.compra ? t.compras : t.materiais) +
                   itensRiscaveis(t.id, 'Levar', t.ferramentas) +
                   (M.recadoDe(t.id) ? '<span class="folha-recado"><b>Detalhes:</b> ' + esc(M.recadoDe(t.id)) + '</span>' : '') +
                 '</div>' +
@@ -2309,7 +2400,8 @@
       var p = t.projetoId ? M.projeto(t.projetoId) : null;
       linhas.push((i + 1) + '. ' + (t.texto || 'tarefa sem texto') + (p ? ' (' + p.nome + ')' : ''));
       if (t.onde) linhas.push('   Onde: ' + t.onde);
-      if ((t.materiais || []).length) linhas.push('   Comprar: ' + t.materiais.join(', '));
+      var comprar = t.compra ? t.compras : t.materiais;
+      if ((comprar || []).length) linhas.push('   Comprar: ' + comprar.join(', '));
       if ((t.ferramentas || []).length) linhas.push('   Levar: ' + t.ferramentas.join(', '));
       if (M.recadoDe(t.id)) linhas.push('   Detalhes: ' + M.recadoDe(t.id));
       linhas.push('');
@@ -2711,7 +2803,7 @@
       M.salvar();
       return;
     }
-    if (chave === 'ganhos' || chave === 'ferramentas' || chave === 'materiais') {
+    if (chave === 'ganhos' || chave === 'ferramentas' || chave === 'materiais' || chave === 'compras') {
       obj[chave] = String(valor).split('\n').map(function (x) { return x.trim(); })
         .filter(function (x) { return x; });
     } else if (chave === 'guardado' && valor === null) {
@@ -3025,6 +3117,15 @@
       if (tarefaDel && tarefaDel.separada) M.fecharDiarista(tid, 'feita');
       else M.terminar('pe_eu', tid, '');
       M.limparKit(tid);
+      /* Compra pela internet concluída: uma espera por item, cada uma com a
+         própria data (§52). Nascem com ~7 dias e o Aguardando abre para
+         acertar as datas na hora — é lá que elas se editam. */
+      var esperasNovas = M.abrirEsperasDaCompra(tid);
+      if (esperasNovas.length) {
+        avisoCascata = 'Abri ' + esperasNovas.length + (esperasNovas.length === 1 ? ' espera' : ' esperas') +
+          ', uma por item. Acerte as datas de entrega aqui.';
+        tela = { tipo: 'pendencias', id: null };
+      }
       return apurarVagas();
     }
     if (acao === 'reabrir-tarefa')  { M.reabrir('pe_eu', tid); return apurarVagas(); }
@@ -3135,6 +3236,21 @@
     if (acao === 'tirar-tag') {
       var alvoTag = el.getAttribute('data-alvo') === 'projeto' ? M.projeto(tid) : M.tarefa(tid);
       M.tirarTag(alvoTag, el.getAttribute('data-valor'));
+      return desenharPalco();
+    }
+    if (acao === 'compra-via') {
+      var tc = M.tarefa(tid); if (!tc) return;
+      var via = el.getAttribute('data-valor');
+      tc.compra = via;
+      // a via decide o local — e o local decide o resto da ficha (§42)
+      if (via === 'rua') tc.ondePrecisaEstar = 'fora';
+      if (via === 'internet') { tc.ondePrecisaEstar = 'computador'; tc.onde = ''; }
+      if (via) {
+        tc.exigeClima = 'indiferente'; tc.podeNoCalor = true; tc.exigeSoloFirme = false;
+        tc.precisaAjuda = false; tc.boaComCriancas = false; tc.perigosaComCriancas = false;
+        tc.podeParar = true; tc.esforco = 'leve'; tc.guardadaParaChuva = false;
+      }
+      tc.ultimoToque = M.agora(); M.salvar();
       return desenharPalco();
     }
     if (acao === 'ir-rua') { tela = { tipo: 'rua', id: null }; entrarNaRua(); return desenhar(); }
@@ -3962,6 +4078,12 @@
   // a nuvem carrega o token ANTES do primeiro desenho: senão a entrada dizia
   // "não sincroniza" com o painel dizendo "sincronizado às…"
   Sync.iniciar();
+  if (typeof Tempo !== 'undefined') {
+    Tempo.ouvir(function () {
+      if (tela.tipo === null && $campo.hidden) desenhar();
+    });
+    Tempo.buscar();
+  }
   desenhar();
   desenharNuvem();
 })();
