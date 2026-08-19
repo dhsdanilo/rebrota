@@ -1482,12 +1482,13 @@
     if (!t.podeParar) m.push(['⏱', 'não pode parar']);
 
     var cond = [];
-    if (t.exigeClima !== 'indiferente') cond.push(t.exigeClima === 'firme' ? 'tempo firme' : 'tolera chuva fina');
+    var noSitioL = t.ondePrecisaEstar === 'sitio';
+    if (noSitioL && t.exigeClima !== 'indiferente') cond.push(t.exigeClima === 'firme' ? 'tempo firme' : 'tolera chuva fina');
     if (t.podeNoCalor === false) cond.push('não no calor');
     if (t.exigeSoloFirme) cond.push('solo firme');
     if (t.guardadaParaChuva) cond.push('guardada para a chuva');
-    cond.push(t.esforco === 'pesado' ? 'pesado' : 'leve');
-    m.push(['☁', cond.join(' · ')]);
+    if (noSitioL) cond.push(t.esforco === 'pesado' ? 'pesado' : 'leve');
+    if (cond.length) m.push(['☁', cond.join(' · ')]);
 
     var gente = [];
     if (t.precisaAjuda) gente.push('precisa ajuda');
@@ -1562,18 +1563,26 @@
      no hover. O texto e a duração saíram daqui: eles já estão na linha de cima
      e agora são editáveis lá mesmo — campo que existe só para repetir o que
      está três centímetros acima é campo para apagar. */
+  /* O LOCAL DIZ O RESTO (§42). No computador, clima, chão, calor, esforço e
+     companhia não existem — e o motor nem lê. Fora, clima e chão também não.
+     O formulário só mostra o que o motor vai ler para aquele local; o resto
+     fica neutro por baixo, e você não vê campo que não precisa preencher. */
   function formularioPasso(t, irmaos, travado) {
     var avisos = M.avisosDe(t);
+    var noSitio = t.ondePrecisaEstar === 'sitio';
+    var noPc = t.ondePrecisaEstar === 'computador';
 
     return [
       grupo('Onde', 'grade',
         campoSelect('tarefa', t.id, 'ondePrecisaEstar', 'Precisa estar', M.LOCAIS, t.ondePrecisaEstar, travado,
           'No sítio, no computador ou fora. Telefonema e encomenda cabem nos vinte minutos ' +
-          'da sala de espera do dentista, e por isso não disputam o dia seco com o trabalho de fora.') +
+          'da sala de espera do dentista, e por isso não disputam o dia seco com o trabalho de fora. ' +
+          'O local decide o resto da ficha: no computador não há clima, chão, esforço nem companhia.') +
+        (noPc ? '' :
         campoTexto('tarefa', t.id, 'onde', 'Lugar', t.onde,
           { dica: 'trecho rente à estrada', travado: travado,
             ajuda: 'O ponto exato. Vem junto da tarefa na hora de sair, para você não ' +
-                   'atravessar o sítio e descobrir lá que era do outro lado.' }),
+                   'atravessar o sítio e descobrir lá que era do outro lado.' })),
         'A primeira pergunta da consulta, e a que poda todas as outras: quando você responde ' +
         '"fora" ou "computador", o app nem pergunta clima, chão, companhia e energia.'),
 
@@ -1593,6 +1602,7 @@
         'A avulsa que custa dinheiro espera o dinheiro, não o app. Mesmo desenho do envelope, em tamanho de tarefa.')) +
 
       grupo('Condições', '',
+        (!noSitio ? '' :
         linhaCond('Clima',
           'Como o tempo precisa estar. "Só com tempo firme" desaparece em qualquer chuva. ' +
           '"Tolera chuva fina" fica guardada para a segunda chamada, quando não sobrou nada limpo, ' +
@@ -1616,12 +1626,13 @@
           'Trabalho que dá para fazer em qualquer dia, mas que vale a pena reservar para um dia ' +
           'de chuva. Fica fora do páreo enquanto o tempo está firme — a não ser que não haja mais ' +
           'nada, e aí o app oferece assim mesmo em vez de te deixar parado.',
-          campoBooleano('tarefa', t.id, 'guardadaParaChuva', t.guardadaParaChuva, travado)) +
+          campoBooleano('tarefa', t.id, 'guardadaParaChuva', t.guardadaParaChuva, travado))) +
 
+        (!noSitio ? '' :
         linhaCond('Esforço',
           'Quanto o corpo vai sentir. Nos dias em que você responder "pouca energia", só as leves ' +
           'chegam até você — as pesadas nem são cogitadas.',
-          campoSelect('tarefa', t.id, 'esforco', '', M.ESFORCOS, t.esforco, travado)) +
+          campoSelect('tarefa', t.id, 'esforco', '', M.ESFORCOS, t.esforco, travado))) +
 
         (t.projetoId ? '' :
         linhaCond('Importância',
@@ -1629,6 +1640,7 @@
           'destrave continuam mandando. Padrão: normal.',
           campoSelect('tarefa', t.id, 'peso', '', M.PESOS, t.peso, travado))) +
 
+        (noPc ? '' :
         linhaCond('Companhia',
           'Quem precisa estar junto e quem não pode. As três marcas são independentes: uma tarefa ' +
           'pode precisar de ajuda e ainda assim ser boa com as crianças por perto.',
@@ -1641,7 +1653,7 @@
             'ganha peso e vem na frente — aproveita o tempo com eles em vez de disputar com eles.') +
           campoMarca('tarefa', t.id, 'perigosaComCriancas', 'perigosa com crianças', t.perigosaComCriancas, travado,
             'Motosserra, altura, ferramenta cortante, elétrica. Nos dias em que você marca ' +
-            '"crianças", esta simplesmente não existe para o app.'))) +
+            '"crianças", esta simplesmente não existe para o app.')))) +
 
         linhaCond('Pode interromper?',
           'Sim: a tarefa aparece mesmo numa janela curta, e o app diz quanto cabe hoje e quanto ' +
@@ -1653,6 +1665,7 @@
         'não bater com a situação que você informou, ela não é oferecida — e você nem fica sabendo ' +
         'que ela existia, que é justamente o alívio.'),
 
+      noPc ? '' :
       grupo('Levar', 'grade',
         campoLista('tarefa', t.id, 'ferramentas', 'Ferramentas', t.ferramentas, 'cavadeira\nmarreta\nEPI', travado,
           'Uma por linha. O que precisa estar na mão para começar, incluindo o EPI — que é ' +
@@ -2437,6 +2450,19 @@
       obj.peso = Number(valor) || 2;
     } else {
       obj[chave] = valor;
+    }
+
+    // o local decide o resto (§42): trocou, o que não se aplica volta ao neutro e a ficha redesenha
+    if (chave === 'ondePrecisaEstar') {
+      if (valor !== 'sitio') {
+        obj.exigeClima = 'indiferente'; obj.podeNoCalor = true; obj.exigeSoloFirme = false;
+        obj.guardadaParaChuva = false; obj.esforco = 'leve';
+      }
+      if (valor === 'computador') {
+        obj.precisaAjuda = false; obj.boaComCriancas = false; obj.perigosaComCriancas = false; obj.onde = '';
+      }
+      obj.ultimoToque = M.agora(); M.salvar();
+      return desenharPalco();
     }
 
     // boa com crianças e perigosa com crianças não coexistem: marcar uma desmarca a outra
