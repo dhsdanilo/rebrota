@@ -762,6 +762,7 @@ button, input, select, textarea {
 }
 
 .envelope-largo { max-width: 420px; margin-bottom: 16px; }
+.envelope-largo .envelope { margin-top: 0; }
 
 /* o custo de um projeto rodando é curiosidade, não decisão: uma linha, quieta */
 /* o cabeçalho da ficha: nome grande, o destino como legenda, e a escrituração
@@ -818,7 +819,7 @@ button, input, select, textarea {
   overflow: hidden;
 }
 
-.envelope-cheia { height: 100%; background: var(--rebrota); }
+.envelope-cheia { display: block; height: 100%; background: var(--rebrota); }
 
 /* ── palco ──────────────────────────────────────────── */
 
