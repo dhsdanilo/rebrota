@@ -2038,6 +2038,25 @@ var Modelo = (function () {
       .reverse();
   }
 
+  /* O COFRE (§48): guardado não se edita — se aporta (ou se retira). Cada
+     movimento é evento no diário (`aportou`, valor com sinal), para a análise
+     poder ver, um dia, que um projeto nunca andou porque o cofre vivia sendo
+     esvaziado. O número no projeto é a soma; o diário é o registro. */
+  function aportar(quem, pid, valor) {
+    var p = projeto(pid);
+    valor = Number(valor) || 0;
+    if (!p || !valor) return null;
+    var atual = Number(p.guardado) || 0;
+    if (valor < 0 && -valor > atual) valor = -atual;   // não tira mais do que há
+    p.guardado = Math.round((atual + valor) * 100) / 100;
+    p.ultimoToque = agora();
+    var ev = registrar(quem, 'aportou', { projetoId: pid, valor: valor, saldo: p.guardado });
+    return ev;
+  }
+  function aportesDe(pid) {
+    return eventosEmOrdem().filter(function (ev) { return ev.tipo === 'aportou' && ev.projetoId === pid; }).reverse();
+  }
+
   function registrarClima(quem, tempo, barro) {
     return registrar(quem, 'clima', { dia: hoje(), tempo: tempo, barro: !!barro });
   }
@@ -2246,6 +2265,7 @@ var Modelo = (function () {
     tarefasDaRua: tarefasDaRua, reordenarRua: reordenarRua,
     semear: semear, absorverSementes: absorverSementes, sementesDe: sementesDe,
     anotar: anotar, riscarAnotacao: riscarAnotacao, anotacoes: anotacoes,
+    aportar: aportar, aportesDe: aportesDe,
     apelido: apelido,
     nomeDe: nomeDe,
 

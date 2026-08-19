@@ -637,17 +637,24 @@
             (p.papel === 'planejamento' && (p.custoEstimado === null || p.custoEstimado === undefined) &&
              Number(p.muda.despesas.inicial) > 0
               ? '<p class="aviso" style="margin:0 0 10px">A muda estimava ' + esc(M.moeda(p.muda.despesas.inicial)) + ' por cima.</p>' : '') +
+            // o custo tem o próprio "editar": orçar não é editar o projeto inteiro
             '<div class="grade">' +
-            campoTexto('projeto', p.id, 'custoEstimado', 'Custo estimado', p.custoEstimado,
-              { numero: true, min: 0, travado: !solto,
-                ajuda: 'O que o planejamento levantou. Sem ele a planejada não sobe: ' +
-                       'o app diz "sem orçamento levantado".' }) +
-            // escapa do cadeado normal (aporte é rotina), mas não do modo consulta
-            campoTexto('projeto', p.id, 'guardado', 'Guardado', p.guardado, { numero: true, min: 0,
-              travado: consulta,
-              ajuda: 'Quanto já está separado para esta obra. Onde você aporta é a sua declaração de ' +
-                     'qual projeto vem primeiro — decisão fria, tomada meses antes de começar.' }) +
-            '</div>',
+            (solto || custoEditando === p.id
+              ? '<div class="custo-edita">' +
+                campoTexto('projeto', p.id, 'custoEstimado', 'Custo estimado', p.custoEstimado,
+                  { numero: true, min: 0, travado: false,
+                    ajuda: 'O que o planejamento levantou. Sem ele a planejada não sobe: ' +
+                           'o app diz "sem orçamento levantado".' }) +
+                (solto ? '' : '<button type="button" class="bt-forte bt-mini" data-acao="custo-ok">ok</button>') +
+                '</div>'
+              : '<div class="campo"><label>Custo estimado</label><p class="valor-lido">' +
+                (p.custoEstimado !== null && p.custoEstimado !== undefined
+                  ? esc(M.moeda(p.custoEstimado)) : '<span class="aviso">sem orçamento ainda</span>') +
+                (consulta ? '' : ' <button type="button" class="bt-linha bt-mini" data-acao="custo-editar" data-id="' + p.id + '">' +
+                  (p.custoEstimado !== null && p.custoEstimado !== undefined ? 'editar' : 'definir') + '</button>') +
+                '</p></div>') +
+            '</div>' +
+            cofre(p, consulta),
             'Quanto custa e quanto já foi juntado. É gatilho para começar, não controle financeiro: ' +
             'quando enche, a porta abre uma vez e o app para de olhar para dinheiro. A barra mostra ' +
             'valores, nunca porcentagem: o valor tem lastro, e quando enche uma porta abre.'),
@@ -860,6 +867,37 @@
       '<div class="secao-titulo"><button type="button" class="cabeca-link" data-acao="abrir-recolhido" data-id="' + chave + '">' +
         esc(titulo) + (aberto ? ' ▾' : ' ▸') + '</button></div>' +
       (aberto ? '<div class="secao-corpo">' + corpo + '</div>' : '') +
+      '</div>';
+  }
+
+  /* O COFRE (§48): o guardado como cofrinho — aportar é a ação; retirar existe
+     em letra pequena. Cada movimento fica no diário. Escapa do cadeado de
+     editar (aportar é rotina), mas não do modo consulta. */
+  var cofreAberto = null;   // { pid, modo: 'aportar' | 'retirar' }
+  var custoEditando = null; // projeto com o custo estimado solto para edição
+  function cofre(p, consulta) {
+    var saldo = Number(p.guardado) || 0;
+    var aportes = M.aportesDe(p.id);
+    var aberto = cofreAberto && cofreAberto.pid === p.id ? cofreAberto.modo : null;
+    return '<div class="cofre">' +
+      '<p class="cofre-saldo">' + esc(M.moeda(saldo)) + ' <span>no cofre</span></p>' +
+      (consulta ? '' :
+        aberto
+          ? '<div class="cofre-caixa">' +
+              '<input type="number" min="1" id="cofre_' + p.id + '" placeholder="quanto?">' +
+              '<button type="button" class="bt-forte bt-mini" data-acao="cofre-confirmar" data-id="' + p.id + '">' + (aberto === 'aportar' ? 'aportar' : 'retirar') + '</button>' +
+              '<button type="button" class="bt-linha bt-mini" data-acao="cofre-fechar">deixa</button>' +
+            '</div>'
+          : '<div class="cofre-acoes">' +
+              '<button type="button" class="bt-fraco bt-mini" data-acao="cofre-abrir" data-valor="aportar" data-id="' + p.id + '">aportar</button>' +
+              (saldo > 0 ? '<button type="button" class="bt-linha bt-mini" data-acao="cofre-abrir" data-valor="retirar" data-id="' + p.id + '">retirar</button>' : '') +
+            '</div>') +
+      (aportes.length
+        ? '<ul class="cofre-historico">' + aportes.slice(0, 5).map(function (a) {
+            return '<li>' + esc(M.formatarData(M.diaDe(a.quando))) + ' · ' +
+              (a.valor > 0 ? '+' : '−') + esc(M.moeda(Math.abs(a.valor))) + '</li>';
+          }).join('') + (aportes.length > 5 ? '<li class="aviso">e mais ' + (aportes.length - 5) + '</li>' : '') + '</ul>'
+        : '') +
       '</div>';
   }
 
@@ -2948,6 +2986,27 @@
       tempoLivre = tid; desenharPalco();
       var caixa = $palco.querySelector('.passo-tempo-edita[data-id="' + tid + '"]'); if (caixa) { caixa.focus(); caixa.select(); }
       return;
+    }
+    if (acao === 'custo-editar') {
+      custoEditando = tid; desenharPalco();
+      var cc = document.getElementById('c_' + tid + '_custoEstimado'); if (cc) { cc.focus(); cc.select(); }
+      return;
+    }
+    if (acao === 'custo-ok') { custoEditando = null; return desenhar(); }
+    if (acao === 'cofre-abrir') {
+      cofreAberto = { pid: tid, modo: el.getAttribute('data-valor') };
+      desenharPalco();
+      var cx = document.getElementById('cofre_' + tid); if (cx) cx.focus();
+      return;
+    }
+    if (acao === 'cofre-fechar') { cofreAberto = null; return desenharPalco(); }
+    if (acao === 'cofre-confirmar') {
+      var quanto = Number(valorDoCampo('cofre_' + tid));
+      if (!quanto || quanto <= 0) { var cq = document.getElementById('cofre_' + tid); if (cq) cq.focus(); return; }
+      M.aportar('pe_eu', tid, cofreAberto && cofreAberto.modo === 'retirar' ? -quanto : quanto);
+      cofreAberto = null;
+      if (M.cascatearVagas().length) colherAvisos();
+      return desenhar();
     }
     if (acao === 'tirar-tag') {
       var alvoTag = el.getAttribute('data-alvo') === 'projeto' ? M.projeto(tid) : M.tarefa(tid);

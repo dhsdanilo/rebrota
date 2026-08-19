@@ -503,6 +503,18 @@ button, input, select, textarea {
 
 .marca-svg { width: 13px; height: 13px; vertical-align: -2px; }
 
+/* ── o cofre (§48) ────────────────────────────────────── */
+.custo-edita { display: flex; align-items: flex-end; gap: 8px; }
+.custo-edita .campo { margin: 0; }
+.custo-edita .bt-mini { margin-bottom: 4px; }
+.cofre { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.cofre-saldo { margin: 0; font-family: var(--display); font-size: 22px; color: var(--neblina); }
+.cofre-saldo span { font-size: 13px; color: var(--neblina-fraca); font-family: var(--corpo); margin-left: 4px; }
+.cofre-acoes, .cofre-caixa { display: flex; gap: 6px; align-items: center; }
+.cofre-caixa input { width: 120px; background: var(--mata); border: 1px solid var(--musgo); border-radius: var(--raio); color: var(--neblina); padding: 5px 8px; font-size: 14px; }
+.cofre-caixa input:focus { border-color: var(--rebrota); outline: none; }
+.cofre-historico { list-style: none; margin: 2px 0 0; padding: 0; font-family: var(--mono); font-size: 11px; color: var(--neblina-fraca); display: flex; flex-direction: column; gap: 2px; }
+
 /* ── botões ─────────────────────────────────────────── */
 
 .bt-forte, .bt-fraco, .bt-linha {
