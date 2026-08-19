@@ -206,10 +206,20 @@
        item de planejamento tinha três andares e os outros pareciam recolhidos. */
     var nota = M.motivoTrancado(p) ||
       (p.estado === 'preparo' ? M.oQueFaltaParaSubir(p) : '');
-    if (p.papel === 'titular' || p.papel === 'reserva') {
-      var passos = M.passosDe(p.id).filter(function (t) { return t.etapa === 'execucao' && M.estadoDe(t.id) !== 'encerrada'; });
+    function xDeY(etapa) {
+      var passos = M.passosDe(p.id).filter(function (t) { return t.etapa === etapa && M.estadoDe(t.id) !== 'encerrada'; });
       var feitas = passos.filter(function (t) { return M.estadoDe(t.id) === 'feita'; }).length;
-      nota = passos.length ? feitas + ' de ' + passos.length + (passos.length === 1 ? ' tarefa feita' : ' tarefas feitas') : 'sem tarefas ainda';
+      return passos.length ? feitas + ' de ' + passos.length + (passos.length === 1 ? ' tarefa feita' : ' tarefas feitas') : 'sem tarefas ainda';
+    }
+    if (p.papel === 'titular' || p.papel === 'reserva') {
+      nota = xDeY('execucao');
+    } else if (p.papel === 'planejamento') {
+      nota = xDeY('planejamento');
+    } else if (p.estado === 'preparo') {
+      // planejada: o que a segura, em uma linha
+      nota = (p.custoEstimado === null || p.custoEstimado === undefined) ? 'pronta, aguardando orçamento'
+        : M.aptaParaExecucao(p) ? 'pronta para entrar'
+        : (M.oQueFaltaParaSubir(p) || '').replace(/\.$/, '').toLowerCase();
     } else if (p.estado === 'fila') {
       nota = (p.muda.estado === 'pronta' ? 'pronta' : 'plantando') + (nota ? ' · ' + nota.replace(/\.$/, '') : '');
     }
@@ -218,7 +228,6 @@
       ' data-abrir="projeto" data-id="' + p.id + '"' + (atual ? ' aria-current="true"' : '') + '>' +
       '<span class="item-etiqueta"><i class="pino"></i>' + esc(r.texto) + '</span>' +
       '<span class="item-nome">' + esc(p.nome || 'sem nome') + '</span>' +
-      (mostraEnvelope(p) ? barraEnvelope(p) : '') +
       (nota ? '<span class="item-nota">' + esc(nota) + '</span>' : '') +
       '</button></li>';
   }
@@ -1058,7 +1067,6 @@
         '<span class="ficha-nome">' + esc(p.nome || p.resultado || 'sem nome') + '</span>' +
         (p.resultado && p.nome ? '<span class="ficha-obra">' + esc(p.resultado) + '</span>' : '') +
         (falta ? '<span class="item-nota">' + esc(falta) + '</span>' : '') +
-        (mostraEnvelope(p) ? barraEnvelope(p) : '') +
         (idade >= 60 && p.estado !== 'ativo'
           ? '<span class="ficha-idade">parado há ' + idade + ' dias</span>' : '') +
       '</button>' +
