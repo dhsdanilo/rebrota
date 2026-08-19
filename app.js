@@ -2246,13 +2246,35 @@
      A ordem se monta SEGURANDO E ARRASTANDO o cartão (ligarArrasteRua) — os
      ↑ ↓ saíram. Na bota a folha é clara, como papel: no carro, com sol, tela
      escura vira espelho; e tudo ali é grande, porque é lida de relance. */
+  /* Comprar e Levar viram itens RISCÁVEIS na loja — mesma peça da conferência
+     do kit (§15): rascunho na chave própria, some quando a tarefa fecha. */
+  function itensRiscaveis(tid, rotulo, itens) {
+    if (!(itens || []).length) return '';
+    return '<span class="rua-compras"><b>' + rotulo + ':</b> ' +
+      itens.map(function (x) {
+        var pego = M.conferido(tid, x);
+        return '<button type="button" class="rua-risca' + (pego ? ' rua-risca-on' : '') +
+          '" data-acao="rua-riscar" data-id="' + tid + '" data-valor="' + esc(x) + '">' +
+          '<i aria-hidden="true">' + (pego ? '✓' : '') + '</i>' + esc(x) + '</button>';
+      }).join('') + '</span>';
+  }
+
   function marcacaoRua() {
     var lista = M.tarefasDaRua();
     var voltar = '<button type="button" class="voltar-lista rua-voltar" data-acao="voltar-inicio">← voltar</button>';
     return [
+      // o que só sai no papel, como na folha do diarista
+      '<div class="folha-papel"><h1>Na rua · ' + esc(M.formatarData(M.hoje())) + '</h1>' +
+        '<p>Na ordem da rota. O que não der, fica.</p></div>',
       voltar,
       '<h2>Na rua</h2>',
       '<p class="palco-sub">O que dá para resolver nesta saída. Segure e arraste para montar a rota; o que não der, fica.</p>',
+      lista.length
+        ? '<div class="rua-cabeca">' +
+            '<button type="button" class="bt-fraco bt-mini" data-acao="rua-copiar">copiar a lista</button>' +
+            '<button type="button" class="bt-fraco bt-mini" onclick="window.print()">imprimir</button>' +
+          '</div>'
+        : '',
       lista.length
         ? '<ol class="folha folha-rua">' + lista.map(function (t, i) {
             var p = t.projetoId ? M.projeto(t.projetoId) : null;
@@ -2262,9 +2284,11 @@
                 '<span class="folha-n">' + (i + 1) + '</span>' +
                 '<div class="folha-texto"><strong>' + esc(t.texto || 'tarefa sem texto') + '</strong>' +
                   (p ? '<em>' + esc(p.nome) + '</em>' : '') +
-                  (t.onde ? '<span><b>Onde:</b> ' + esc(t.onde) + '</span>' : '') +
-                  ((t.materiais || []).length ? '<span><b>Comprar:</b> ' + esc(t.materiais.join(', ')) + '</span>' : '') +
-                  ((t.ferramentas || []).length ? '<span><b>Levar:</b> ' + esc(t.ferramentas.join(', ')) + '</span>' : '') +
+                  // o mapa é opcional e discreto: ele conhece os lugares (§51)
+                  (t.onde ? '<span><b>Onde:</b> ' + esc(t.onde) +
+                    ' <a class="rua-mapa" href="https://maps.google.com/?q=' + encodeURIComponent(t.onde) + '" target="_blank" rel="noopener">mapa</a></span>' : '') +
+                  itensRiscaveis(t.id, 'Comprar', t.materiais) +
+                  itensRiscaveis(t.id, 'Levar', t.ferramentas) +
                   (M.recadoDe(t.id) ? '<span class="folha-recado"><b>Detalhes:</b> ' + esc(M.recadoDe(t.id)) + '</span>' : '') +
                 '</div>' +
                 '<span class="folha-acoes">' +
@@ -2276,6 +2300,21 @@
       // no celular a lista é longa: voltar também no pé, grande
       lista.length ? '<div class="rua-pe">' + voltar + '</div>' : ''
     ].join('');
+  }
+
+  // a lista como texto puro: WhatsApp, ou colar onde quiser
+  function textoDaRua() {
+    var linhas = ['Rebrota — na rua · ' + M.formatarData(M.hoje()), ''];
+    M.tarefasDaRua().forEach(function (t, i) {
+      var p = t.projetoId ? M.projeto(t.projetoId) : null;
+      linhas.push((i + 1) + '. ' + (t.texto || 'tarefa sem texto') + (p ? ' (' + p.nome + ')' : ''));
+      if (t.onde) linhas.push('   Onde: ' + t.onde);
+      if ((t.materiais || []).length) linhas.push('   Comprar: ' + t.materiais.join(', '));
+      if ((t.ferramentas || []).length) linhas.push('   Levar: ' + t.ferramentas.join(', '));
+      if (M.recadoDe(t.id)) linhas.push('   Detalhes: ' + M.recadoDe(t.id));
+      linhas.push('');
+    });
+    return linhas.join('\n');
   }
 
   /* "VAI SAIR" É UM ESTADO, não uma tela de passagem: na bota, recarregar o
@@ -3095,6 +3134,14 @@
       return desenharPalco();
     }
     if (acao === 'ir-rua') { tela = { tipo: 'rua', id: null }; entrarNaRua(); return desenhar(); }
+    if (acao === 'rua-riscar') { M.alternarConferido(tid, el.getAttribute('data-valor')); return desenharPalco(); }
+    if (acao === 'rua-copiar') {
+      var textoRua = textoDaRua();
+      function copiou() { el.textContent = 'copiado'; setTimeout(function () { el.textContent = 'copiar a lista'; }, 1500); }
+      if (navigator.clipboard) navigator.clipboard.writeText(textoRua).then(copiou, function () { prompt('Copie:', textoRua); });
+      else prompt('Copie:', textoRua);
+      return;
+    }
     if (acao === 'rua-feita') {
       M.terminar('pe_eu', tid, ''); M.limparKit(tid); colherAvisos();
       if (!M.tarefasDaRua().length) sairDaRua();   // acabou a rua: o próximo abrir é a entrada
@@ -3894,6 +3941,20 @@
   voltarAoLugar();
   // a bota abre na entrada, de propósito — salvo se você disse que ia sair e a rua ainda tem coisa
   if (!naMesa() && aindaNaRua()) tela = { tipo: 'rua', id: null };
+  /* Atalhos do ícone (manifest §51): segurar o ícone no celular → direto ao
+     lugar. A URL é limpa em seguida para o F5 não repetir o salto. */
+  var atalho = /[?&]atalho=([a-z]+)/.exec(location.search);
+  if (atalho) {
+    try { history.replaceState(null, '', location.pathname); } catch (e) {}
+    if (atalho[1] === 'rua' && M.tarefasDaRua().length) { tela = { tipo: 'rua', id: null }; entrarNaRua(); }
+    if (atalho[1] === 'semente') setTimeout(alternarSemear, 0);
+    if (atalho[1] === 'tarefa') {
+      setTimeout(function () {
+        $campo.hidden = false;
+        Campo.abrir($campoTela, naMesa() ? { local: 'computador' } : null, sairDoCampo);
+      }, 0);
+    }
+  }
   // a nuvem carrega o token ANTES do primeiro desenho: senão a entrada dizia
   // "não sincroniza" com o painel dizendo "sincronizado às…"
   Sync.iniciar();

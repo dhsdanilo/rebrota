@@ -10,7 +10,52 @@
   "theme_color": "#0F1A17",
   "lang": "pt-BR",
   "icons": [
-    { "src": "./icone.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
-    { "src": "./icone-mascara.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+    {
+      "src": "./icone.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "./icone-mascara.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Encontrar tarefa",
+      "url": "./index.html?atalho=tarefa",
+      "icons": [
+        {
+          "src": "./icone.svg",
+          "sizes": "any",
+          "type": "image/svg+xml"
+        }
+      ]
+    },
+    {
+      "name": "Na rua",
+      "url": "./index.html?atalho=rua",
+      "icons": [
+        {
+          "src": "./icone.svg",
+          "sizes": "any",
+          "type": "image/svg+xml"
+        }
+      ]
+    },
+    {
+      "name": "Plantar semente",
+      "url": "./index.html?atalho=semente",
+      "icons": [
+        {
+          "src": "./icone-semente.svg",
+          "sizes": "any",
+          "type": "image/svg+xml"
+        }
+      ]
+    }
   ]
 }
