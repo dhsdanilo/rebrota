@@ -522,7 +522,8 @@ select option { background: var(--mata); color: var(--neblina); }
 .cofre-saldo { margin: 0; }
 /* os dois valores do custo no mesmo corpo: são a mesma coisa (dinheiro), lado a lado */
 .valor-lido.valor-dinheiro, .cofre-saldo { font-family: var(--display); font-size: 22px; line-height: 1.2; color: var(--neblina); }
-.bt-mini.custo-bt { margin-top: 6px; align-self: flex-start; padding-left: 0; }
+/* alinhado ao valor pela MARGEM negativa, não tirando o respiro: no hover a moldura fica inteira */
+.bt-mini.custo-bt { margin-top: 6px; align-self: flex-start; margin-left: -9px; }
 .cofre-historico { max-height: 180px; overflow-y: auto; }
 .cofre-acoes .bt-icone-mini { width: auto; height: auto; padding: 3px 7px; }
 .bt-icone-mini svg { width: 14px; height: 14px; }
