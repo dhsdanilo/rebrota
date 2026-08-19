@@ -16,6 +16,7 @@ var CASCO = [
   './index.html',
   './app.css',
   './modelo.js',
+  './tempo.js',
   './sync.js',
   './motor.js',
   './dados.js',
