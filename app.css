@@ -731,13 +731,14 @@ button, input, select, textarea {
 .envelope-largo { max-width: 420px; margin-bottom: 16px; }
 
 /* o custo de um projeto rodando é curiosidade, não decisão: uma linha, quieta */
-.palco-custo {
-  display: block;
-  margin-top: 4px;
-  font-family: var(--mono);
-  font-size: 11px;
-  color: var(--neblina-fraca);
+/* o cabeçalho da ficha: nome grande, o destino como legenda, e a escrituração
+   em mono miúdo, uma linha por fato, com ar entre os três planos */
+.palco-meta {
+  display: flex; flex-direction: column; gap: 5px;
+  margin: 14px 0 0;
+  font-family: var(--mono); font-size: 11.5px; letter-spacing: .02em; color: var(--neblina-fraca);
 }
+.palco-custo { color: var(--casca); }
 
 /* As três vagas e os três degraus da fila, reconhecíveis de relance */
 .pino {
@@ -951,8 +952,8 @@ button, input, select, textarea {
   margin-left: -6px;
 }
 
-.titulo-obra { font-size: 26px; font-weight: 500; }
-.titulo-resultado { font-size: 17px; color: var(--neblina-fraca); margin-bottom: 6px; }
+.titulo-obra { font-size: 30px; font-weight: 500; line-height: 1.15; }
+.titulo-resultado { font-size: 17px; color: var(--neblina-fraca); margin-top: 2px; }
 
 .titulo-obra[readonly], .titulo-resultado[readonly] { cursor: default; }
 
@@ -1241,7 +1242,7 @@ input[type="number"][readonly] { -moz-appearance: textfield; }
   align-items: center;
   flex-wrap: wrap;
   gap: 10px;
-  margin-top: 18px;
+  margin-top: 22px;
 }
 
 .bt-acao { padding: 6px 16px; }

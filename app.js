@@ -576,16 +576,17 @@
               ' data-alvo="projeto" data-id="' + p.id + '" data-campo="resultado"' +
               ' value="' + esc(p.resultado) + '">'
             : ''),
-          '<p class="palco-sub">' + esc(trancado || ondeParou(p.id)) +
-            /* Num projeto rodando o envelope já disparou e some — mas quanto a
-               obra custou continua sendo curiosidade legítima. Fica aqui, numa
-               linha só, sem barra e sem campo. */
+          /* A escrituração do cabeçalho, em mono miúdo e uma linha por fato:
+             quanto foi orçado (só na obra rodando — o envelope já disparou e
+             some, mas quanto custou é curiosidade legítima) e onde parou. */
+          '<div class="palco-meta">' +
             ((p.papel === 'titular' || p.papel === 'reserva' ||
               p.estado === 'concluido' || p.estado === 'encerrado') &&
              p.custoEstimado !== null && p.custoEstimado !== undefined && Number(p.custoEstimado) > 0
               ? '<span class="palco-custo">orçado em ' + esc(M.moeda(p.custoEstimado)) + '</span>'
               : '') +
-          '</p>',
+            '<span class="palco-onde">' + esc(trancado || ondeParou(p.id)) + '</span>' +
+          '</div>',
           barraAcoes(p),
         '</div>',
         consulta ? '<span class="selo-consulta">consulta</span>'
@@ -1228,6 +1229,8 @@
        registro. Muda também não adiciona (detalhar é da vaga de planejamento). */
     var executando = p.papel === 'titular' || p.papel === 'reserva';
     var podeAdicionar = !emConsulta(p.id) && p.estado !== 'fila' && !(etapa === 'planejamento' && executando);
+    // obra rodando sem nenhuma tarefa de planejamento: a seção não tem o que dizer
+    if (etapa === 'planejamento' && executando && !tarefas.length) return '';
 
     return '<div class="secao secao-etapa' + (travada ? ' secao-travada' : '') +
       (recolhido ? ' secao-recolhida' : '') + '">' +
