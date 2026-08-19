@@ -2003,7 +2003,7 @@
     });
 
     if (travado) {
-      return '<div class="fichas">' + (fichas || '<span class="aviso">Sem vínculo duro.</span>') + '</div>';
+      return '<div class="fichas">' + (fichas || '<span class="aviso">Sem dependência.</span>') + '</div>';
     }
 
     var seletor = candidatas.length
@@ -2016,7 +2016,7 @@
           '<button type="button" class="bt-fraco" data-acao="por-dep" data-id="' + t.id + '">vincular</button></div>'
       : '<p class="aviso">Nenhuma outra tarefa para vincular.</p>';
 
-    return '<div class="fichas">' + (fichas || '<span class="aviso">Sem vínculo duro.</span>') +
+    return '<div class="fichas">' + (fichas || '<span class="aviso">Sem dependência.</span>') +
       '</div>' + seletor;
   }
 
