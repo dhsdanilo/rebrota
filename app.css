@@ -512,6 +512,9 @@ button, input, select, textarea {
 .cofre-saldo { margin: 0; font-family: var(--display); font-size: 22px; color: var(--neblina); }
 .valor-dinheiro { font-family: var(--display); font-size: 22px; }
 .cofre-historico { max-height: 180px; overflow-y: auto; }
+.bt-icone-mini { width: 28px; height: 28px; }
+.bt-icone-mini svg { width: 15px; height: 15px; }
+.bt-icone-on { border-color: var(--rebrota); color: var(--neblina); }
 .cofre-saldo span { font-size: 13px; color: var(--neblina-fraca); font-family: var(--corpo); margin-left: 4px; }
 .cofre-acoes, .cofre-caixa { display: flex; gap: 6px; align-items: center; }
 .cofre-caixa input { width: 120px; background: var(--mata); border: 1px solid var(--musgo); border-radius: var(--raio); color: var(--neblina); padding: 5px 8px; font-size: 14px; }
@@ -795,7 +798,11 @@ button, input, select, textarea {
 
 /* ── barra do envelope ──────────────────────────────── */
 
-.envelope { margin-top: 6px; }
+/* são spans (cabem dentro de botão), mas precisam empilhar: sem display block a
+   barra de 4 px não tinha altura nenhuma e sumia */
+.envelope { display: block; margin-top: 6px; }
+.envelope-valor { display: block; }
+.envelope-barra { display: block; }
 
 .envelope-valor {
   font-family: var(--mono);
@@ -804,7 +811,7 @@ button, input, select, textarea {
 }
 
 .envelope-barra {
-  height: 4px;
+  height: 5px;
   background: var(--musgo);
   border-radius: 2px;
   margin-top: 4px;

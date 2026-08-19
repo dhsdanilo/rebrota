@@ -894,12 +894,16 @@
           : '<div class="cofre-acoes">' +
               '<button type="button" class="bt-fraco bt-mini" data-acao="cofre-abrir" data-valor="aportar" data-id="' + p.id + '">aportar</button>' +
               (saldo > 0 ? '<button type="button" class="bt-linha bt-mini" data-acao="cofre-abrir" data-valor="retirar" data-id="' + p.id + '">retirar</button>' : '') +
+              // o histórico atrás de um ícone: trinta aportes não podem virar uma coluna
+              (aportes.length
+                ? '<button type="button" class="bt-icone bt-icone-mini' + (cofreHistorico === p.id ? ' bt-icone-on' : '') + '" data-acao="cofre-historico" data-id="' + p.id + '"' +
+                  ' aria-label="histórico" title="Histórico do cofre · ' + aportes.length + (aportes.length === 1 ? ' movimento' : ' movimentos') + '">' +
+                  '<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+                  '<path d="M3.5 10a6.5 6.5 0 1 0 1.9-4.6"/><path d="M3.5 3.5v3h3"/><path d="M10 6.5V10l2.5 1.5"/></svg></button>'
+                : '') +
             '</div>') +
-      // o histórico fica atrás de um toque: trinta aportes não podem virar uma coluna
       (aportes.length
-        ? '<button type="button" class="bt-linha bt-mini cofre-hist-bt" data-acao="cofre-historico" data-id="' + p.id + '">' +
-            (cofreHistorico === p.id ? 'esconder o histórico' : 'histórico · ' + aportes.length) + '</button>' +
-          (cofreHistorico === p.id
+        ? (cofreHistorico === p.id
             ? '<ul class="cofre-historico">' + aportes.map(function (a) {
                 return '<li>' + esc(M.formatarData(M.diaDe(a.quando))) + ' · ' +
                   (a.valor > 0 ? '+' : '−') + esc(M.moeda(Math.abs(a.valor))) + '</li>';
