@@ -2279,7 +2279,7 @@ input[type="number"][readonly] { -moz-appearance: textfield; }
 .c-confirma { text-align: center; }
 .c-confirma .c-titulo { margin-bottom: 10px; }
 .c-confirma-resumo { margin: 0 0 28px; }
-.c-confirma .c-bt-largo { margin-top: 10px; width: 100%; min-height: 52px; font-size: 16px; }
+.c-confirma .c-bt-largo { margin-top: 10px; width: 100%; min-height: 52px; font-size: 16px; text-align: center; }
 
 /* o que a cascata moveu, dito uma vez, em cima da próxima resposta */
 .c-aviso {
