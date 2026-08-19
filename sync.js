@@ -120,7 +120,8 @@ var Sync = (function () {
 
   function escreverGist(id, arquivos) {
     var files = {};
-    Object.keys(arquivos).forEach(function (n) { files[n] = { content: arquivos[n] }; });
+    // conteúdo null apaga o arquivo do Gist (é assim que a API faz)
+    Object.keys(arquivos).forEach(function (n) { files[n] = arquivos[n] === null ? null : { content: arquivos[n] }; });
     return pedir('PATCH', '/gists/' + id, { files: files });
   }
 
@@ -132,6 +133,41 @@ var Sync = (function () {
 
   /* Baixa tudo, junta com o local, sobe o que este aparelho tem direito de
      escrever. Uma passada só; quem chamou de novo no meio espera a próxima. */
+  /* CÓPIA AUTOMÁTICA (§47): uma vez por dia a mesa deixa o export inteiro
+     (catálogo + diários) num segundo Gist privado, `rebrota-copias`, como
+     `copia-AAAA-MM-DD.json`, e guarda as últimas sete. É o paraquedas que ele
+     não precisa lembrar de puxar. Falha aqui não derruba a sincronização. */
+  var DESCRICAO_COPIAS = 'rebrota-copias';
+  var aoCopiar = null;
+  function quandoCopiar(fn) { aoCopiar = fn; }
+
+  function acharGistCopias() {
+    if (cfg.gistCopias) return Promise.resolve(cfg.gistCopias);
+    return pedir('GET', '/gists?per_page=100').then(function (lista) {
+      var meu = (lista || []).filter(function (g) { return g.description === DESCRICAO_COPIAS; })[0];
+      if (meu) { cfg.gistCopias = meu.id; salvarCfg(); return meu.id; }
+      return pedir('POST', '/gists', {
+        description: DESCRICAO_COPIAS, public: false,
+        files: { 'leia-me.txt': { content: 'Cópias diárias do Rebrota — as últimas sete. Não edite à mão.' } }
+      }).then(function (g) { cfg.gistCopias = g.id; salvarCfg(); return g.id; });
+    });
+  }
+  function fazerCopiaDoDia() {
+    var hoje = M.hoje();
+    return acharGistCopias().then(function (id) {
+      return pedir('GET', '/gists/' + id).then(function (g) {
+        var files = {};
+        files['copia-' + hoje + '.json'] = { content: M.exportar() };
+        Object.keys(g.files || {}).filter(function (n) { return /^copia-\d{4}-\d{2}-\d{2}\.json$/.test(n) && n !== 'copia-' + hoje + '.json'; })
+          .sort().reverse().slice(6).forEach(function (n) { files[n] = null; });   // fica com 7
+        return pedir('PATCH', '/gists/' + id, { files: files });
+      });
+    }).then(function () {
+      cfg.ultimaCopia = hoje; salvarCfg();
+      if (aoCopiar) aoCopiar();
+    }).catch(function () { /* a cópia tenta de novo na próxima; a sincronização segue */ });
+  }
+
   function sincronizar() {
     if (!ligado() || !navigator.onLine) return Promise.resolve(false);
     if (estado.ocupado) { sujouNoMeio = true; return Promise.resolve(false); }
@@ -155,26 +191,22 @@ var Sync = (function () {
            - senão, o daqui é o mais novo: sobe.
            Quem não é mesa aceita o de lá, salvo se o daqui for mais novo (foi
            mesa há pouco e ainda não subiu) — aí espera. */
+      /* §47: o de lá se JUNTA ao daqui, item a item — em todo aparelho. Nada
+         que só exista de um lado se perde. Antes de juntar, uma foto do daqui
+         fica guardada (rede de segurança: "voltar ao de antes" no painel).
+         A mesa sobe o resultado quando ele difere do de lá; quem não é mesa
+         só junta. */
       var remoto = lerJson(arquivos['catalogo.json']);
       var remotoValido = remoto && typeof remoto === 'object';
-      var vLa = remotoValido ? M.versaoDoCatalogo(remoto) : -1;
-      var vAqui = M.versaoDoCatalogo();
-      if (papel.escreveCatalogo) {
-        /* A versão manda. A "primeira vez como mesa" só desempata quando as
-           versões são iguais (aí o de lá pode ser o mesmo ou melhor): se o
-           daqui é MAIS NOVO, ele sobe mesmo sendo a primeira vez — senão,
-           religar o token depois de um sumiço jogaria fora o que se editou. */
-        var aceitarDeLa = remotoValido && !M.catalogoVazio(remoto) &&
-          (vLa > vAqui || M.catalogoVazio() || (!cfg.jaFoiMesa && vLa === vAqui));
-        if (aceitarDeLa) {
-          if (M.receberCatalogo(remoto)) mudouLocal = true;
-        } else {
-          var meu = JSON.stringify(M.cat());
-          if (!remotoValido || JSON.stringify(remoto) !== meu) subir['catalogo.json'] = meu;
-        }
-        if (!cfg.jaFoiMesa) { cfg.jaFoiMesa = true; salvarCfg(); }
-      } else if (remotoValido && vLa >= vAqui) {
+      if (remotoValido) {
+        M.fotografarCatalogo();
         if (M.receberCatalogo(remoto)) mudouLocal = true;
+      }
+      if (papel.escreveCatalogo) {
+        var meu = JSON.stringify(M.cat());
+        if (!remotoValido || JSON.stringify(remoto) !== meu) subir['catalogo.json'] = meu;
+        if (!cfg.jaFoiMesa) { cfg.jaFoiMesa = true; salvarCfg(); }
+
       }
 
       // 2. diários: união por id, para cada pessoa que existir de um lado ou do outro
@@ -196,6 +228,9 @@ var Sync = (function () {
       var idGist = cfg.gistId;
       if (Object.keys(subir).length) return escreverGist(idGist, subir);
       return null;
+    }).then(function () {
+      // a cópia do dia vai num Gist à parte, para não pesar a sincronização de 2 em 2 min
+      if (papel.escreveCatalogo && cfg.ultimaCopia !== M.hoje()) return fazerCopiaDoDia();
     }).then(function () {
       estado.ultimo = new Date().toISOString();
       estado.ocupado = false;
@@ -245,7 +280,7 @@ var Sync = (function () {
 
   return {
     iniciar: iniciar, configurar: configurar, ouvir: ouvir,
-    ligado: ligado, ligar: ligar, desligar: desligar,
+    ligado: ligado, ligar: ligar, desligar: desligar, quandoCopiar: quandoCopiar,
     sincronizar: sincronizar, marcarSujo: marcarSujo, situacao: situacao
   };
 })();

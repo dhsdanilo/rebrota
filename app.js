@@ -3087,6 +3087,9 @@
      tira uma — em texto seco, sem alarme. É um fato, não uma cobrança. */
   var CHAVE_COPIA = 'app-sitio-ultima-copia';
 
+  // a cópia automática na nuvem conta como cópia: o aviso só cobra quem não tem nuvem
+  Sync.quandoCopiar(function () { localStorage.setItem(CHAVE_COPIA, M.hoje()); desenhar(); });
+
   function avisoDeCopia() {
     var quando = localStorage.getItem(CHAVE_COPIA);
     var dias = quando ? M.diasDesde(quando) : null;
@@ -3429,6 +3432,10 @@
     document.getElementById('btLigarNuvem').hidden = s.ligado;
     document.getElementById('btDesligarNuvem').hidden = !s.ligado;
     document.getElementById('btSincronizarAgora').hidden = !s.ligado;
+    var foto = M.fotoDoCatalogo();
+    var btFoto = document.getElementById('btVoltarFoto');
+    btFoto.hidden = !foto;
+    if (foto) btFoto.textContent = 'voltar ao de antes das ' + M.horaDe(new Date(foto.em));
     $nuvemToken.hidden = s.ligado;
     document.getElementById('nuvemComo').hidden = s.ligado;
     document.body.classList.toggle('sem-nuvem', !s.ligado);
@@ -3454,6 +3461,11 @@
   });
   document.getElementById('btSincronizarAgora').addEventListener('click', function () { Sync.sincronizar(); });
   document.getElementById('nuvemCarimbo').addEventListener('click', function () { Sync.sincronizar(); });
+  document.getElementById('btVoltarFoto').addEventListener('click', function () {
+    var mudou = M.voltarAFoto();
+    $nuvemEstado.textContent = mudou ? 'juntei o de antes ao de agora — e vai subir' : 'nada para voltar: já estava tudo aqui';
+    desenhar();
+  });
 
   Sync.configurar({ escreveCatalogo: naMesa(), pessoa: 'pe_eu' });
   window.matchMedia('(min-width: 721px)').addEventListener('change', function () {

@@ -154,6 +154,9 @@ var Modelo = (function () {
         sementes: [],
         // ids de sementes que nasceram como evento e a mesa já trouxe para cá
         absorvidas: [],
+        // o que foi APAGADO de propósito: { id, em }. Sem isto, o merge item a
+        // item (§47) ressuscitaria tudo que um aparelho apagou e o outro ainda tinha
+        apagados: [],
         // sobe a cada gravação que muda o catálogo: é o que impede um aparelho
         // com catálogo velho de escrever por cima do novo (§38)
         versao: 0
@@ -237,14 +240,73 @@ var Modelo = (function () {
 
   // ── sincronização: o que o modelo oferece ao Sync ────────────────
 
-  /* O catálogo que veio de fora substitui o daqui: só a mesa escreve, e este
-     aparelho não é a mesa. Devolve se mudou algo. */
+  /* O CATÁLOGO DE FORA SE JUNTA AO DAQUI, ITEM A ITEM (§47) — nunca substitui.
+     Três tarefas cadastradas com a nuvem desligada sumiram quando ela religou,
+     porque o catálogo inteiro era trocado pelo de lá. Agora:
+       - item que só existe de um lado fica (salvo lápide: apagado de propósito);
+       - item que existe dos dois lados: vence o de `ultimoToque` mais recente;
+       - listas de ids (absorvidas, apagados) são união; versão é o maior.
+     Vale para quem é mesa e para quem não é. Devolve se mudou algo daqui. */
+  var COLECOES_MERGE = ['projetos', 'tarefas', 'pendencias', 'sementes', 'pessoas'];
   function receberCatalogo(remoto) {
-    var novo = costurar({ catalogo: remoto, diarios: estado.diarios, bilhete: estado.bilhete });
-    if (JSON.stringify(novo.catalogo) === JSON.stringify(estado.catalogo)) return false;
-    estado.catalogo = novo.catalogo;
+    var antes = JSON.stringify(estado.catalogo);
+    var deLa = costurar({ catalogo: remoto }).catalogo;
+    var meu = estado.catalogo;
+
+    // lápides dos dois lados, a mais recente por id
+    var lapides = {};
+    (meu.apagados || []).concat(deLa.apagados || []).forEach(function (l) {
+      if (!lapides[l.id] || lapides[l.id] < l.em) lapides[l.id] = l.em;
+    });
+    function apagadoDepois(item) {
+      var em = lapides[item.id];
+      return !!em && em >= (item.ultimoToque || item.criadoEm || item.criadaEm || item.desde || '');
+    }
+
+    COLECOES_MERGE.forEach(function (k) {
+      var porId = {};
+      (meu[k] || []).forEach(function (x) { porId[x.id] = x; });
+      (deLa[k] || []).forEach(function (x) {
+        var aqui = porId[x.id];
+        if (!aqui) { porId[x.id] = x; return; }
+        var tAqui = aqui.ultimoToque || '', tLa = x.ultimoToque || '';
+        if (tLa > tAqui) porId[x.id] = x;      // o de lá é mais novo
+      });
+      // ordem: a daqui primeiro, depois o que só veio de lá — e fora o que foi apagado
+      var ordem = (meu[k] || []).map(function (x) { return x.id; });
+      (deLa[k] || []).forEach(function (x) { if (ordem.indexOf(x.id) === -1) ordem.push(x.id); });
+      meu[k] = ordem.map(function (id) { return porId[id]; }).filter(function (x) { return x && !apagadoDepois(x); });
+    });
+
+    var uni = {};
+    (meu.absorvidas || []).concat(deLa.absorvidas || []).forEach(function (id) { uni[id] = true; });
+    meu.absorvidas = Object.keys(uni);
+    meu.apagados = Object.keys(lapides).map(function (id) { return { id: id, em: lapides[id] }; });
+    meu.versao = Math.max(Number(meu.versao) || 0, Number(deLa.versao) || 0);
+
+    if (JSON.stringify(meu) === antes) return false;
     silencio = true; salvar(); silencio = false;
     return true;
+  }
+
+  // a foto do catálogo antes da última sincronização que mudou algo: a rede de segurança
+  var CHAVE_FOTO = 'app-sitio-v3-antes-da-nuvem';
+  function fotografarCatalogo() {
+    try { localStorage.setItem(CHAVE_FOTO, JSON.stringify({ em: agora(), catalogo: estado.catalogo })); } catch (e) {}
+  }
+  function fotoDoCatalogo() {
+    try { return JSON.parse(localStorage.getItem(CHAVE_FOTO)); } catch (e) { return null; }
+  }
+  /* Voltar à foto não substitui: JUNTA a foto ao que está — assim o que veio
+     depois não se perde, e o que a foto tinha volta. */
+  function voltarAFoto() {
+    var f = fotoDoCatalogo();
+    if (!f || !f.catalogo) return false;
+    var mudou = receberCatalogo(f.catalogo);
+    // o que voltou precisa subir: marca o catálogo como mais novo
+    estado.catalogo.versao = (Number(estado.catalogo.versao) || 0) + 1;
+    salvar();
+    return mudou;
   }
 
   // catálogo sem projeto, tarefa nem semente: nunca deve escrever por cima de um cheio
@@ -1416,7 +1478,14 @@ var Modelo = (function () {
     return t;
   }
 
+  function lapide(id) {
+    cat().apagados = (cat().apagados || []).filter(function (l) { return l.id !== id; });
+    cat().apagados.push({ id: id, em: agora() });
+  }
+
   function removerProjeto(pid) {
+    lapide(pid);
+    cat().tarefas.filter(function (t) { return t.projetoId === pid; }).forEach(function (t) { lapide(t.id); });
     cat().projetos = cat().projetos.filter(function (p) { return p.id !== pid; });
     cat().tarefas = cat().tarefas.filter(function (t) { return t.projetoId !== pid; });
     cat().projetos.forEach(function (p) {
@@ -1427,6 +1496,7 @@ var Modelo = (function () {
 
   function removerTarefa(tid) {
     var era = tarefa(tid);
+    lapide(tid);
     cat().tarefas = cat().tarefas.filter(function (t) { return t.id !== tid; });
     cat().tarefas.forEach(function (t) {
       t.dependeDe = (t.dependeDe || []).filter(function (d) { return d !== tid; });
@@ -2166,6 +2236,7 @@ var Modelo = (function () {
 
     // sincronização
     quandoSalvar: quandoSalvar, receberCatalogo: receberCatalogo, unirDiario: unirDiario,
+    fotografarCatalogo: fotografarCatalogo, fotoDoCatalogo: fotoDoCatalogo, voltarAFoto: voltarAFoto,
     catalogoVazio: catalogoVazio, versaoDoCatalogo: versaoDoCatalogo, relerSeOutraAbaGravou: relerSeOutraAbaGravou,
     usoIniciar: usoIniciar, usoTela: usoTela, usoFechar: usoFechar, usoRetomar: usoRetomar,
     usoAtividade: usoAtividade, usoVerificarOcio: usoVerificarOcio,
