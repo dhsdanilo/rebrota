@@ -647,7 +647,7 @@
                            'o app diz "sem orçamento levantado".' }) +
                 (solto ? '' : '<button type="button" class="bt-forte bt-mini" data-acao="custo-ok">ok</button>') +
                 '</div>'
-              : '<div class="campo"><label>Custo estimado</label><p class="valor-lido">' +
+              : '<div class="campo"><label>Custo estimado</label><p class="valor-lido valor-dinheiro">' +
                 (p.custoEstimado !== null && p.custoEstimado !== undefined
                   ? esc(M.moeda(p.custoEstimado)) : '<span class="aviso">sem orçamento ainda</span>') +
                 (consulta ? '' : ' <button type="button" class="bt-linha bt-mini" data-acao="custo-editar" data-id="' + p.id + '">' +
@@ -876,6 +876,7 @@
      editar (aportar é rotina), mas não do modo consulta. */
   var cofreAberto = null;   // { pid, modo: 'aportar' | 'retirar' }
   var custoEditando = null; // projeto com o custo estimado solto para edição
+  var cofreHistorico = null; // projeto com o histórico do cofre aberto
   function cofre(p, consulta) {
     var saldo = Number(p.guardado) || 0;
     var aportes = M.aportesDe(p.id);
@@ -893,11 +894,16 @@
               '<button type="button" class="bt-fraco bt-mini" data-acao="cofre-abrir" data-valor="aportar" data-id="' + p.id + '">aportar</button>' +
               (saldo > 0 ? '<button type="button" class="bt-linha bt-mini" data-acao="cofre-abrir" data-valor="retirar" data-id="' + p.id + '">retirar</button>' : '') +
             '</div>') +
+      // o histórico fica atrás de um toque: trinta aportes não podem virar uma coluna
       (aportes.length
-        ? '<ul class="cofre-historico">' + aportes.slice(0, 5).map(function (a) {
-            return '<li>' + esc(M.formatarData(M.diaDe(a.quando))) + ' · ' +
-              (a.valor > 0 ? '+' : '−') + esc(M.moeda(Math.abs(a.valor))) + '</li>';
-          }).join('') + (aportes.length > 5 ? '<li class="aviso">e mais ' + (aportes.length - 5) + '</li>' : '') + '</ul>'
+        ? '<button type="button" class="bt-linha bt-mini cofre-hist-bt" data-acao="cofre-historico" data-id="' + p.id + '">' +
+            (cofreHistorico === p.id ? 'esconder o histórico' : 'histórico · ' + aportes.length) + '</button>' +
+          (cofreHistorico === p.id
+            ? '<ul class="cofre-historico">' + aportes.map(function (a) {
+                return '<li>' + esc(M.formatarData(M.diaDe(a.quando))) + ' · ' +
+                  (a.valor > 0 ? '+' : '−') + esc(M.moeda(Math.abs(a.valor))) + '</li>';
+              }).join('') + '</ul>'
+            : '')
         : '') +
       '</div>';
   }
@@ -3001,6 +3007,7 @@
       return;
     }
     if (acao === 'cofre-fechar') { cofreAberto = null; return desenharPalco(); }
+    if (acao === 'cofre-historico') { cofreHistorico = cofreHistorico === tid ? null : tid; return desenharPalco(); }
     if (acao === 'cofre-confirmar') {
       var quanto = Number(valorDoCampo('cofre_' + tid));
       if (!quanto || quanto <= 0) { var cq = document.getElementById('cofre_' + tid); if (cq) cq.focus(); return; }
