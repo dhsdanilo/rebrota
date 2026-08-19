@@ -705,6 +705,9 @@ button, input, select, textarea {
 }
 
 .ficha-abrir:hover .ficha-nome { color: var(--casca); }
+/* o cartão inteiro responde ao mouse: contorno acende, não só o nome */
+.ficha-projeto:has(.ficha-abrir:hover) { border-color: var(--neblina-fraca); }
+.ficha-projeto { transition: border-color .12s ease; }
 .ficha-nome { display: block; font-size: 15px; }
 /* o resultado, embaixo do nome: o destino, na cor de destaque, como na ficha */
 /* o resultado como legenda do nome: serifa, cinza — a casca virava alerta em texto corrido.
