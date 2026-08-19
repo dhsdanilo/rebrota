@@ -3458,8 +3458,21 @@
     if (projetoEditando) { projetoEditando = null; desenharPalco(); }
   });
 
-  document.getElementById('btExportar').addEventListener('click', exportar);
+  // os menus da barra: abre um, fecha o outro; clique fora fecha
+  function fecharMenus() { document.querySelectorAll('.menu-ferramenta').forEach(function (m) { m.hidden = true; }); }
+  document.querySelectorAll('[data-menu]').forEach(function (b) {
+    b.addEventListener('click', function (e) {
+      e.stopPropagation();
+      var m = document.getElementById(b.getAttribute('data-menu') === 'arquivo' ? 'menuArquivo' : 'menuCelular');
+      var estava = !m.hidden;
+      fecharMenus();
+      m.hidden = estava;
+    });
+  });
+  document.addEventListener('click', function (e) { if (!e.target.closest('.ferramenta-menu')) fecharMenus(); });
+  document.getElementById('btExportar').addEventListener('click', function () { fecharMenus(); exportar(); });
   document.getElementById('btImportar').addEventListener('click', function () {
+    fecharMenus();
     document.getElementById('arquivoImportar').click();
   });
   document.getElementById('arquivoImportar').addEventListener('change', function (e) {

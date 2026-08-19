@@ -14,7 +14,7 @@
 <link rel="apple-touch-icon" href="icone.svg">
 <!-- ?v= sobe a cada mudança: sem isso o navegador serve o arquivo velho do
      cache e a correção parece não ter funcionado -->
-<link rel="stylesheet" href="app.css?v=100">
+<link rel="stylesheet" href="app.css?v=101">
 </head>
 <body>
 
@@ -123,20 +123,20 @@
 <div class="ferramentas">
   <!-- carimbo da última sincronização: texto, antes dos botões -->
   <span class="nuvem-carimbo" id="nuvemCarimbo" hidden></span>
-  <button type="button" class="bt-icone" id="btExportar" aria-label="exportar"
-          title="Baixar tudo em JSON — o paraquedas: você nunca fica refém do app.">
-    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"
-         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      <path d="M10 3v9"/><path d="M6.5 8.5 10 12l3.5-3.5"/><path d="M4 15.5h12"/>
-    </svg>
-  </button>
-  <button type="button" class="bt-icone" id="btImportar" aria-label="importar"
-          title="Ler um arquivo JSON. Nada é gravado antes de você ver o que muda.">
-    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"
-         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      <path d="M10 12V3"/><path d="M6.5 6.5 10 3l3.5 3.5"/><path d="M4 15.5h12"/>
-    </svg>
-  </button>
+  <!-- arquivo: exportar e importar, num botão só com um menu -->
+  <span class="ferramenta-menu">
+    <button type="button" class="bt-icone" data-menu="arquivo" aria-label="arquivo"
+            title="Arquivo: baixar tudo em JSON (o paraquedas) ou ler um JSON.">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M3 6.5a1.5 1.5 0 0 1 1.5-1.5H8l1.6 1.8H15.5A1.5 1.5 0 0 1 17 8.3v6.2a1.5 1.5 0 0 1-1.5 1.5h-11A1.5 1.5 0 0 1 3 14.5z"/>
+      </svg>
+    </button>
+    <div class="menu-ferramenta" id="menuArquivo" hidden>
+      <button type="button" id="btExportar">exportar (baixar JSON)</button>
+      <button type="button" id="btImportar">importar um JSON</button>
+    </div>
+  </span>
   <input type="file" id="arquivoImportar" accept="application/json" hidden>
   <button type="button" class="bt-icone" data-acao="nuvem" aria-label="sincronização"
           title="Sincronizar este aparelho com os outros — celular, mesa e a tela de sementes.">
@@ -145,25 +145,21 @@
       <path d="M6 15.5h8.5a3 3 0 0 0 .4-6 4.5 4.5 0 0 0-8.7-1.2A3.6 3.6 0 0 0 6 15.5z"/>
     </svg>
   </button>
-  <!-- bancada provisória: ver o app em tamanho de celular sem celular -->
-  <a class="bt-icone" href="celular.html" target="_blank" aria-label="prova de celular"
-     title="Abrir o app em tamanho de celular, para lapidar o desenho.">
-    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"
-         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      <rect x="6" y="2.5" width="8" height="15" rx="1.8"/><path d="M9 15.2h2"/>
-    </svg>
-  </a>
-  <!-- bancada provisória: a Sementeira, tela da esposa, na mesma moldura — para
-       testar sem pedir o celular dela emprestado -->
-  <a class="bt-icone" href="celular.html?tela=semear" target="_blank" aria-label="prova da sementeira"
-     title="Abrir a Sementeira em tamanho de celular. Semente plantada aqui é de verdade.">
-    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"
-         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      <path d="M10 17V9.5"/><path d="M10 9.5c-.4-3.2-2.4-4.9-5.5-5 .2 3.2 2.1 5 5.5 5z"/>
-      <path d="M10 9.5c.4-3.2 2.4-4.9 5.5-5-.2 3.2-2.1 5-5.5 5z"/>
-    </svg>
-  </a>
-  <button type="button" class="bilhete-bt" id="btBilhete" aria-label="anotar sobre o app">✎</button>
+  <!-- bancada: o app e a Sementeira em moldura de celular, num botão só -->
+  <span class="ferramenta-menu">
+    <button type="button" class="bt-icone" data-menu="celular" aria-label="prova de celular"
+            title="Ver em tamanho de celular: o app (bota) ou a Sementeira.">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="6" y="2.5" width="8" height="15" rx="1.8"/><path d="M9 15.2h2"/>
+      </svg>
+    </button>
+    <div class="menu-ferramenta" id="menuCelular" hidden>
+      <a href="celular.html" target="_blank">o app, na bota</a>
+      <a href="celular.html?tela=semear" target="_blank">a Sementeira</a>
+    </div>
+  </span>
+  <button type="button" class="bilhete-bt" id="btBilhete" aria-label="anotações">✎</button>
 </div>
 
 <!-- sincronização: um token do GitHub, colado uma vez por aparelho. Fica só
@@ -206,11 +202,11 @@
   <ul class="bilhete-lista" id="bilheteLista"></ul>
 </div>
 
-<script src="modelo.js?v=100"></script>
-<script src="sync.js?v=100"></script>
-<script src="motor.js?v=100"></script>
-<script src="dados.js?v=100"></script>
-<script src="campo.js?v=100"></script>
-<script src="app.js?v=100"></script>
+<script src="modelo.js?v=101"></script>
+<script src="sync.js?v=101"></script>
+<script src="motor.js?v=101"></script>
+<script src="dados.js?v=101"></script>
+<script src="campo.js?v=101"></script>
+<script src="app.js?v=101"></script>
 </body>
 </html>
