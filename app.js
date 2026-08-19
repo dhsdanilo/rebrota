@@ -1246,19 +1246,19 @@
           : '') +
       '</div>' +
       (recolhido ? '' :
-        listaPassos(tarefas, etapa) +
         /* Detalhar é trabalho da vaga de planejamento — é o vazamento por onde
            o teto de três frentes escapava: dava para passar a tarde cadastrando
            tarefas de uma obra que não está em vaga nenhuma. */
-        (emConsulta(p.id) ? ''
-          : p.estado === 'fila'
-          ? '<p class="aviso" style="margin-top:14px">Detalhar é trabalho da vaga de planejamento.</p>'
-          : !podeAdicionar
-          ? ''
-          : '<div class="rodape-acoes">' +
-            '<button type="button" class="bt-fraco" data-acao="nova-tarefa" data-id="' + p.id +
-            '" data-etapa="' + etapa + '">adicionar tarefa</button>' +
-          '</div>')) +
+        listaPassos(tarefas, etapa,
+          emConsulta(p.id) ? ''
+            : p.estado === 'fila'
+            ? '<p class="aviso" style="margin-top:14px">Detalhar é trabalho da vaga de planejamento.</p>'
+            : !podeAdicionar
+            ? ''
+            : '<div class="rodape-acoes">' +
+              '<button type="button" class="bt-fraco" data-acao="nova-tarefa" data-id="' + p.id +
+              '" data-etapa="' + etapa + '">adicionar tarefa</button>' +
+            '</div>')) +
       '</div>';
   }
 
@@ -1314,12 +1314,12 @@
         botaoFiltroAvulsas('', 'todas'),
         FILTROS_AVULSAS.map(function (g) { return botaoFiltroAvulsas(g.chave, g.t); }).join(''),
       '</div>',
-      listaPassos(lista),
-      emConsulta(null) ? '' :
-      '<div class="rodape-acoes">' +
-        '<button type="button" class="bt-forte" data-acao="novo-passo" data-id="">adicionar tarefa</button>' +
-        deSemente() +
-      '</div>'
+      listaPassos(lista, null,
+        emConsulta(null) ? '' :
+        '<div class="rodape-acoes">' +
+          '<button type="button" class="bt-forte" data-acao="novo-passo" data-id="">adicionar tarefa</button>' +
+          deSemente() +
+        '</div>')
     ].join('');
   }
 
@@ -1358,11 +1358,13 @@
      da seção, sem a tira de marcas, e as abertas numeram de 1. */
   /* A lista existe mesmo vazia: é ela que recebe a tarefa arrastada da outra
      etapa. Sem isso, mover para um planejamento vazio seria impossível. */
-  function listaPassos(passos, etapa) {
+  /* `rodape` (o "adicionar tarefa") entra ANTES das feitas: o que já foi desce
+     para o pé e o botão não pode descer junto — senão some atrás do histórico. */
+  function listaPassos(passos, etapa, rodape) {
     if (!passos.length) {
       return '<ul class="passos passos-vazia" data-etapa="' + esc(etapa || '') + '">' +
         '<li class="passos-nada">Nenhuma tarefa aqui' +
-        (etapa ? ' — arraste uma da outra seção, ou adicione' : '') + '.</li></ul>';
+        (etapa ? ' — arraste uma da outra seção, ou adicione' : '') + '.</li></ul>' + (rodape || '');
     }
 
     var abertas = passos.filter(function (t) { return !fechada(t); });
@@ -1374,6 +1376,7 @@
     abertas.forEach(function (t, i) { numeros[t.id] = i + 1; });
 
     var html = abertas.map(function (t, i) { return marcacaoPasso(t, i + 1, numeros, etapa); }).join('');
+    if (rodape) html += '<li class="passos-rodape">' + rodape + '</li>';
     if (prontas.length) {
       var temFeita = prontas.some(function (t) { return M.estadoDe(t.id) === 'feita'; });
       var temCancelada = prontas.some(function (t) { return M.estadoDe(t.id) === 'encerrada'; });

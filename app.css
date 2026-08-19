@@ -1404,6 +1404,9 @@ input[type="number"][readonly] { -moz-appearance: textfield; }
 }
 
 /* o que já foi desce para o pé da seção e sai do caminho da leitura */
+.passos-rodape { list-style: none; }
+.passos-rodape .rodape-acoes { margin-top: 14px; margin-bottom: 6px; }
+
 .passos-divisor {
   font-family: var(--mono);
   font-size: 10px;
