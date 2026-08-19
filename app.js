@@ -200,8 +200,19 @@
   function itemProjeto(p) {
     var atual = tela.tipo === 'projeto' && tela.id === p.id;
     var r = M.etiquetaDe(p);
+    /* Toda vaga com a mesma anatomia: etiqueta, nome, UMA linha de escrituração.
+       Titular e reserva dizem "x de y tarefas feitas"; planejamento diz o que
+       falta (e a barra, se houver custo); muda diz plantando/pronta. Sem isso o
+       item de planejamento tinha três andares e os outros pareciam recolhidos. */
     var nota = M.motivoTrancado(p) ||
       (p.estado === 'preparo' ? M.oQueFaltaParaSubir(p) : '');
+    if (p.papel === 'titular' || p.papel === 'reserva') {
+      var passos = M.passosDe(p.id).filter(function (t) { return t.etapa === 'execucao' && M.estadoDe(t.id) !== 'encerrada'; });
+      var feitas = passos.filter(function (t) { return M.estadoDe(t.id) === 'feita'; }).length;
+      nota = passos.length ? feitas + ' de ' + passos.length + (passos.length === 1 ? ' tarefa feita' : ' tarefas feitas') : 'sem tarefas ainda';
+    } else if (p.estado === 'fila') {
+      nota = (p.muda.estado === 'pronta' ? 'pronta' : 'plantando') + (nota ? ' · ' + nota.replace(/\.$/, '') : '');
+    }
 
     return '<li><button type="button" class="item-projeto vaga-' + r.chave + '"' +
       ' data-abrir="projeto" data-id="' + p.id + '"' + (atual ? ' aria-current="true"' : '') + '>' +
