@@ -629,7 +629,7 @@
          quando o projeto está planejado. */
       !(p.papel === 'planejamento' || (p.estado === 'preparo' && !p.papel))
         ? ''
-        : grupo('Envelope', '',
+        : grupo('Custo', '',
             // a barra é a leitura; os campos são só o jeito de mexer nela
             (mostraEnvelope(p) ? '<div class="envelope-largo">' + barraEnvelope(p) + '</div>' : '') +
             // a muda estimou por cima; o orçamento de verdade é trabalho daqui
@@ -657,7 +657,7 @@
       (p.papel === 'titular' || p.papel === 'reserva' || p.estado === 'fila' || p.estado === 'descartado' ||
        p.estado === 'concluido' || p.estado === 'encerrado')
         ? ''
-        : grupo('Depende', '', fichasPrerequisitos(p, outros, !solto),
+        : grupo('Dependência', '', fichasPrerequisitos(p, outros, !solto),
             'Projetos que precisam estar concluídos antes deste. Enquanto faltar um, este fica ' +
             'com a porta trancada e o motivo aparece em texto seco na coluna da esquerda.'),
 
@@ -1110,7 +1110,7 @@
       nota = M.oQueFaltaParaSubir(p);
       // o cadeado tem que dizer o caminho: sem custo, o botão parece morto
       if (p.estado === 'preparo' && !p.papel && /orçamento/.test(nota || '')) {
-        nota += ' Preencha o custo estimado no Envelope — 0 se não custa nada — e o botão abre.';
+        nota += ' Preencha o custo estimado em Custo — 0 se não custa nada — e o botão abre.';
       }
       var idade = M.diasDesde(p.ultimoToque);
       if (p.estado === 'preparo' && !p.papel && idade >= 60) {
@@ -1749,7 +1749,7 @@
 
       blocoQuando(t, travado),
 
-      grupo('Depende', '', fichasDependencia(t, travado),
+      grupo('Dependência', '', fichasDependencia(t, travado),
         'Tarefas que precisam terminar antes desta. A ordem da lista é preferência sua e muda ' +
         'arrastando; isto aqui é lei, e o app segura a tarefa até as outras ficarem prontas. ' +
         'Usar demais engessa o projeto — vincule só o que é impossível fora de ordem.'),
