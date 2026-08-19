@@ -1483,7 +1483,7 @@
 
     var cond = [];
     var noSitioL = t.ondePrecisaEstar === 'sitio';
-    if (noSitioL && t.exigeClima !== 'indiferente') cond.push(t.exigeClima === 'firme' ? 'tempo firme' : 'tolera chuva fina');
+    if (t.ondePrecisaEstar !== 'computador' && t.exigeClima !== 'indiferente') cond.push(t.exigeClima === 'firme' ? 'tempo firme' : 'tolera chuva fina');
     if (t.podeNoCalor === false) cond.push('não no calor');
     if (t.exigeSoloFirme) cond.push('solo firme');
     if (t.guardadaParaChuva) cond.push('guardada para a chuva');
@@ -1602,7 +1602,7 @@
         'A avulsa que custa dinheiro espera o dinheiro, não o app. Mesmo desenho do envelope, em tamanho de tarefa.')) +
 
       grupo('Condições', '',
-        (!noSitio ? '' :
+        (noPc ? '' :
         linhaCond('Clima',
           'Como o tempo precisa estar. "Só com tempo firme" desaparece em qualquer chuva. ' +
           '"Tolera chuva fina" fica guardada para a segunda chamada, quando não sobrou nada limpo, ' +
@@ -1620,8 +1620,9 @@
         linhaCond('Precisa de chão firme?',
           'Para o que exige pisar sem atolar ou rodar carrinho de mão. Some nos dias em que você ' +
           'responde "barro" na consulta — e chuva forte já responde barro sozinha.',
-          campoBooleano('tarefa', t.id, 'exigeSoloFirme', t.exigeSoloFirme, travado)) +
+          campoBooleano('tarefa', t.id, 'exigeSoloFirme', t.exigeSoloFirme, travado))) +
 
+        (!noSitio ? '' :
         linhaCond('Guardar para a chuva?',
           'Trabalho que dá para fazer em qualquer dia, mas que vale a pena reservar para um dia ' +
           'de chuva. Fica fora do páreo enquanto o tempo está firme — a não ser que não haja mais ' +
@@ -2454,11 +2455,9 @@
 
     // o local decide o resto (§42): trocou, o que não se aplica volta ao neutro e a ficha redesenha
     if (chave === 'ondePrecisaEstar') {
-      if (valor !== 'sitio') {
-        obj.exigeClima = 'indiferente'; obj.podeNoCalor = true; obj.exigeSoloFirme = false;
-        obj.guardadaParaChuva = false; obj.esforco = 'leve';
-      }
+      if (valor !== 'sitio') { obj.guardadaParaChuva = false; obj.esforco = 'leve'; }
       if (valor === 'computador') {
+        obj.exigeClima = 'indiferente'; obj.podeNoCalor = true; obj.exigeSoloFirme = false;
         obj.precisaAjuda = false; obj.boaComCriancas = false; obj.perigosaComCriancas = false; obj.onde = '';
       }
       obj.ultimoToque = M.agora(); M.salvar();

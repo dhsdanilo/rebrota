@@ -106,8 +106,12 @@ var Motor = (function () {
     if (t.precisaAjuda && !s.ajuda) return false;
     if (s.criancas && t.perigosaComCriancas) return false;
 
-    // fora do sítio, clima e chão não dizem nada
-    if (s.local !== 'sitio') return true;
+    // no computador, clima e chão não dizem nada
+    if (s.local === 'computador') return true;
+    /* Fora também tem estrada precária e sol a pino (§42): clima, calor e chão
+       valem — com o tempo que a consulta já sabe do dia. Se o dia ainda não
+       tem clima (a primeira consulta foi "fora"), não se filtra no escuro. */
+    if (s.local === 'fora' && !s.tempo) return true;
 
     if (t.exigeSoloFirme && s.barro) return false;
 
