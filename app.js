@@ -2435,6 +2435,14 @@
       obj[chave] = valor;
     }
 
+    // boa com crianças e perigosa com crianças não coexistem: marcar uma desmarca a outra
+    if ((chave === 'boaComCriancas' || chave === 'perigosaComCriancas') && valor === true) {
+      var outra = chave === 'boaComCriancas' ? 'perigosaComCriancas' : 'boaComCriancas';
+      obj[outra] = false;
+      var caixa = $palco.querySelector('[data-alvo="tarefa"][data-id="' + obj.id + '"][data-campo="' + outra + '"]');
+      if (caixa) { caixa.checked = false; var rot = caixa.closest('.campo-marca'); if (rot) rot.classList.remove('campo-marca-on'); }
+    }
+
     // duração recém-cadastrada define o restante: a tarefa ainda não começou
     if (chave === 'duracaoTotal' && obj.estado === 'aberta') obj.restanteEstimado = valor;
 
