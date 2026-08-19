@@ -3156,10 +3156,20 @@
   }
   document.getElementById('btPastaCopias').addEventListener('click', function () {
     if (!temApiDePasta()) return;
-    window.showDirectoryPicker({ mode: 'readwrite', id: 'rebrota-copias' }).then(function (h) {
+    var estadoEl = document.getElementById('copiaLocalEstado');
+    estadoEl.textContent = 'abrindo a escolha da pasta…';
+    var pedido;
+    try { pedido = window.showDirectoryPicker({ mode: 'readwrite', id: 'rebrota-copias' }); }
+    catch (e) { estadoEl.textContent = 'não abriu: ' + (e.message || e); return; }
+    pedido.then(function (h) {
       pastaCopias = h;
       return bdPasta('gravar', h).then(function () { return copiarLocal(true); });
-    }).then(function () { estadoDaCopiaLocal(); }).catch(function () { /* cancelou */ });
+    }).then(function () { estadoDaCopiaLocal(); })
+      .catch(function (e) {
+        // cancelou (AbortError) não é erro; o resto é
+        if (e && e.name === 'AbortError') { estadoDaCopiaLocal(); return; }
+        estadoEl.textContent = 'não deu: ' + (e && e.message ? e.message : e);
+      });
   });
   carregarPastaCopias().then(function () { estadoDaCopiaLocal(); copiarLocal(); });
 

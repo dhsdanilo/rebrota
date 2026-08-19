@@ -707,8 +707,12 @@ button, input, select, textarea {
 .ficha-abrir:hover .ficha-nome { color: var(--casca); }
 .ficha-nome { display: block; font-size: 15px; }
 /* o resultado, embaixo do nome: o destino, na cor de destaque, como na ficha */
-/* o resultado como legenda do nome: serifa, cinza — a casca virava alerta em texto corrido */
-.ficha-obra { display: block; font-size: 13.5px; font-family: var(--display); color: var(--neblina-fraca); }
+/* o resultado como legenda do nome: serifa, cinza — a casca virava alerta em texto corrido.
+   A nota (o que falta, o que segura) vem depois, em mono miúdo e com ar: são duas vozes —
+   o destino da obra e a escrituração do app — e não podem parecer a mesma linha */
+.ficha-obra { display: block; font-size: 14px; font-family: var(--display); color: var(--neblina-fraca); margin-top: 3px; line-height: 1.35; }
+.fichario .item-nota { font-family: var(--mono); font-size: 11px; letter-spacing: .03em; margin-top: 8px; }
+.fichario .ficha-nome { font-size: 16px; }
 
 .ficha-idade {
   display: block;
