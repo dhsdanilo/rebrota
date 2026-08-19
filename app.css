@@ -507,7 +507,8 @@ button, input, select, textarea {
 .custo-edita { display: flex; align-items: flex-end; gap: 8px; }
 .custo-edita .campo { margin: 0; }
 .custo-edita .bt-mini { margin-bottom: 4px; }
-.cofre { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.cofre { margin-top: 2px; display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.campo-cofre { align-self: start; }
 .cofre-saldo { margin: 0; font-family: var(--display); font-size: 22px; color: var(--neblina); }
 .cofre-saldo span { font-size: 13px; color: var(--neblina-fraca); font-family: var(--corpo); margin-left: 4px; }
 .cofre-acoes, .cofre-caixa { display: flex; gap: 6px; align-items: center; }

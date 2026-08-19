@@ -653,8 +653,9 @@
                 (consulta ? '' : ' <button type="button" class="bt-linha bt-mini" data-acao="custo-editar" data-id="' + p.id + '">' +
                   (p.custoEstimado !== null && p.custoEstimado !== undefined ? 'editar' : 'definir') + '</button>') +
                 '</p></div>') +
-            '</div>' +
-            cofre(p, consulta),
+            // o cofre ao lado do custo, na segunda coluna da mesma grade
+            '<div class="campo campo-cofre"><label>Cofre</label>' + cofre(p, consulta) + '</div>' +
+            '</div>',
             'Quanto custa e quanto já foi juntado. É gatilho para começar, não controle financeiro: ' +
             'quando enche, a porta abre uma vez e o app para de olhar para dinheiro. A barra mostra ' +
             'valores, nunca porcentagem: o valor tem lastro, e quando enche uma porta abre.'),
