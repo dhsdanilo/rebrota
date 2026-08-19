@@ -2492,6 +2492,9 @@
     var naRua = tela.tipo === 'rua' && !naMesa();
     document.body.classList.toggle('sem-coluna', tela.tipo === null || naRua);
     document.body.classList.toggle('na-rua', naRua);
+    // de dia a folha é papel (sol no carro); de noite o papel ofusca, e ela fica escura
+    var h = new Date().getHours();
+    document.body.classList.toggle('rua-clara', naRua && h >= 6 && h < 18);
     // "mesa" e "bota" são as duas posturas que a spec descreve, e o topo diz
     // qual delas está valendo — nunca o que você vai fazer nela
     document.body.classList.toggle('na-bota', !naMesa());

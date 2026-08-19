@@ -504,44 +504,61 @@ body.rua-arrastando, body.rua-arrastando * { cursor: grabbing; }
   .folha-linha { flex-wrap: wrap; }
   .folha-acoes { width: 100%; justify-content: flex-start; padding-left: 32px; }
 
-  /* NA BOTA A FOLHA DA RUA É PAPEL. No carro, com sol batendo, a tela escura
-     vira espelho; preto no branco é o que se lê. E tudo grande: número da rota,
-     nome, o que comprar, e um "feita" de 54 px — é lida de relance, com o
-     celular no porta-copos. Só aqui: o resto do app continua escuro. */
-  body.na-rua { background: #F3EFE6; color: #151515; }
+  /* NA BOTA A FOLHA DA RUA É GRANDE — e de dia é PAPEL. No carro, com sol
+     batendo, a tela escura vira espelho; preto no branco é o que se lê. De
+     noite (antes das 6, depois das 18) o papel ofusca, então fica escura, mas
+     igualmente grande: número da rota, nome, o que comprar, e um "feita" de
+     54 px — lida de relance, com o celular no porta-copos. Só aqui: o resto do
+     app continua escuro. Tamanhos em .na-rua; as cores do papel em .rua-clara. */
   /* body. na frente: a regra da entrada (.sem-coluna .palco, flex centrado) vem depois no arquivo */
-  body.na-rua .palco { display: block; padding: 14px 14px 110px; color: #151515; }
-  .na-rua .topo { color: var(--neblina); }   /* o topo continua escuro: a marca precisa ler clara */
-  .na-rua .palco h2 { color: #111; font-size: 30px; margin-bottom: 6px; }
-  .na-rua .palco-sub { color: #4A4A4A; font-size: 15px; margin-bottom: 14px; }
-  .na-rua .aviso-cascata { color: #333; border-color: #B9B2A4; }
+  body.na-rua .palco { display: block; padding: 14px 14px 110px; }
+  .na-rua .palco h2 { font-size: 30px; margin-bottom: 6px; }
+  .na-rua .palco-sub { font-size: 15px; margin-bottom: 14px; color: var(--neblina); }
   .na-rua .voltar-lista {
     display: inline-flex; align-items: center; min-height: 48px; padding: 0 20px; margin: 0 0 16px;
-    font-family: var(--corpo); font-size: 17px; letter-spacing: 0; color: #222;
-    background: #fff; border: 2px solid #8E877A; border-radius: 8px;
+    font-family: var(--corpo); font-size: 17px; letter-spacing: 0; color: var(--neblina);
+    background: var(--mata); border: 2px solid var(--neblina-fraca); border-radius: 8px;
   }
   .na-rua .rua-pe { display: block; margin-top: 26px; }
   .na-rua .rua-pe .voltar-lista { width: 100%; justify-content: center; margin: 0; }
   .na-rua .folha { max-width: none; }
-  .na-rua .folha-item { border-top: 2px solid #CFC8BA; padding: 14px 0 16px; }
+  .na-rua .folha-item { border-top: 2px solid var(--musgo); padding: 14px 0 16px; }
   .na-rua .folha-linha { gap: 10px; align-items: flex-start; }
-  .na-rua .rua-alca { font-size: 24px; color: #8A8378; padding: 3px 4px 0 0; }
-  .na-rua .folha-n { font-family: var(--display); font-size: 28px; line-height: 1.1; color: #111; min-width: 34px; padding-top: 0; letter-spacing: 0; }
+  .na-rua .rua-alca { font-size: 24px; padding: 3px 4px 0 0; }
+  .na-rua .folha-n { font-family: var(--display); font-size: 28px; line-height: 1.1; color: var(--neblina); min-width: 34px; padding-top: 0; letter-spacing: 0; }
   .na-rua .folha-texto { gap: 6px; }
-  .na-rua .folha-texto strong { font-size: 21px; line-height: 1.25; font-weight: 600; color: #0E0E0E; }
-  .na-rua .folha-rua .folha-texto em { font-family: var(--corpo); font-size: 14px; color: #5C5C5C; letter-spacing: 0; }
-  .na-rua .folha-texto span { font-family: var(--corpo); font-size: 16px; line-height: 1.35; color: #222; letter-spacing: 0; }
-  .na-rua .folha-texto span b { color: #111; font-weight: 700; }
-  .na-rua .folha-recado { color: #5A3B1F !important; font-style: italic; }
+  .na-rua .folha-texto strong { font-size: 21px; line-height: 1.25; font-weight: 600; }
+  .na-rua .folha-rua .folha-texto em { font-family: var(--corpo); font-size: 14px; letter-spacing: 0; }
+  .na-rua .folha-texto span { font-family: var(--corpo); font-size: 16px; line-height: 1.35; color: var(--neblina); letter-spacing: 0; }
+  .na-rua .folha-texto span b { font-weight: 700; }
+  .na-rua .folha-recado { font-style: italic; }
   .na-rua .folha-acoes { padding-left: 0; margin-top: 10px; }
   .na-rua .rua-feita {
     width: 100%; min-height: 54px; padding: 10px 16px;
     font-size: 19px; font-weight: 600;
     background: var(--rebrota); color: #0F1A17; border: 2px solid #8EA22C; border-radius: 8px;
   }
-  .na-rua .rua-pegando { background: #fff; border-radius: 10px; border-top-color: transparent;
-    box-shadow: 0 12px 32px rgba(0, 0, 0, .28); padding-left: 8px; padding-right: 8px; }
-  .na-rua .rua-nada { color: #444; font-size: 17px; }
+  .na-rua .rua-pegando { border-radius: 10px; border-top-color: transparent; padding-left: 8px; padding-right: 8px; }
+  .na-rua .rua-nada { font-size: 17px; }
+
+  /* o papel: só de dia */
+  body.rua-clara { background: #F3EFE6; color: #151515; }
+  .rua-clara .topo { color: var(--neblina); }   /* o topo continua escuro: a marca precisa ler clara */
+  body.rua-clara .palco { color: #151515; }
+  .rua-clara .palco h2 { color: #111; }
+  .rua-clara .palco-sub { color: #4A4A4A; }
+  .rua-clara .aviso-cascata { color: #333; border-color: #B9B2A4; }
+  .rua-clara .voltar-lista { color: #222; background: #fff; border-color: #8E877A; }
+  .rua-clara .folha-item { border-top-color: #CFC8BA; }
+  .rua-clara .rua-alca { color: #8A8378; }
+  .rua-clara .folha-n { color: #111; }
+  .rua-clara .folha-texto strong { color: #0E0E0E; }
+  .rua-clara .folha-rua .folha-texto em { color: #5C5C5C; }
+  .rua-clara .folha-texto span { color: #222; }
+  .rua-clara .folha-texto span b { color: #111; }
+  .rua-clara .folha-recado { color: #5A3B1F !important; }
+  .rua-clara .rua-pegando { background: #fff; box-shadow: 0 12px 32px rgba(0, 0, 0, .28); }
+  .rua-clara .rua-nada { color: #444; }
 }
 
 /* ── tags (§44) ──────────────────────────────────────── */
