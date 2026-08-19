@@ -149,8 +149,9 @@ var Sync = (function () {
            - versão maior lá do que aqui → o daqui está velho, aceita o de lá
              (é o celular deitado, a janela estreita, a mesa nova, a segunda mesa);
            - catálogo daqui vazio e o de lá cheio → nunca escreve por cima;
-           - primeira sincronização deste aparelho como mesa → aceita o de lá,
-             porque o daqui pode ser a amostra do dados.js;
+           - primeira sincronização deste aparelho como mesa com versões iguais
+             → aceita o de lá (o daqui pode ser a amostra do dados.js); se o
+             daqui for mais novo, sobe;
            - senão, o daqui é o mais novo: sobe.
            Quem não é mesa aceita o de lá, salvo se o daqui for mais novo (foi
            mesa há pouco e ainda não subiu) — aí espera. */
@@ -159,8 +160,12 @@ var Sync = (function () {
       var vLa = remotoValido ? M.versaoDoCatalogo(remoto) : -1;
       var vAqui = M.versaoDoCatalogo();
       if (papel.escreveCatalogo) {
+        /* A versão manda. A "primeira vez como mesa" só desempata quando as
+           versões são iguais (aí o de lá pode ser o mesmo ou melhor): se o
+           daqui é MAIS NOVO, ele sobe mesmo sendo a primeira vez — senão,
+           religar o token depois de um sumiço jogaria fora o que se editou. */
         var aceitarDeLa = remotoValido && !M.catalogoVazio(remoto) &&
-          (vLa > vAqui || M.catalogoVazio() || !cfg.jaFoiMesa);
+          (vLa > vAqui || M.catalogoVazio() || (!cfg.jaFoiMesa && vLa === vAqui));
         if (aceitarDeLa) {
           if (M.receberCatalogo(remoto)) mudouLocal = true;
         } else {
