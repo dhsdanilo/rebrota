@@ -624,7 +624,7 @@
         'lê meses depois, quando a vontade acabou e você precisa lembrar por que começou.'),
 
       // a muda que esta obra foi: guardada, fechada, para ler quando a vontade acabar
-      (p.estado !== 'fila' && p.estado !== 'descartado' && M.cadeiasVivas(p.muda.vantagens).length)
+      (p.estado !== 'fila' && p.estado !== 'descartado' && mudaTemConteudo(p))
         ? grupoRecolhido('Muda de origem', p.id, resumoMuda(p)) : '',
 
       /* O envelope é gatilho de entrada: dispara uma vez e some. Num projeto já
@@ -831,6 +831,14 @@
           : ''),
         'O sítio tem limite de espaço e você de tempo. O que esta obra tira de outra?')
     ].join('');
+  }
+
+  // muda vazia (obra criada direto, antes da §37) não tem o que mostrar
+  function mudaTemConteudo(p) {
+    var m = p.muda, d = m.despesas || {};
+    return M.cadeiasVivas(m.vantagens).length || M.cadeiasVivas(m.desvantagens).length ||
+      (m.sentimento || '').trim() || (m.inviabiliza || '').trim() ||
+      [d.inicial, d.fixaMensal, d.retornoMensal].some(function (v) { return v !== null && v !== undefined; });
   }
 
   /* A muda depois de virar obra: um resumo fechado, para ler quando a vontade
