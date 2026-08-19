@@ -1290,6 +1290,7 @@ input[type="number"][readonly] { -moz-appearance: textfield; }
 .bt-concluir:hover { color: var(--casca); }
 
 .passo-rodape-fim { display: flex; gap: 6px; }
+.passo-rodape-quieto { justify-content: flex-end; margin-top: 6px; }
 
 /* lista vazia continua existindo: é o alvo de quem arrasta da outra etapa */
 .passos-vazia { border: 1px dashed transparent; border-radius: var(--raio); }
@@ -1316,21 +1317,27 @@ input[type="number"][readonly] { -moz-appearance: textfield; }
 
 .passo-texto[readonly] { cursor: pointer; }
 .passo-texto[readonly]:hover { color: var(--casca); }
-.passo-texto:not([readonly]):hover { border-color: var(--musgo); }
+/* solto, o título é campo como os da ficha: mesma moldura, mesmo fundo, mesmo
+   respiro — a primeira linha não pode parecer outro formulário */
+.passo-texto:not([readonly]) { background: var(--mata); border-color: var(--musgo); padding: 6px 9px; margin-left: 0; }
+.passo-texto:not([readonly]):hover { border-color: var(--neblina-fraca); }
 .passo-texto:not([readonly]):focus {
   border-color: var(--neblina-fraca);
-  background: var(--breu);
+  background: var(--mata);
   outline: none;
 }
 
 .passo-tempo-edita {
-  width: 74px;
-  background: var(--breu);
+  width: 84px;
+  background: var(--mata);
   border: 1px solid var(--musgo);
   border-radius: var(--raio);
-  padding: 3px 6px;
+  padding: 6px 9px;
+  font-size: 15px;
+  color: var(--neblina);
   text-align: right;
 }
+.passo-tempo-edita:focus { border-color: var(--neblina-fraca); outline: none; }
 
 /* o que já foi desce para o pé da seção e sai do caminho da leitura */
 .passos-divisor {
@@ -1371,13 +1378,15 @@ input[type="number"][readonly] { -moz-appearance: textfield; }
 }
 
 .passo-etapa-edita {
-  background: var(--breu);
+  background: var(--mata);
+  border: 1px solid var(--musgo);
+  border-radius: var(--raio);
+  padding: 6px 9px;
   color: var(--neblina);
   text-transform: none;
   letter-spacing: 0;
   font-family: var(--corpo);
-  font-size: 13px;
-  padding: 3px 6px;
+  font-size: 15px;
 }
 
 /* SEM MOLDURA. Cada marca dentro de uma caixinha fazia sete caixas por linha e

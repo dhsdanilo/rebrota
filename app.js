@@ -1353,6 +1353,11 @@
     return '<ul class="passos" data-etapa="' + esc(etapa || '') + '">' + html + '</ul>';
   }
 
+  function executandoObra(pid) {
+    var p = M.projeto(pid);
+    return !!p && (p.papel === 'titular' || p.papel === 'reserva');
+  }
+
   function marcacaoPasso(t, n, numeros, etapaDaSecao) {
     var aberto = passoAberto === t.id;
     var solto = passoEditando === t.id;
@@ -1386,11 +1391,15 @@
         /* A etiqueta só aparece quando diz algo novo: dentro da seção EXECUÇÃO,
            sete etiquetas "execução" empilhadas não informam nada e só pesam.
            Nas avulsas, que não têm seção, ela sempre aparece. */
-        (solto
+        /* A etapa só se escolhe onde ela ainda é escolha: projeto em planejamento
+           ou planejada. Obra rodando não ganha planejamento (a seção já nasce
+           certa), e avulsa não tem etapa. Fechar essa brecha é o que impede
+           tarefa de planejamento nascer em obra com planejamento fechado. */
+        (solto && t.projetoId && !executandoObra(t.projetoId)
           ? '<select class="passo-etapa passo-etapa-edita"' +
             ' data-alvo="tarefa" data-id="' + t.id + '" data-campo="etapa">' +
             opcoes(M.ETAPAS, t.etapa) + '</select>'
-          : t.etapa === etapaDaSecao ? ''
+          : t.etapa === etapaDaSecao || !t.projetoId ? ''
           : '<span class="passo-etapa" title="' + esc(AJUDA_ETAPA) + '">' +
             esc(t.etapa === 'planejamento' ? 'planejamento' : 'execução') + '</span>') +
         (solto
@@ -1400,8 +1409,9 @@
             ' value="' + esc(t.duracaoTotal) + '">'
           : '<span class="passo-tempo" title="' + esc(AJUDA_DURACAO) + '">' +
             '<i aria-hidden="true">⏱</i>' + esc(M.duracao(t.duracaoTotal)) + '</span>') +
-        // delegar ao diarista (§39): decisão de véspera, na própria linha
-        (emConsulta(t.projetoId) ? ''
+        // delegar ao diarista (§39): decisão de véspera, na própria linha.
+        // Em edição a linha só tem salvar: o resto espera a tarefa existir.
+        (emConsulta(t.projetoId) || solto ? ''
           : t.separada
           ? '<span class="passo-delegada" title="separada para o diarista">delegada · ' + esc(M.formatarData(t.separada.dia)) + '</span>' +
             '<button type="button" class="bt-linha bt-mini" data-acao="desfazer-separacao" data-id="' + t.id + '">tirar da folha</button>'
@@ -1409,7 +1419,7 @@
           ? '<button type="button" class="bt-linha bt-mini" data-acao="separar-diarista" data-id="' + t.id + '">delegar</button>'
           : '') +
         // as duas ações da linha, com nome: concluir de um lado do editar
-        (emConsulta(t.projetoId) ? ''
+        (emConsulta(t.projetoId) || solto ? ''
           : pronta
           ? '<button type="button" class="bt-linha bt-mini" data-acao="reabrir-tarefa" data-id="' + t.id + '">reabrir</button>'
           : '<button type="button" class="bt-linha bt-mini bt-concluir" data-acao="concluir-tarefa" data-id="' + t.id + '">concluir</button>') +
@@ -1431,7 +1441,7 @@
             return '<span class="aviso-linha">' + esc(a) + '</span>'; }).join('') + '</div>'
         : '') +
       // §40: o que esta tarefa espera chegar — e o campo para dizer que espera mais
-      (aberto && !emConsulta(t.projetoId) && !fechada(t)
+      (aberto && !solto && !emConsulta(t.projetoId) && !fechada(t)
         ? '<div class="passo-espera">' +
             M.esperasDe(t.id).map(function (x) {
               return '<div class="espera-item espera-' + M.nivelPendencia(x) + '">' +
@@ -1671,8 +1681,26 @@
       '<div class="secao"><div class="avisos">' + avisos.map(function (a) {
         return '<p class="aviso-linha">' + esc(a) + '</p>'; }).join('') + '</div></div>',
 
-      // remover só aparece com os campos soltos: apagar é decisão de edição
-      travado ? '' :
+      /* Cancelar e apagar são decisões sobre a tarefa que JÁ EXISTE: aparecem
+         com a ficha aberta e trancada, no pé, em letra pequena. Em edição, o
+         rodapé só tem salvar (e desfazer): o resto espera a tarefa ser salva. */
+      travado
+        ? (emConsulta(t.projetoId) || fechada(t) ? '' :
+          cancelandoTarefa === t.id
+            ? '<div class="confirma">' +
+                '<p class="confirma-texto">Cancelar a tarefa. Ela sai do caminho, deixa de segurar ' +
+                'as que vinham depois e para de travar a conclusão do projeto — mas continua no ' +
+                'registro, com o motivo.</p>' +
+                '<input type="text" class="confirma-campo" id="campoCancelaTarefa" placeholder="por quê?">' +
+                '<div class="confirma-acoes">' +
+                  '<button type="button" class="bt-forte" data-acao="confirmar-cancelar-tarefa" data-id="' + t.id + '">cancelar a tarefa</button>' +
+                  '<button type="button" class="bt-fraco" data-acao="voltar-cancelar-tarefa">deixa quieto</button>' +
+                '</div></div>'
+            : '<div class="passo-rodape passo-rodape-quieto"><span class="passo-rodape-fim">' +
+                '<button type="button" class="bt-linha bt-mini" data-acao="cancelar-tarefa" data-id="' + t.id + '">cancelar tarefa</button>' +
+                '<button type="button" class="bt-linha bt-mini" data-acao="remover-passo" data-id="' + t.id + '">apagar</button>' +
+              '</span></div>')
+        :
       cancelandoTarefa === t.id
         ? '<div class="confirma">' +
             '<p class="confirma-texto">Cancelar a tarefa. Ela sai do caminho, deixa de segurar ' +
@@ -1687,10 +1715,8 @@
             '<button type="button" class="bt-forte" data-acao="salvar-passo">salvar</button>' +
             (foto && foto.id === t.id
               ? '<button type="button" class="bt-fraco" data-acao="desfazer-passo" data-id="' + t.id + '" title="Volta a tarefa a como estava quando você clicou em editar.">desfazer</button>' : '') +
-            '<span class="passo-rodape-fim">' +
-              '<button type="button" class="bt-linha" data-acao="cancelar-tarefa" data-id="' + t.id + '">cancelar tarefa</button>' +
-              '<button type="button" class="bt-linha" data-acao="remover-passo" data-id="' + t.id + '">apagar</button>' +
-            '</span>' +
+            // cancelar e apagar ficam para depois de salva: em edição, só salvar (e desfazer)
+            '<span class="passo-rodape-fim"></span>' +
           '</div>'
     ].join('');
   }
