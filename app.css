@@ -488,6 +488,31 @@ select option { background: var(--mata); color: var(--neblina); }
 .pendencia-nota em { color: var(--neblina); font-style: normal; }
 
 /* ── a folha da rua (§43) ──────────────────────────────── */
+/* na bota, a segunda porta da entrada: um botão de verdade, embaixo do
+   "encontrar tarefa" — é por ele que se entra no carro (§51) */
+.porta-rua {
+  display: block;
+  width: 100%;
+  min-height: 58px;
+  margin: -26px 0 40px;
+  padding: 10px 16px;
+  background: var(--mata);
+  border: 1px solid var(--musgo);
+  border-radius: 4px;
+  color: var(--neblina);
+  font-size: 17px;
+  cursor: pointer;
+  text-align: center;
+}
+.porta-rua:hover { border-color: var(--neblina-fraca); }
+.porta-rua-n {
+  display: block;
+  margin-top: 2px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: .03em;
+  color: var(--casca);
+}
 .rua-link { margin: -22px 0 30px; text-align: center; }
 .rua-link .bt-linha { font-size: 14px; }
 .folha-rua .folha-texto em { font-family: var(--mono); font-style: normal; font-size: 11px; color: var(--neblina-fraca); }

@@ -24,6 +24,7 @@
   var projetoEditando = null;      // id do projeto com os campos soltos
   var acaoProjeto = null;          // { pid, tipo } esperando confirmação
   var cancelandoTarefa = null;     // id da tarefa com o cancelar destravado
+  var apagandoTarefa = null;       // id da tarefa com o apagar destravado
   var avisoCascata = '';           // o que a última ação moveu de vaga
   var planejamentoAberto = null;   // pid com o planejamento concluído reaberto
   var filtroProjetos = '';         // grupo aberto na página de projetos
@@ -239,6 +240,16 @@
     if (!n) return '';
     return '<p class="rua-link"><button type="button" class="bt-linha" data-acao="ir-rua">vai sair? · ' +
       n + (n === 1 ? ' coisa' : ' coisas') + ' na rua</button></p>';
+  }
+
+  /* Na bota a rua é a segunda porta da entrada — botão de verdade, não link
+     miúdo: é por ele que se entra no carro (§51). "Fora" saiu da consulta;
+     a resposta para rua É a folha, não um sorteio. */
+  function botaoDaRua() {
+    var n = M.tarefasDaRua().length;
+    if (!n) return '';
+    return '<button type="button" class="porta-rua" data-acao="ir-rua">vai sair?' +
+      '<span class="porta-rua-n">' + n + (n === 1 ? ' coisa' : ' coisas') + ' na rua</span></button>';
   }
 
   /* Vaga vazia é convite, não buraco: leva direto para a escolha. */
@@ -505,7 +516,7 @@
     if (!naMesa()) {
       return '<div class="abertura">' + frase +
         '<button type="button" class="c-acao porta-unica" data-acao="ir-executar">encontrar tarefa</button>' +
-        linkDaRua() +
+        botaoDaRua() +
         vagasDaAbertura() + avisoDeNuvem() +
         '</div>';
     }
@@ -1859,9 +1870,17 @@
                   '<button type="button" class="bt-forte" data-acao="confirmar-cancelar-tarefa" data-id="' + t.id + '">cancelar a tarefa</button>' +
                   '<button type="button" class="bt-fraco" data-acao="voltar-cancelar-tarefa">deixa quieto</button>' +
                 '</div></div>'
+            : apagandoTarefa === t.id
+            ? '<div class="confirma">' +
+                '<p class="confirma-texto">Apagar a tarefa e o que ela registrou, sem desfazer. ' +
+                'Para tirar do caminho guardando o registro, use <em>cancelar</em>.</p>' +
+                '<div class="confirma-acoes">' +
+                  '<button type="button" class="bt-forte" data-acao="remover-passo" data-id="' + t.id + '">sim, apagar</button>' +
+                  '<button type="button" class="bt-fraco" data-acao="voltar-apagar-tarefa">deixa quieto</button>' +
+                '</div></div>'
             : '<div class="passo-rodape passo-rodape-quieto"><span class="passo-rodape-fim">' +
                 '<button type="button" class="bt-linha bt-mini" data-acao="cancelar-tarefa" data-id="' + t.id + '">cancelar tarefa</button>' +
-                '<button type="button" class="bt-linha bt-mini" data-acao="remover-passo" data-id="' + t.id + '">apagar</button>' +
+                '<button type="button" class="bt-linha bt-mini" data-acao="pedir-apagar-tarefa" data-id="' + t.id + '">apagar</button>' +
               '</span></div>')
         :
       cancelandoTarefa === t.id
@@ -2770,7 +2789,7 @@
     return campo ? campo.value.trim() : '';
   }
 
-  function fecharFicha() { passoAberto = null; passoEditando = null; cancelandoTarefa = null; }
+  function fecharFicha() { passoAberto = null; passoEditando = null; cancelandoTarefa = null; apagandoTarefa = null; }
 
   // largura, não user-agent: o que muda o comportamento é o tamanho da tela
   function naMesa() { return window.matchMedia('(min-width: 721px)').matches; }
@@ -2799,7 +2818,7 @@
 
   function criarProjeto() {
     var p = M.inserirProjeto();
-    if (!p) { alert(M.motivoTetoMudas()); return; }
+    if (!p) { avisoCascata = M.motivoTetoMudas(); return desenhar(); }
     tela = { tipo: 'projeto', id: p.id };
     projetoEditando = p.id;
     desenhar();
@@ -2880,7 +2899,7 @@
     if (acao === 'esconder-planejamento') { planejamentoAberto = null; return desenharPalco(); }
 
     // cancelar tarefa: o registro fica, a execução não
-    if (acao === 'cancelar-tarefa') { cancelandoTarefa = tid; return desenharPalco(); }
+    if (acao === 'cancelar-tarefa') { cancelandoTarefa = tid; apagandoTarefa = null; return desenharPalco(); }
     if (acao === 'voltar-cancelar-tarefa') { cancelandoTarefa = null; return desenharPalco(); }
     if (acao === 'confirmar-cancelar-tarefa') {
       var porque = valorDoCampo('campoCancelaTarefa');
@@ -2967,9 +2986,12 @@
     }
     if (acao === 'reabrir-tarefa')  { M.reabrir('pe_eu', tid); return apurarVagas(); }
 
+    // apagar tarefa: confirmação do app, não a janelinha do navegador
+    if (acao === 'pedir-apagar-tarefa') { apagandoTarefa = tid; cancelandoTarefa = null; return desenharPalco(); }
+    if (acao === 'voltar-apagar-tarefa') { apagandoTarefa = null; return desenharPalco(); }
     if (acao === 'remover-passo') {
-      if (!confirm('Remover esta tarefa?')) return;
       M.removerTarefa(tid);
+      apagandoTarefa = null;
       fecharFicha();
       return desenhar();
     }
@@ -3003,7 +3025,7 @@
     if (acao === 'pendencia-chegou')    { M.resolverPendencia(tid, 'chegou'); return desenhar(); }
     if (acao === 'pendencia-cancelada') {
       var gerada = M.resolverPendencia(tid, 'cancelada');
-      if (gerada) alert('Criei a tarefa: ' + gerada.texto);
+      if (gerada) avisoCascata = 'Criei a tarefa: ' + gerada.texto + '.';
       return desenhar();
     }
 
@@ -3107,7 +3129,7 @@
     if (acao === 'promover-semente') {
       var novo = M.promoverSemente(tid);
       if (novo) tela = { tipo: 'projeto', id: novo.id };
-      else if (M.motivoTetoMudas()) alert(M.motivoTetoMudas());
+      else if (M.motivoTetoMudas()) avisoCascata = M.motivoTetoMudas();
       return desenhar();
     }
     // ── muda: pronta, plantando, reabrir ──
@@ -3120,7 +3142,7 @@
     if (acao === 'muda-plantar') { M.voltarAPlantar(tid); mudaAviso = ''; return desenhar(); }
     if (acao === 'abrir-recolhido') { recolhidos[tid] = !recolhidos[tid]; return desenharPalco(); }
     if (acao === 'muda-reabrir') {
-      if (!M.reabrirMuda(tid)) alert(M.motivoTetoMudas() || 'Não deu para reabrir.');
+      if (!M.reabrirMuda(tid)) avisoCascata = M.motivoTetoMudas() || 'Não deu para reabrir.';
       return desenhar();
     }
     // da semente para a lista das avulsas, com a ficha nova já solta
@@ -3459,7 +3481,8 @@
         fecharFicha();
         desenhar();
       } catch (e) {
-        alert('Não consegui ler esse arquivo: ' + e.message);
+        avisoCascata = 'Não consegui ler esse arquivo: ' + e.message;
+        desenhar();
       }
     };
     leitor.readAsText(arquivo);
@@ -3488,7 +3511,11 @@
       return console.warn('dados.js ilegível', e);
     }
 
-    if (M.estaVazio()) return M.confirmarImportacao(lida.estado);
+    /* A amostra NUNCA entra sozinha — nem em catálogo vazio (§51). Entrava, e
+       um aparelho novo que depois ligasse a nuvem misturava os projetos de
+       exemplo com o catálogo real pelo merge item a item (§47). Agora é sempre
+       proposta na coluna: nada é gravado sem aceite (regra 11), e quem tem
+       nuvem simplesmente ignora — o catálogo de verdade chega dela. */
     if (!lida.resumo.length) return;
     if (localStorage.getItem(CHAVE_DESCARTE) === impressao(texto)) return;
 
@@ -3582,6 +3609,7 @@
     }
     if (acaoProjeto)     { acaoProjeto = null; return desenharPalco(); }
     if (cancelandoTarefa) { cancelandoTarefa = null; return desenharPalco(); }
+    if (apagandoTarefa)  { apagandoTarefa = null; return desenharPalco(); }
     if (passoAberto)     { fecharFicha(); return desenharPalco(); }
     if (projetoEditando) { projetoEditando = null; desenharPalco(); }
   });

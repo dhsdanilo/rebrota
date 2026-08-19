@@ -75,8 +75,11 @@ var Campo = (function () {
     var s = cena.sit;
     var partes = [];
 
+    /* "Fora" saiu da consulta (§51): rua não se sorteia, se lista — a folha da
+       rua é o caminho, pelo botão "vai sair?" da entrada. Aqui ficam os dois
+       lugares onde a situação decide a tarefa. */
     partes.push(linha('Onde você está?',
-      M.LOCAIS.map(function (l) {
+      M.LOCAIS.filter(function (l) { return l.v !== 'fora'; }).map(function (l) {
         return botao('local', l.v, l.t, s.local === l.v);
       }).join('')));
 
@@ -426,6 +429,16 @@ var Campo = (function () {
       '</div>';
   }
 
+  /* Encerrar é ação de primeira classe (regra 9) e merece a mesma caixa das
+     outras saídas — não a janelinha cinza do navegador. Motivo obrigatório,
+     como sempre foi. */
+  function marcacaoEncerrar() {
+    return caixa('Encerrar. Por quê?',
+      '<textarea class="c-campo" id="cEncerrar" rows="3" placeholder="não vale mais a pena, mudou o plano…"></textarea>' +
+      '<button type="button" class="c-acao" data-acao="confirmar-encerrar">encerrar</button>') +
+      '<p class="c-nota">A tarefa sai do caminho e fica no registro, com o motivo.</p>';
+  }
+
   // ── terminei: a coleta ────────────────────────────────────────────
 
   /* A anotação é pedida na conclusão, não no cadastro. Ao cadastrar você não
@@ -457,6 +470,7 @@ var Campo = (function () {
     : cena.fase === 'naoda'     ? marcacaoNaoDa()
     : cena.fase === 'naoquero'  ? marcacaoNaoQuero()
     : cena.fase === 'terminar'  ? marcacaoTerminar()
+    : cena.fase === 'encerrar'  ? marcacaoEncerrar()
     : cena.fase === 'projeto'   ? marcacaoProjeto()
     : cena.fase === 'encerrado' ? marcacaoEncerrado()
     : '';
@@ -590,10 +604,11 @@ var Campo = (function () {
       return depoisDeFechar();       // registrado; agora sim outra frente
     }
 
-    if (acao === 'encerrar' && ativa) {
-      var motivo = prompt('Encerrar. Por quê?');
-      if (motivo === null) return;
-      M.encerrar(EU, ativa.id, motivo);
+    if (acao === 'encerrar' && ativa) { cena.fase = 'encerrar'; return desenhar(); }
+    if (acao === 'confirmar-encerrar' && ativa) {
+      var motivoEnc = ($.querySelector('#cEncerrar') || {}).value || '';
+      if (!motivoEnc.trim()) return;
+      M.encerrar(EU, ativa.id, motivoEnc.trim());
       M.limparKit(ativa.id);
       return depoisDeFechar();
     }
