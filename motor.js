@@ -50,7 +50,7 @@ var Motor = (function () {
       quem: 'pe_eu',
       local: null,          // 'sitio' | 'computador' | 'fora'
       minutos: null,
-      tempo: null,          // 'sol' | 'nublado' | 'chuva_fina' | 'chuva_forte'
+      tempo: null,          // 'sol' | 'calor' | 'nublado' | 'chuva_fina' | 'chuva_forte'
       barro: null,
       criancas: false,
       ajuda: false,
@@ -110,6 +110,9 @@ var Motor = (function () {
     if (s.local !== 'sitio') return true;
 
     if (t.exigeSoloFirme && s.barro) return false;
+
+    // calor é o tempo de hoje, não a hora: nublado e fresco às 13 h pode (§41)
+    if (t.evitaCalor && s.tempo === 'calor') return false;
 
     if (t.exigeClima === 'firme' && chovendo(s)) return false;
     if (t.exigeClima === 'tolera_chuva_fina') {
@@ -211,6 +214,9 @@ var Motor = (function () {
     var restante = M.restanteDe(t.id);
     if (t.duracaoTotal && restante <= t.duracaoTotal * 0.25) p += 3;
     if (proj && proj.natureza === 'acumulavel') p -= 2;
+
+    // importância (§41): um ponto para cima ou para baixo — desempata, não manda
+    if (!t.projetoId) p += (Number(t.peso) || 2) - 2;
 
     return p;
   }

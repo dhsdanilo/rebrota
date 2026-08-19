@@ -65,7 +65,7 @@
 
   function opcoes(lista, atual) {
     return lista.map(function (o) {
-      return '<option value="' + esc(o.v) + '"' + (o.v === atual ? ' selected' : '') +
+      return '<option value="' + esc(o.v) + '"' + (String(o.v) === String(atual) ? ' selected' : '') +
         '>' + esc(o.t) + '</option>';
     }).join('');
   }
@@ -1265,6 +1265,7 @@
   var FILTROS_AVULSAS = [
     { chave: 'abertas',    t: 'abertas',    cabe: function (t) { return !fechada(t) && !M.periodica(t); } },
     { chave: 'rotina',     t: 'rotina',     cabe: function (t) { return M.periodica(t); } },
+    { chave: 'juntando',   t: 'juntando dinheiro', cabe: function (t) { return !fechada(t) && M.juntandoDinheiro(t); } },
     { chave: 'feitas',     t: 'feitas',     cabe: function (t) { return M.estadoDe(t.id) === 'feita'; } },
     { chave: 'canceladas', t: 'canceladas', cabe: function (t) { return M.estadoDe(t.id) === 'encerrada'; } }
   ];
@@ -1418,6 +1419,8 @@
           : '<button type="button" class="bt-linha bt-mini" data-acao="editar-passo" data-id="' + t.id + '">editar</button>') +
       '</div>' +
 
+      (M.juntandoDinheiro(t) && !aberto && !fechada(t)
+        ? '<div class="passo-avisos"><span class="aviso-linha aviso-diarista">juntando dinheiro · faltam ' + esc(M.moeda(M.faltaDinheiro(t))) + '</span></div>' : '') +
       (M.esperasDe(t.id).length && !aberto
         ? '<div class="passo-avisos">' + M.esperasDe(t.id).map(function (x) {
             return '<span class="aviso-linha aviso-espera espera-' + M.nivelPendencia(x) + '">espera ' + esc(x.descricao) +
@@ -1469,6 +1472,7 @@
 
     var cond = [];
     if (t.exigeClima !== 'indiferente') cond.push(t.exigeClima === 'firme' ? 'tempo firme' : 'tolera chuva fina');
+    if (t.evitaCalor) cond.push('não no calor');
     if (t.exigeSoloFirme) cond.push('solo firme');
     if (t.guardadaParaChuva) cond.push('guardada para a chuva');
     cond.push(t.esforco === 'pesado' ? 'pesado' : 'leve');
@@ -1562,6 +1566,21 @@
         'A primeira pergunta da consulta, e a que poda todas as outras: quando você responde ' +
         '"fora" ou "computador", o app nem pergunta clima, chão, companhia e energia.'),
 
+      // dinheiro só na avulsa (§41): obra tem o envelope do projeto
+      (t.projetoId ? '' :
+      grupo('Dinheiro', '',
+        '<div class="grade">' +
+        campoTexto('tarefa', t.id, 'custo', 'Custo, por cima', t.custo,
+          { numero: true, min: 0, travado: travado,
+            ajuda: 'Deixe vazio se não custa. Com custo e sem o dinheiro separado, ela fica fora do ' +
+                   'páreo como "juntando dinheiro".' }) +
+        campoTexto('tarefa', t.id, 'guardado', 'Separado', t.guardado,
+          { numero: true, min: 0, travado: travado,
+            ajuda: 'Quanto já está separado para isto. Igual ou maior que o custo, ela entra no páreo.' }) +
+        '</div>' +
+        (M.juntandoDinheiro(t) ? '<p class="aviso" style="margin:8px 0 0">juntando dinheiro — faltam ' + esc(M.moeda(M.faltaDinheiro(t))) + '</p>' : ''),
+        'A avulsa que custa dinheiro espera o dinheiro, não o app. Mesmo desenho do envelope, em tamanho de tarefa.')) +
+
       grupo('Condições', '',
         linhaCond('Clima',
           'Como o tempo precisa estar. "Só com tempo firme" desaparece em qualquer chuva. ' +
@@ -1572,6 +1591,11 @@
         /* Estas duas eram caixas de marca empilhadas embaixo do valor do clima,
            e liam-se como uma lista em que o primeiro item tinha perdido a
            caixinha. Viraram pergunta com resposta, como todas as outras. */
+        linhaCond('Não no calor?',
+          'Some nos dias em que você responde "sol forte · calor" na consulta. É o tempo de hoje, ' +
+          'não a hora: nublado e fresco às 13 h continua valendo.',
+          campoBooleano('tarefa', t.id, 'evitaCalor', t.evitaCalor, travado)) +
+
         linhaCond('Precisa de chão firme?',
           'Para o que exige pisar sem atolar ou rodar carrinho de mão. Some nos dias em que você ' +
           'responde "barro" na consulta — e chuva forte já responde barro sozinha.',
@@ -1587,6 +1611,12 @@
           'Quanto o corpo vai sentir. Nos dias em que você responder "pouca energia", só as leves ' +
           'chegam até você — as pesadas nem são cogitadas.',
           campoSelect('tarefa', t.id, 'esforco', '', M.ESFORCOS, t.esforco, travado)) +
+
+        (t.projetoId ? '' :
+        linhaCond('Importância',
+          'Só para desempatar entre avulsas iguais no resto. Não é ordem: data, rotina vencida e ' +
+          'destrave continuam mandando. Padrão: normal.',
+          campoSelect('tarefa', t.id, 'peso', '', M.PESOS, t.peso, travado))) +
 
         linhaCond('Companhia',
           'Quem precisa estar junto e quem não pode. As três marcas são independentes: uma tarefa ' +
@@ -2373,6 +2403,8 @@
         .filter(function (x) { return x; });
     } else if (chave === 'guardado' && valor === null) {
       obj.guardado = 0;
+    } else if (chave === 'peso') {
+      obj.peso = Number(valor) || 2;
     } else {
       obj[chave] = valor;
     }

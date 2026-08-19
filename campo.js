@@ -92,7 +92,7 @@ var Campo = (function () {
     if (s.local === 'sitio') {
       var jaTem = !!M.climaDeHoje();
       partes.push(linha(jaTem ? 'O tempo mudou?' : 'Como está o tempo?',
-        [['sol', 'sol'], ['nublado', 'nublado'], ['chuva_fina', 'chuva fina'], ['chuva_forte', 'chuva forte']]
+        [['sol', 'sol'], ['calor', 'sol forte · calor'], ['nublado', 'nublado'], ['chuva_fina', 'chuva fina'], ['chuva_forte', 'chuva forte']]
           .map(function (p) { return botao('tempo', p[0], p[1], s.tempo === p[0]); }).join('')));
 
       // chuva forte hoje implica barro e a pergunta some

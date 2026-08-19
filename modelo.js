@@ -44,6 +44,12 @@ var Modelo = (function () {
     { v: 'leve',   t: 'leve' },
     { v: 'pesado', t: 'pesado' }
   ];
+  // importância da avulsa (§41): só desempate entre iguais, nunca ordenação principal
+  var PESOS = [
+    { v: 1, t: 'baixa' },
+    { v: 2, t: 'normal' },
+    { v: 3, t: 'alta' }
+  ];
 
   /* Estado e papel eram dois controles que se contradiziam — dava para marcar
      "titular" e "fila" ao mesmo tempo. Viraram um só; os dois campos por baixo
@@ -464,8 +470,14 @@ var Modelo = (function () {
       blocoMinimo: null,     // null = derivado da duração
 
       exigeClima: 'indiferente',
+      evitaCalor: false,     // some nos dias em que a consulta diz "calor" (§41)
       guardadaParaChuva: false,
       exigeSoloFirme: false,
+      // só avulsa (§41): custo por cima e o que já está separado — enquanto
+      // faltar, ela não entra no páreo ("juntando dinheiro")
+      custo: null,
+      guardado: 0,
+      peso: 2,               // 1 baixa · 2 normal · 3 alta — desempate
 
       ondePrecisaEstar: 'sitio',
       onde: '',              // texto livre; era zona + ponto, que diziam o mesmo
@@ -1083,6 +1095,9 @@ var Modelo = (function () {
     // espera algo chegar (§40): material na loja, resposta de terceiro
     if (esperasDe(t.id).length) return false;
 
+    // avulsa juntando dinheiro (§41): sem o custo coberto, não entra
+    if (juntandoDinheiro(t)) return false;
+
     /* Cancelada conta como resolvida: você decidiu que aquilo não vai
        acontecer, e segurar o que vem depois por causa de uma decisão sua já
        tomada é o app teimando contra você. */
@@ -1098,7 +1113,13 @@ var Modelo = (function () {
 
   /* Por que esta tarefa não está disponível — sempre apontando para uma
      decisão sua, nunca para uma regra do app. */
+  function juntandoDinheiro(t) {
+    return !t.projetoId && Number(t.custo) > 0 && Number(t.guardado || 0) < Number(t.custo);
+  }
+  function faltaDinheiro(t) { return Math.max(0, Number(t.custo) - Number(t.guardado || 0)); }
+
   function porQueEspera(t) {
+    if (juntandoDinheiro(t)) return 'juntando dinheiro — faltam ' + moeda(faltaDinheiro(t));
     var esp = esperasDe(t.id)[0];
     if (esp) return 'espera ' + esp.descricao + ' — ' + textoPendencia(esp).toLowerCase().replace(/\.$/, '');
     var trava = vistaDe(t.id).travadaPor;
@@ -2050,7 +2071,8 @@ var Modelo = (function () {
   }
 
   return {
-    PERFIS: PERFIS, LOCAIS: LOCAIS, CLIMAS: CLIMAS, ESFORCOS: ESFORCOS,
+    PERFIS: PERFIS, LOCAIS: LOCAIS, CLIMAS: CLIMAS, ESFORCOS: ESFORCOS, PESOS: PESOS,
+    juntandoDinheiro: juntandoDinheiro, faltaDinheiro: faltaDinheiro,
     SITUACOES: SITUACOES, MOTIVOS_NAO_DA: MOTIVOS_NAO_DA,
     HORARIOS: HORARIOS, DIAS_SEMANA: DIAS_SEMANA, ETAPAS: ETAPAS,
     NOMES_DIA: NOMES_DIA, NOMES_MES: NOMES_MES, TODOS_MESES: TODOS_MESES,
