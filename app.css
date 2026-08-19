@@ -335,7 +335,7 @@ button, input, select, textarea {
   color: var(--neblina); font-family: inherit;
 }
 .sitio-cabeca strong { font-size: 17px; font-weight: 500; }
-.sitio-fim { font-family: var(--display); font-size: 15px; color: var(--casca); }
+.sitio-fim { font-family: var(--display); font-size: 15px; color: var(--neblina-fraca); }
 .sitio-envelope, .sitio-cabeca em, .sitio-etiqueta {
   font-family: var(--mono); font-style: normal; font-size: 11px; color: var(--neblina-fraca);
 }
@@ -397,7 +397,7 @@ button, input, select, textarea {
 .seta { color: var(--casca); font-size: 13px; }
 .muda-centro { margin: 10px 0 0; font-size: 13px; color: var(--neblina-fraca); }
 .muda-centro b { color: var(--rebrota); font-weight: 500; }
-.muda-leitura { margin: 12px 0 0; font-family: var(--display); font-size: 16px; color: var(--casca); min-height: 1em; }
+.muda-leitura { margin: 12px 0 0; font-family: var(--display); font-size: 16px; color: var(--neblina); min-height: 1em; }
 .muda-resumo h4 { font-family: var(--mono); font-size: 11px; letter-spacing: .06em; color: var(--neblina-fraca); font-weight: normal; margin: 12px 0 4px; }
 .muda-resumo p { margin: 0; font-size: 14px; }
 .cadeias-lidas { list-style: none; margin: 0; padding: 0; font-size: 14px; }
@@ -706,7 +706,8 @@ button, input, select, textarea {
 .ficha-abrir:hover .ficha-nome { color: var(--casca); }
 .ficha-nome { display: block; font-size: 15px; }
 /* o resultado, embaixo do nome: o destino, na cor de destaque, como na ficha */
-.ficha-obra { display: block; font-size: 13px; color: var(--casca); }
+/* o resultado como legenda do nome: serifa, cinza — a casca virava alerta em texto corrido */
+.ficha-obra { display: block; font-size: 13.5px; font-family: var(--display); color: var(--neblina-fraca); }
 
 .ficha-idade {
   display: block;
@@ -922,7 +923,7 @@ button, input, select, textarea {
 .palco-resultado {
   font-family: var(--display);
   font-size: 17px;
-  color: var(--casca);
+  color: var(--neblina-fraca);
   margin: 0 0 6px;
 }
 
@@ -941,7 +942,7 @@ button, input, select, textarea {
 }
 
 .titulo-obra { font-size: 26px; font-weight: 500; }
-.titulo-resultado { font-size: 17px; color: var(--casca); margin-bottom: 6px; }
+.titulo-resultado { font-size: 17px; color: var(--neblina-fraca); margin-bottom: 6px; }
 
 .titulo-obra[readonly], .titulo-resultado[readonly] { cursor: default; }
 
@@ -1932,7 +1933,7 @@ input[type="number"][readonly] { -moz-appearance: textfield; }
 .c-trilha-fim {
   font-family: var(--display);
   font-size: 17px;
-  color: var(--casca);
+  color: var(--neblina);
   margin: 6px 0 26px;
 }
 

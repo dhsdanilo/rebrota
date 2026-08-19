@@ -948,7 +948,8 @@
         : 'Nada esperando na fila.');
     }
 
-    var nomes = vazias.map(function (v) { return v.t; }).join(' e ');
+    // 'em planejamento' já carrega o 'em'; titular e reserva não
+    var nomes = vazias.map(function (v) { return v.papel === 'planejamento' ? 'planejamento' : v.t; }).join(' e ');
     var querPlanejamento = vazias.some(function (v) { return v.papel === 'planejamento'; });
     var querExecucao = vazias.some(function (v) { return v.papel !== 'planejamento'; });
 
