@@ -1435,6 +1435,18 @@ var Modelo = (function () {
     return novas;
   }
 
+  /* Tirar é diferente de resolver (§55): a espera cadastrada errada, ou que
+     já não faz sentido, sai sem deixar registro nem gerar tarefa. Com lápide,
+     senão o merge (§47) a ressuscitava do outro aparelho. */
+  function desfazerPendencia(xid) {
+    var x = pendencia(xid);
+    if (!x) return false;
+    lapide(xid);
+    cat().pendencias = cat().pendencias.filter(function (p) { return p.id !== xid; });
+    salvar();
+    return true;
+  }
+
   /* Chegou: destrava a tarefa vinculada. Cancelada: gera a tarefa de resolver,
      porque o projeto não pode ficar esperando para sempre uma coisa que não vem. */
   function resolverPendencia(xid, como) {
@@ -2356,6 +2368,7 @@ var Modelo = (function () {
 
     pendenciasAbertas: pendenciasAbertas, nivelPendencia: nivelPendencia,
     esperarPara: esperarPara, esperasDe: esperasDe, abrirEsperasDaCompra: abrirEsperasDaCompra,
+    desfazerPendencia: desfazerPendencia,
     textoPendencia: textoPendencia, inserirPendencia: inserirPendencia,
     resolverPendencia: resolverPendencia,
 

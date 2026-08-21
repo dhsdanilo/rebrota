@@ -1653,14 +1653,17 @@
             return '<span class="aviso-linha">' + esc(a) + '</span>'; }).join('') + '</div>'
         : '') +
       // §40: o que esta tarefa espera chegar — e o campo para dizer que espera mais
-      (aberto && !solto && !emConsulta(t.projetoId) && !fechada(t)
+      (aberto && !emConsulta(t.projetoId) && !fechada(t)
         ? '<div class="passo-espera">' +
             M.esperasDe(t.id).map(function (x) {
               return '<div class="espera-item espera-' + M.nivelPendencia(x) + '">' +
                 '<span class="ponto ponto-' + M.nivelPendencia(x) + '"></span>' +
                 '<span class="espera-texto">espera <b>' + esc(x.descricao) + '</b> · ' + esc(M.textoPendencia(x)) + '</span>' +
                 '<button type="button" class="bt-fraco bt-mini" data-acao="pendencia-chegou" data-id="' + x.id + '">chegou</button>' +
-                '<button type="button" class="bt-linha bt-mini" data-acao="pendencia-cancelada" data-id="' + x.id + '">cancelada</button>' +
+                '<button type="button" class="bt-linha bt-mini" data-acao="pendencia-cancelada" data-id="' + x.id + '"' +
+                  ' title="A coisa não vem mais: gera a tarefa de resolver no lugar.">cancelada</button>' +
+                '<button type="button" class="bt-linha bt-mini" data-acao="pendencia-tirar" data-id="' + x.id + '"' +
+                  ' title="Apaga a espera sem registro — para a que foi criada errada ou já não faz sentido.">tirar</button>' +
                 '</div>';
             }).join('') +
             (esperando === t.id
@@ -2296,7 +2299,10 @@
       '<input type="date" class="pendencia-data" data-alvo="pendencia" data-id="' + x.id +
         '" data-campo="previsto" value="' + esc(x.previsto) + '">' +
       '<button type="button" class="bt-fraco" data-acao="pendencia-chegou" data-id="' + x.id + '">chegou</button>' +
-      '<button type="button" class="bt-linha" data-acao="pendencia-cancelada" data-id="' + x.id + '">cancelada</button>' +
+      '<button type="button" class="bt-linha" data-acao="pendencia-cancelada" data-id="' + x.id + '"' +
+        ' title="A coisa não vem mais: gera a tarefa de resolver no lugar.">cancelada</button>' +
+      '<button type="button" class="bt-linha bt-mini" data-acao="pendencia-tirar" data-id="' + x.id + '"' +
+        ' title="Apaga a espera sem registro — para a que foi criada errada ou já não faz sentido.">tirar</button>' +
       '</li>';
   }
 
@@ -3211,6 +3217,7 @@
       esperando = null;
       return desenhar();
     }
+    if (acao === 'pendencia-tirar')     { M.desfazerPendencia(tid); return desenhar(); }
     if (acao === 'pendencia-chegou')    { M.resolverPendencia(tid, 'chegou'); return desenhar(); }
     if (acao === 'pendencia-cancelada') {
       var gerada = M.resolverPendencia(tid, 'cancelada');
