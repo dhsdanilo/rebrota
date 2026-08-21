@@ -35,6 +35,7 @@
   var mudaAvisoDe = null;          // …e de qual muda, para não vazar para a ficha de outra
   var diaristaMetade = null;       // linha da folha com o campo "sobrou quanto?" aberto
   var esperando = null;            // tarefa com o campo "espera algo chegar" aberto
+  var faltando = null;             // tarefa com o campo "falta comprar algo" aberto
 
   /* Cada tecla grava — então "desfazer" é devolver a foto tirada na hora do
      editar. Entrou na tarefa errada, mexeu, viu: desfazer, e ela volta inteira. */
@@ -237,7 +238,7 @@
   /* "Vai sair?" (§43): só quando há coisa de rua em jogo. Não é cobrança —
      é aproveitar a viagem. */
   function linkDaRua() {
-    var n = M.tarefasDaRua().length;
+    var n = M.tarefasDaRua().length + M.itensDaRua().length;
     if (!n) return '';
     return '<p class="rua-link"><button type="button" class="bt-linha" data-acao="ir-rua">vai sair? · ' +
       n + (n === 1 ? ' coisa' : ' coisas') + ' na rua</button></p>';
@@ -247,7 +248,7 @@
      miúdo: é por ele que se entra no carro (§51). "Fora" saiu da consulta;
      a resposta para rua É a folha, não um sorteio. */
   function botaoDaRua() {
-    var n = M.tarefasDaRua().length;
+    var n = M.tarefasDaRua().length + M.itensDaRua().length;
     if (!n) return '';
     return '<button type="button" class="porta-rua" data-acao="ir-rua">vai sair?' +
       '<span class="porta-rua-n">' + n + (n === 1 ? ' coisa' : ' coisas') + ' na rua</span></button>';
@@ -1609,7 +1610,7 @@
         /* O LOCAL vem antes do tempo, na própria linha (§46): é ele que decide o
            resto da ficha, e escondido no fim ele era esquecido. Fora, o tempo
            não entra — coisa de rua é rápida e o tempo serve ao sorteio do dia. */
-        (solto && !t.compra
+        (solto
           ? '<select class="passo-local-edita" title="Onde esta tarefa precisa ser feita — decide o resto da ficha."' +
             ' data-alvo="tarefa" data-id="' + t.id + '" data-campo="ondePrecisaEstar">' +
             opcoes(M.LOCAIS, t.ondePrecisaEstar) + '</select>'
@@ -1645,8 +1646,10 @@
         ? '<div class="passo-avisos"><span class="aviso-linha aviso-diarista">juntando dinheiro · faltam ' + esc(M.moeda(M.faltaDinheiro(t))) + '</span></div>' : '') +
       (M.esperasDe(t.id).length && !aberto
         ? '<div class="passo-avisos">' + M.esperasDe(t.id).map(function (x) {
-            return '<span class="aviso-linha aviso-espera espera-' + M.nivelPendencia(x) + '">espera ' + esc(x.descricao) +
-              ' · ' + esc(M.textoPendencia(x).toLowerCase().replace(/\.$/, '')) + '</span>'; }).join('') + '</div>'
+            return x.fase === 'falta'
+              ? '<span class="aviso-linha aviso-espera espera-falta">falta comprar ' + esc(x.descricao) + '</span>'
+              : '<span class="aviso-linha aviso-espera espera-' + M.nivelPendencia(x) + '">espera ' + esc(x.descricao) +
+                ' · ' + esc(M.textoPendencia(x).toLowerCase().replace(/\.$/, '')) + '</span>'; }).join('') + '</div>'
         : '') +
       (avisos.length && !aberto
         ? '<div class="passo-avisos">' + avisos.map(function (a) {
@@ -1655,17 +1658,7 @@
       // §40: o que esta tarefa espera chegar — e o campo para dizer que espera mais
       (aberto && !emConsulta(t.projetoId) && !fechada(t)
         ? '<div class="passo-espera">' +
-            M.esperasDe(t.id).map(function (x) {
-              return '<div class="espera-item espera-' + M.nivelPendencia(x) + '">' +
-                '<span class="ponto ponto-' + M.nivelPendencia(x) + '"></span>' +
-                '<span class="espera-texto">espera <b>' + esc(x.descricao) + '</b> · ' + esc(M.textoPendencia(x)) + '</span>' +
-                '<button type="button" class="bt-fraco bt-mini" data-acao="pendencia-chegou" data-id="' + x.id + '">chegou</button>' +
-                '<button type="button" class="bt-linha bt-mini" data-acao="pendencia-cancelada" data-id="' + x.id + '"' +
-                  ' title="A coisa não vem mais: gera a tarefa de resolver no lugar.">cancelada</button>' +
-                '<button type="button" class="bt-linha bt-mini" data-acao="pendencia-tirar" data-id="' + x.id + '"' +
-                  ' title="Apaga a espera sem registro — para a que foi criada errada ou já não faz sentido.">tirar</button>' +
-                '</div>';
-            }).join('') +
+            M.esperasDe(t.id).map(linhaItem).join('') +
             (esperando === t.id
               ? '<div class="espera-nova">' +
                   '<input type="text" id="esperaDesc_' + t.id + '" placeholder="o quê? — tela fina 1 m, agroloja">' +
@@ -1673,7 +1666,18 @@
                   '<button type="button" class="bt-forte bt-mini" data-acao="esperar-confirmar" data-id="' + t.id + '">esperar</button>' +
                   '<button type="button" class="bt-linha bt-mini" data-acao="esperar-cancelar">deixa</button>' +
                 '</div>'
-              : '<button type="button" class="bt-linha bt-mini" data-acao="esperar-abrir" data-id="' + t.id + '">espera algo chegar</button>') +
+              : faltando === t.id
+              ? '<div class="espera-nova">' +
+                  '<input type="text" id="faltaDesc_' + t.id + '" placeholder="o que falta comprar? — 90 m de tela">' +
+                  '<button type="button" class="bt-forte bt-mini" data-acao="falta-confirmar" data-id="' + t.id + '">anotar</button>' +
+                  '<button type="button" class="bt-linha bt-mini" data-acao="esperar-cancelar">deixa</button>' +
+                '</div>'
+              : '<span class="espera-adders">' +
+                  '<button type="button" class="bt-linha bt-mini" data-acao="falta-abrir" data-id="' + t.id + '"' +
+                    ' title="Um item que precisa ser comprado antes desta tarefa. Entra na lista de compras — a folha da rua, ou encomenda pela internet.">falta comprar algo</button>' +
+                  '<button type="button" class="bt-linha bt-mini" data-acao="esperar-abrir" data-id="' + t.id + '"' +
+                    ' title="Espera que não é compra: terceiro que ficou de responder, entrega já feita, processo com data.">espera algo chegar</button>' +
+                '</span>') +
           '</div>'
         : '') +
       (aberto
@@ -1697,20 +1701,51 @@
     return M.diaLocal(d);
   }
   function caixaConcluir(t) {
-    var compraNet = t.compra === 'internet' && (t.compras || []).length;
     return '<div class="confirma confirma-concluir">' +
-      '<p class="confirma-texto">' + (t.separada ? 'Concluir como feita pelo diarista.' : 'Concluir.') +
-        (compraNet ? ' Chega quando? Uma data por item — cada um vira uma espera no Aguardando.' : '') + '</p>' +
-      (compraNet ? t.compras.map(function (item, i) {
-          return '<label class="concluir-data">' + esc(item) +
-            '<input type="date" id="dataCompra_' + t.id + '_' + i + '" value="' + dataMais7() + '"></label>';
-        }).join('') : '') +
+      '<p class="confirma-texto">' + (t.separada ? 'Concluir como feita pelo diarista.' : 'Concluir.') + '</p>' +
       '<input type="text" class="confirma-campo" id="notaConcluir_' + t.id + '"' +
         ' placeholder="anotação — opcional: quem fez, o que descobriu, quanto custou">' +
       '<div class="confirma-acoes">' +
         '<button type="button" class="bt-forte" data-acao="confirmar-concluir" data-id="' + t.id + '">concluir</button>' +
         '<button type="button" class="bt-fraco" data-acao="voltar-concluir">deixa quieto</button>' +
       '</div></div>';
+  }
+
+  /* Uma linha por item (§56): em falta mostra a via e as saídas comprei /
+     encomendei / tirar; esperando mostra o semáforo e chegou / cancelada /
+     tirar. É o mesmo desenho na ficha da tarefa e no Aguardando. */
+  var encomendando = null;   // item com o campo de data do encomendei aberto
+  function linhaItem(x) {
+    var nivel = M.nivelPendencia(x);
+    if (x.fase === 'falta') {
+      return '<div class="espera-item espera-falta">' +
+        '<span class="ponto ponto-falta"></span>' +
+        '<span class="espera-texto">falta comprar <b>' + esc(x.descricao) + '</b></span>' +
+        '<span class="item-vias">' +
+          '<button type="button" class="filtro' + (x.via !== 'internet' ? ' filtro-on' : '') + '" data-acao="item-via" data-id="' + x.id + '" data-valor="rua">rua</button>' +
+          '<button type="button" class="filtro' + (x.via === 'internet' ? ' filtro-on' : '') + '" data-acao="item-via" data-id="' + x.id + '" data-valor="internet">internet</button>' +
+        '</span>' +
+        (encomendando === x.id
+          ? '<span class="espera-nova"><input type="date" id="encomendaDia_' + x.id + '" value="' + esc(dataMais7()) + '">' +
+            '<button type="button" class="bt-forte bt-mini" data-acao="item-encomendar-ok" data-id="' + x.id + '">encomendei</button>' +
+            '<button type="button" class="bt-linha bt-mini" data-acao="item-encomendar-nao">deixa</button></span>'
+          : '<button type="button" class="bt-fraco bt-mini" data-acao="item-comprei" data-id="' + x.id + '"' +
+              ' title="Já está na mão: a tarefa destrava.">comprei</button>' +
+            '<button type="button" class="bt-fraco bt-mini" data-acao="item-encomendar" data-id="' + x.id + '"' +
+              ' title="Encomendei e vai chegar: vira espera com data.">encomendei</button>' +
+            '<button type="button" class="bt-linha bt-mini" data-acao="pendencia-tirar" data-id="' + x.id + '"' +
+              ' title="Tira da lista sem registro — não precisa mais.">tirar</button>') +
+        '</div>';
+    }
+    return '<div class="espera-item espera-' + nivel + '">' +
+      '<span class="ponto ponto-' + nivel + '"></span>' +
+      '<span class="espera-texto">espera <b>' + esc(x.descricao) + '</b> · ' + esc(M.textoPendencia(x)) + '</span>' +
+      '<button type="button" class="bt-fraco bt-mini" data-acao="pendencia-chegou" data-id="' + x.id + '">chegou</button>' +
+      '<button type="button" class="bt-linha bt-mini" data-acao="pendencia-cancelada" data-id="' + x.id + '"' +
+        ' title="A coisa não vem mais: gera a tarefa de resolver no lugar.">cancelada</button>' +
+      '<button type="button" class="bt-linha bt-mini" data-acao="pendencia-tirar" data-id="' + x.id + '"' +
+        ' title="Apaga a espera sem registro — para a que foi criada errada ou já não faz sentido.">tirar</button>' +
+      '</div>';
   }
 
   function marcasDe(t, numeros) {
@@ -1820,27 +1855,8 @@
     var naRua = t.ondePrecisaEstar === 'fora';
 
     return [
-      /* COMPRA (§52): "como vai comprar?" decide a via — e a via decide o
-         local sozinha (rua = fora, internet = computador). A lista do que
-         comprar é própria: comprar não é levar. */
-      grupo('Compra', '',
-        linhaCond('Como vai comprar?',
-          'Tarefa de compra: "na rua" cai na folha da rua com a lista; "pela internet" é ' +
-          'trabalho de computador — e, concluída, cada item vira uma espera própria no ' +
-          'Aguardando, porque as entregas chegam em datas diferentes.',
-          '<span class="compra-vias">' +
-          chipCompra(t, '', 'não é compra', travado) +
-          chipCompra(t, 'rua', 'na rua', travado) +
-          chipCompra(t, 'internet', 'pela internet', travado) + '</span>') +
-        (t.compra
-          ? campoLista('tarefa', t.id, 'compras', 'O que comprar', t.compras,
-              '90 m de tela soldada\n2 kg de grampo', travado,
-              'Um item por linha, com a quantidade. Na rua vira a lista de compras da folha; ' +
-              'pela internet, cada item vira uma espera quando a compra é concluída.')
-          : ''),
-        'Se esta tarefa é uma compra, e por onde. A via decide o resto: rua entra na folha ' +
-        'da rua; internet é computador.'),
-
+      /* Compra não é tarefa (§56): o que falta comprar são ITENS, no bloco de
+         compras e esperas da ficha aberta — nada de grupo de compra aqui. */
       // o local mora na linha da tarefa (§46); aqui fica só o ponto exato
       noPc ? '' :
       grupo('Onde', 'grade',
@@ -2043,17 +2059,6 @@
     return '<div class="cond">' +
       '<span class="cond-rotulo tem-ajuda" title="' + esc(ajuda) + '">' + esc(rotulo) + '</span>' +
       '<div class="cond-corpo">' + corpo + '</div></div>';
-  }
-
-  // os três chips da compra: o marcado aceso; travado vira texto lido
-  function chipCompra(t, via, texto, travado) {
-    if (travado) {
-      if (t.compra === via && via) return '<span class="valor-lido">' + esc(texto) + '</span>';
-      if (!via && !t.compra) return '<span class="valor-lido aviso">não é compra</span>';
-      return '';
-    }
-    return '<button type="button" class="filtro' + (t.compra === via ? ' filtro-on' : '') +
-      '" data-acao="compra-via" data-id="' + t.id + '" data-valor="' + via + '">' + esc(texto) + '</button>';
   }
 
   /* Sim/não com palavra, não caixa de marca: trancado, "[ ] sim" não diz se a
@@ -2269,7 +2274,11 @@
       '</div>',
 
       abertas.length
-        ? '<ul class="pendencias">' + abertas.map(linhaPendencia).join('') + '</ul>'
+        ? '<ul class="pendencias">' + abertas.map(function (x) {
+            return x.fase === 'falta'
+              ? '<li class="pendencia pendencia-falta">' + linhaItem(x) + segurandoDe(x) + '</li>'
+              : linhaPendencia(x);
+          }).join('') + '</ul>'
         : '<p class="aviso" style="margin-top:24px">Nada esperando.</p>',
 
       resolvidas.length
@@ -2279,6 +2288,15 @@
           }).join('') + '</div>'
         : ''
     ].join('');
+  }
+
+  // de onde o item veio — a tarefa que ele segura, em mono miúdo
+  function segurandoDe(x) {
+    var t = x.tarefaId && M.tarefa(x.tarefaId);
+    if (!t) return '';
+    var p = t.projetoId && M.projeto(t.projetoId);
+    return '<span class="pendencia-nota">segura <em>' + esc(t.texto) + '</em>' +
+      (p ? ' (' + esc(p.nome) + ')' : '') + '</span>';
   }
 
   function linhaPendencia(x) {
@@ -2390,6 +2408,7 @@
 
   function marcacaoRua() {
     var lista = M.tarefasDaRua();
+    var itensRua = M.itensDaRua();
     var voltar = '<button type="button" class="voltar-lista rua-voltar" data-acao="voltar-inicio">← voltar</button>';
     return [
       // o que só sai no papel, como na folha do diarista
@@ -2398,6 +2417,16 @@
       voltar,
       '<h2>Na rua</h2>',
       '<p class="palco-sub">O que dá para resolver nesta saída. Segure e arraste para montar a rota; o que não der, fica.</p>',
+      itensRua.length
+        ? '<div class="secao rua-comprar"><div class="secao-titulo">Comprar</div>' +
+            '<div class="rua-comprar-itens">' + itensRua.map(function (x) {
+              var t = x.tarefaId && M.tarefa(x.tarefaId);
+              var p = (x.projetoId && M.projeto(x.projetoId)) || (t && t.projetoId && M.projeto(t.projetoId));
+              return '<button type="button" class="rua-risca" data-acao="rua-comprei" data-id="' + x.id + '">' +
+                '<i aria-hidden="true"></i>' + esc(x.descricao) +
+                (t || p ? '<em>' + esc(t ? t.texto : p.nome) + '</em>' : '') + '</button>';
+            }).join('') + '</div></div>'
+        : '',
       lista.length
         ? '<div class="rua-cabeca">' +
             '<button type="button" class="bt-fraco bt-mini" data-acao="rua-copiar">copiar a lista</button>' +
@@ -2416,7 +2445,7 @@
                   // o mapa é opcional e discreto: ele conhece os lugares (§51)
                   (t.onde ? '<span><b>Onde:</b> ' + esc(t.onde) +
                     ' <a class="rua-mapa" href="https://maps.google.com/?q=' + encodeURIComponent(t.onde) + '" target="_blank" rel="noopener">mapa</a></span>' : '') +
-                  itensRiscaveis(t.id, 'Comprar', t.compra ? t.compras : t.materiais) +
+                  itensRiscaveis(t.id, 'Comprar', t.materiais) +
                   itensRiscaveis(t.id, 'Levar', t.ferramentas) +
                   (M.recadoDe(t.id) ? '<span class="folha-recado"><b>Detalhes:</b> ' + esc(M.recadoDe(t.id)) + '</span>' : '') +
                 '</div>' +
@@ -2434,12 +2463,17 @@
   // a lista como texto puro: WhatsApp, ou colar onde quiser
   function textoDaRua() {
     var linhas = ['Rebrota — na rua · ' + M.formatarData(M.hoje()), ''];
+    var itens = M.itensDaRua();
+    if (itens.length) {
+      linhas.push('Comprar:');
+      itens.forEach(function (x) { linhas.push('  [ ] ' + x.descricao); });
+      linhas.push('');
+    }
     M.tarefasDaRua().forEach(function (t, i) {
       var p = t.projetoId ? M.projeto(t.projetoId) : null;
       linhas.push((i + 1) + '. ' + (t.texto || 'tarefa sem texto') + (p ? ' (' + p.nome + ')' : ''));
       if (t.onde) linhas.push('   Onde: ' + t.onde);
-      var comprar = t.compra ? t.compras : t.materiais;
-      if ((comprar || []).length) linhas.push('   Comprar: ' + comprar.join(', '));
+      if ((t.materiais || []).length) linhas.push('   Comprar: ' + t.materiais.join(', '));
       if ((t.ferramentas || []).length) linhas.push('   Levar: ' + t.ferramentas.join(', '));
       if (M.recadoDe(t.id)) linhas.push('   Detalhes: ' + M.recadoDe(t.id));
       linhas.push('');
@@ -2456,7 +2490,7 @@
   function aindaNaRua() {
     var dia = null;
     try { dia = localStorage.getItem(CHAVE_RUA); } catch (e) {}
-    return dia === M.hoje() && M.tarefasDaRua().length > 0;
+    return dia === M.hoje() && (M.tarefasDaRua().length + M.itensDaRua().length) > 0;
   }
 
   function textoDaFolha() {
@@ -3166,16 +3200,6 @@
       if (tarefaC.separada) M.fecharDiarista(tid, 'feita', null, notaC);
       else M.terminar('pe_eu', tid, notaC);
       M.limparKit(tid);
-      /* Compra pela internet: as esperas nascem AGORA, com as datas dadas na
-         própria caixa (§54) — nada de ir acertar no Aguardando depois. */
-      var datasC = (tarefaC.compra === 'internet')
-        ? (tarefaC.compras || []).map(function (x, i) { return valorDoCampo('dataCompra_' + tid + '_' + i); })
-        : null;
-      var esperasNovas = M.abrirEsperasDaCompra(tid, datasC);
-      if (esperasNovas.length) {
-        avisoCascata = 'Abri ' + esperasNovas.length + (esperasNovas.length === 1 ? ' espera' : ' esperas') +
-          ' no Aguardando, com as datas que você deu.';
-      }
       concluindoTarefa = null;
       return apurarVagas();
     }
@@ -3208,8 +3232,29 @@
       return desenhar();
     }
     if (acao === 'sincronizar-agora') { Sync.sincronizar(); return; }
-    if (acao === 'esperar-abrir')  { esperando = tid; return desenharPalco(); }
-    if (acao === 'esperar-cancelar') { esperando = null; return desenharPalco(); }
+    if (acao === 'esperar-abrir')  { esperando = tid; faltando = null; return desenharPalco(); }
+    if (acao === 'esperar-cancelar') { esperando = null; faltando = null; return desenharPalco(); }
+    if (acao === 'falta-abrir') { faltando = tid; esperando = null; return desenharPalco(); }
+    if (acao === 'falta-confirmar') {
+      var oqueFalta = valorDoCampo('faltaDesc_' + tid);
+      if (!oqueFalta) { var cf = document.getElementById('faltaDesc_' + tid); if (cf) cf.focus(); return; }
+      M.faltarItem(tid, oqueFalta, 'rua');
+      faltando = null;
+      return desenhar();
+    }
+    if (acao === 'item-via') { M.mudarViaItem(tid, el.getAttribute('data-valor')); return desenharPalco(); }
+    if (acao === 'item-comprei') {
+      M.comprarItem('pe_eu', tid);
+      if (naMesa()) M.absorverCompras();
+      return desenhar();
+    }
+    if (acao === 'item-encomendar') { encomendando = tid; return desenharPalco(); }
+    if (acao === 'item-encomendar-nao') { encomendando = null; return desenharPalco(); }
+    if (acao === 'item-encomendar-ok') {
+      M.encomendarItem(tid, valorDoCampo('encomendaDia_' + tid));
+      encomendando = null;
+      return desenhar();
+    }
     if (acao === 'esperar-confirmar') {
       var oque = valorDoCampo('esperaDesc_' + tid);
       if (!oque) { var c = document.getElementById('esperaDesc_' + tid); if (c) c.focus(); return; }
@@ -3290,23 +3335,13 @@
       M.tirarTag(alvoTag, el.getAttribute('data-valor'));
       return desenharPalco();
     }
-    if (acao === 'compra-via') {
-      var tc = M.tarefa(tid); if (!tc) return;
-      var via = el.getAttribute('data-valor');
-      tc.compra = via;
-      // a via decide o local — e o local decide o resto da ficha (§42)
-      if (via === 'rua') tc.ondePrecisaEstar = 'fora';
-      if (via === 'internet') { tc.ondePrecisaEstar = 'computador'; tc.onde = ''; }
-      if (via) {
-        tc.exigeClima = 'indiferente'; tc.podeNoCalor = true; tc.exigeSoloFirme = false;
-        tc.precisaAjuda = false; tc.boaComCriancas = false; tc.perigosaComCriancas = false;
-        tc.podeParar = true; tc.esforco = 'leve'; tc.guardadaParaChuva = false;
-      }
-      tc.ultimoToque = M.agora(); M.salvar();
-      return desenharPalco();
-    }
     if (acao === 'ir-rua') { tela = { tipo: 'rua', id: null }; entrarNaRua(); return desenhar(); }
     if (acao === 'rua-riscar') { M.alternarConferido(tid, el.getAttribute('data-valor')); return desenharPalco(); }
+    if (acao === 'rua-comprei') {
+      M.comprarItem('pe_eu', tid);
+      if (naMesa()) M.absorverCompras();
+      return desenharPalco();
+    }
     if (acao === 'rua-copiar') {
       var textoRua = textoDaRua();
       function copiou() { el.textContent = 'copiado'; setTimeout(function () { el.textContent = 'copiar a lista'; }, 1500); }
@@ -3316,7 +3351,7 @@
     }
     if (acao === 'rua-feita') {
       M.terminar('pe_eu', tid, ''); M.limparKit(tid); colherAvisos();
-      if (!M.tarefasDaRua().length) sairDaRua();   // acabou a rua: o próximo abrir é a entrada
+      if (!M.tarefasDaRua().length && !M.itensDaRua().length) sairDaRua();
       return desenhar();
     }
     if (acao === 'diarista-copiar') {
@@ -4107,7 +4142,7 @@
     // a linha da nuvem na entrada acompanha o estado (hora, erro), sem mexer no resto
     if (!mudouLocal && tela.tipo === null && $campo.hidden && !s.ocupado) return desenhar();
     if (!mudouLocal) return;
-    if (naMesa()) M.absorverSementes();
+    if (naMesa()) { M.absorverSementes(); M.absorverCompras(); }
     M.cascatearVagas(); colherAvisos();
     // a frente de campo lê o estado a cada toque; a mesa precisa redesenhar
     if ($campo.hidden) desenhar(); else desenharLista();
@@ -4120,7 +4155,7 @@
   colherAvisos();       // ... e dito, não engolido
   conferirProposta();
   desenharProposta();
-  if (naMesa()) M.absorverSementes();
+  if (naMesa()) { M.absorverSementes(); M.absorverCompras(); }
   voltarAoLugar();
   // a bota abre na entrada, de propósito — salvo se você disse que ia sair e a rua ainda tem coisa
   if (!naMesa() && aindaNaRua()) tela = { tipo: 'rua', id: null };

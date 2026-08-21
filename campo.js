@@ -511,24 +511,10 @@ var Campo = (function () {
   function marcacaoTerminar() {
     var t = M.tarefaAtivaDe(EU);
     if (!t) return '';
-    /* Compra pela internet (§54): "chega quando?", uma data por item, aqui
-       mesmo — as esperas nascem com as datas certas. Só na mesa: pendência é
-       catálogo, e a bota não escreve catálogo. */
-    var compraNet = t.compra === 'internet' && (t.compras || []).length &&
-      window.matchMedia('(min-width: 721px)').matches;
-    var d = new Date(); d.setDate(d.getDate() + 7);
-    var padrao = M.diaLocal(d);
     return caixa('Quer anotar alguma coisa?',
       '<p class="c-nota" style="text-align:left;margin:0 0 14px">' +
         'A medida, o preço, o que descobriu. Pode deixar em branco.</p>' +
       '<textarea class="c-campo" id="cAnotacao" rows="4" placeholder="opcional"></textarea>' +
-      (compraNet
-        ? '<p class="c-titulo" style="margin-top:20px">Chega quando?</p>' +
-          t.compras.map(function (item, i) {
-            return '<label class="c-data-compra">' + esc(item) +
-              '<input type="date" id="cDataCompra_' + i + '" value="' + padrao + '"></label>';
-          }).join('')
-        : '') +
       '<button type="button" class="c-acao" data-acao="confirmar-terminei">pronto</button>');
   }
 
@@ -663,22 +649,8 @@ var Campo = (function () {
     if (acao === 'terminei' && ativa) { cena.fase = 'terminar'; return desenhar(); }
     if (acao === 'confirmar-terminei' && ativa) {
       var nota = ($.querySelector('#cAnotacao') || {}).value || '';
-      var eraCompra = ativa.compra === 'internet' && (ativa.compras || []).length;
       M.terminar(EU, ativa.id, nota.trim());
       M.limparKit(ativa.id);
-      /* Compra pela internet: uma espera por item, com as datas dadas aqui
-         mesmo (§54) — só na mesa, porque pendência é catálogo e a bota não
-         escreve catálogo. */
-      if (eraCompra && window.matchMedia('(min-width: 721px)').matches) {
-        var datas = (ativa.compras || []).map(function (x, i) {
-          return (($.querySelector('#cDataCompra_' + i) || {}).value) || '';
-        });
-        var novas = M.abrirEsperasDaCompra(ativa.id, datas);
-        if (novas.length) {
-          cena.avisoPendente = 'Abri ' + novas.length + (novas.length === 1 ? ' espera' : ' esperas') +
-            ' no Aguardando, com as datas que você deu.';
-        }
-      }
       return depoisDeFechar();
     }
 

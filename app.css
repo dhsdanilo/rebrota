@@ -488,6 +488,7 @@ select option { background: var(--mata); color: var(--neblina); }
 .espera-nova { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .espera-nova input { padding: 5px 8px; font-size: 14px; }
 .espera-nova input[type="text"] { min-width: 260px; flex: 1; }
+.aviso-espera.espera-falta { color: var(--casca); }
 .aviso-espera.espera-verde { color: var(--dentro); }
 .aviso-espera.espera-amarelo { color: var(--beirada); }
 .aviso-espera.espera-vermelho { color: var(--passou); }
@@ -585,6 +586,9 @@ body.rua-arrastando, body.rua-arrastando * { cursor: grabbing; }
   }
   .na-rua .rua-pegando { border-radius: 10px; border-top-color: transparent; padding-left: 8px; padding-right: 8px; }
   .na-rua .rua-nada { font-size: 17px; }
+  .na-rua .rua-comprar { margin: 0 0 18px; }
+  .na-rua .rua-comprar .secao-titulo { font-size: 13px; }
+  .rua-clara .rua-comprar .secao-titulo { color: #4A4A4A; }
   .na-rua .rua-cabeca { margin: 0 0 14px; gap: 10px; }
   .na-rua .rua-cabeca .bt-mini { min-height: 44px; padding: 8px 16px; font-size: 15px; }
   .na-rua .rua-mapa { font-size: 12px; padding: 3px 12px; }
@@ -2275,15 +2279,17 @@ input[type="number"][readonly] { -moz-appearance: textfield; }
   text-align: center;
 }
 
-.compra-vias { display: flex; gap: 6px; flex-wrap: wrap; }
-/* "chega quando?" — uma data por item, na caixa do concluir */
-.concluir-data, .c-data-compra {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px;
-  font-size: 14px; color: var(--neblina); margin: 0 0 8px; max-width: 480px;
-}
-.concluir-data input, .c-data-compra input { font-family: var(--mono); font-size: 13px; padding: 5px 8px; }
-.c-data-compra { margin: 0 0 10px; text-align: left; }
 .confirma-concluir { margin: 10px 0 14px; }
+/* itens de compra (§56) */
+.ponto-falta { background: var(--neblina-fraca); }
+.item-vias { display: inline-flex; gap: 4px; }
+.espera-adders { display: flex; gap: 8px; flex-wrap: wrap; }
+.pendencia-falta { display: flex; flex-direction: column; gap: 4px; align-items: stretch; }
+.pendencia-falta .espera-item { flex-wrap: wrap; }
+.pendencia-falta .pendencia-nota { padding-left: 22px; }
+.rua-comprar .rua-comprar-itens { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+.rua-comprar .rua-risca em { font-style: normal; font-family: var(--mono); font-size: 10px;
+  color: var(--neblina-fraca); margin-left: 8px; }
 
 /* a previsão (§53): leitura, nunca registro */
 .c-previsao {

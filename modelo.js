@@ -193,7 +193,40 @@ var Modelo = (function () {
     ultimoCatalogo = JSON.stringify(estado.catalogo);
     carregarKit();
     derivar();
+    converterTarefasDeCompra();
     return estado;
+  }
+
+  /* MIGRAÇÃO (§56): tarefa de compra ABERTA vira itens em falta — um por linha
+     da lista, vinculados à primeira tarefa que dependia dela — e a tarefa sai,
+     com lápide. Ids determinísticos: os dois aparelhos convertem igual e o
+     merge não duplica. Compra já feita fica como está: é registro. */
+  function converterTarefasDeCompra() {
+    var compras = cat().tarefas.filter(function (t) {
+      return t.compra && estadoDe(t.id) === 'aberta';
+    });
+    if (!compras.length) return;
+    compras.forEach(function (t) {
+      var dependente = tarefasVivas().filter(function (o) {
+        return (o.dependeDe || []).indexOf(t.id) !== -1 && estadoDe(o.id) === 'aberta';
+      })[0] || null;
+      var itens = (t.compras || []).length ? t.compras : [t.texto || 'compra'];
+      itens.forEach(function (item, i) {
+        var xid = 'x_' + t.id + '_' + i;
+        if (achar(cat().pendencias, xid)) return;
+        var x = novoItem(item, t.compra === 'internet' ? 'internet' : 'rua');
+        x.id = xid;
+        x.tarefaId = dependente ? dependente.id : null;
+        x.projetoId = t.projetoId || null;
+        cat().pendencias.push(x);
+      });
+      lapide(t.id);
+      cat().tarefas = cat().tarefas.filter(function (o) { return o.id !== t.id; });
+      cat().tarefas.forEach(function (o) {
+        o.dependeDe = (o.dependeDe || []).filter(function (d) { return d !== t.id; });
+      });
+    });
+    salvar();
   }
 
   /* Gravar o catálogo refaz a vista: uma tarefa recém-criada precisa existir
@@ -590,16 +623,31 @@ var Modelo = (function () {
     };
   }
 
+  /* O ITEM (§56): compra não é tarefa — é o que falta para uma tarefa
+     acontecer. A pendência ganhou o estado anterior à espera:
+       fase 'falta'     — sei que preciso, ainda não comprei (sem data);
+       fase 'esperando' — comprei/encomendei, tem data prevista.
+     `via` diz por onde se compra: rua (a folha da rua lista) ou internet.
+     Espera que não é compra (terceiro, processo) segue fase 'esperando'. */
   function novaPendencia(descricao) {
     return {
       id: id('x'),
       descricao: descricao || '',
       projetoId: null,
       tarefaId: null,          // a tarefa que ela destrava quando chegar
+      fase: 'esperando',       // 'falta' | 'esperando'
+      via: '',                 // '' | 'rua' | 'internet' (só interessa em falta)
       desde: hoje(),
       previsto: hoje(),
       resolvida: null          // null | 'chegou' | 'cancelada'
     };
+  }
+
+  function novoItem(descricao, via) {
+    var x = novaPendencia(descricao);
+    x.fase = 'falta';
+    x.via = via || 'rua';
+    return x;
   }
 
   /* O ditado do teclado não devolve pontuação, então o nome não pode confiar
@@ -812,9 +860,9 @@ var Modelo = (function () {
     { texto: 'Conferir o que já tenho — ferramenta e material',
       ondePrecisaEstar: 'sitio', duracaoTotal: 45, exigeClima: 'tolera_chuva_fina' },
     { texto: 'Orçar o que falta',
-      ondePrecisaEstar: 'computador', duracaoTotal: 60, quando: COMERCIAL },
-    { texto: 'Comprar o que falta', compra: 'rua',
-      ondePrecisaEstar: 'fora', duracaoTotal: 180, podeParar: false, quando: COMERCIAL }
+      ondePrecisaEstar: 'computador', duracaoTotal: 60, quando: COMERCIAL }
+    /* "Comprar o que falta" saiu (§56): comprar não é tarefa — o orçar produz
+       os ITENS em falta, e eles se compram pela folha da rua ou encomendando. */
   ];
 
   function semearPlanejamento(pid) {
@@ -1230,6 +1278,7 @@ var Modelo = (function () {
   function porQueEspera(t) {
     if (juntandoDinheiro(t)) return 'juntando dinheiro — faltam ' + moeda(faltaDinheiro(t));
     var esp = esperasDe(t.id)[0];
+    if (esp && esp.fase === 'falta') return 'falta comprar ' + esp.descricao;
     if (esp) return 'espera ' + esp.descricao + ' — ' + textoPendencia(esp).toLowerCase().replace(/\.$/, '');
     var trava = vistaDe(t.id).travadaPor;
     if (trava && estadoDe(trava) !== 'feita') {
@@ -1356,6 +1405,7 @@ var Modelo = (function () {
      performance de terceiro, nunca sobre a do usuário — por isso a regra 2
      não se aplica. Não vaza para nenhuma outra tela. */
   function nivelPendencia(x) {
+    if (x.fase === 'falta') return 'falta';   // sem data: ainda nem foi comprado
     var folga = diasAte(x.previsto);
     if (folga < 0) return 'vermelho';
     if (folga <= BEIRA_DO_PRAZO) return 'amarelo';
@@ -1363,6 +1413,7 @@ var Modelo = (function () {
   }
 
   function textoPendencia(x) {
+    if (x.fase === 'falta') return 'Falta comprar' + (x.via === 'internet' ? ' — internet.' : ' — rua.');
     var folga = diasAte(x.previsto);
     if (folga < 0)  return 'Era para ter chegado há ' + (-folga) + (folga === -1 ? ' dia.' : ' dias.');
     if (folga === 0) return 'Chega hoje.';
@@ -1371,9 +1422,9 @@ var Modelo = (function () {
   }
 
   function pendenciasAbertas() {
-    var peso = { vermelho: 0, amarelo: 1, verde: 2 };
-    return cat().pendencias
-      .filter(function (x) { return !x.resolvida; })
+    var peso = { vermelho: 0, amarelo: 1, verde: 2, falta: 3 };
+    return pendenciasVivas()
+      .filter(function (x) { return !x.resolvida && !vista.compradas[x.id]; })
       .sort(function (a, b) {
         var d = peso[nivelPendencia(a)] - peso[nivelPendencia(b)];
         return d || diasAte(a.previsto) - diasAte(b.previsto);
@@ -1403,8 +1454,69 @@ var Modelo = (function () {
     salvar();
     return x;
   }
+  function pendenciasVivas() {
+    var lapides = {};
+    (cat().apagados || []).forEach(function (l) { lapides[l.id] = true; });
+    return cat().pendencias.concat(vista.itensExtras.filter(function (x) {
+      return !achar(cat().pendencias, x.id) && !lapides[x.id];
+    }));
+  }
   function esperasDe(tid) {
-    return cat().pendencias.filter(function (x) { return x.tarefaId === tid && !x.resolvida; });
+    return pendenciasVivas().filter(function (x) {
+      return x.tarefaId === tid && !x.resolvida && !vista.compradas[x.id];
+    });
+  }
+
+  /* ── itens de compra (§56) ── */
+  // acrescentar um item em falta à tarefa (ou solto no projeto): mesa
+  function faltarItem(tid, descricao, via) {
+    descricao = (descricao || '').trim();
+    if (!descricao) return null;
+    var t = tid ? tarefa(tid) : null;
+    var x = novoItem(descricao, via);
+    if (t) { x.tarefaId = t.id; x.projetoId = t.projetoId || null; }
+    cat().pendencias.push(x);
+    salvar();
+    return x;
+  }
+  // comprei (na loja, riscando a lista): EVENTO — funciona na bota e na mesa
+  function comprarItem(quem, xid) {
+    return registrar(quem, 'comprou', { itemId: xid });
+  }
+  // encomendei (internet): ganha a data e vira espera de sempre — mesa
+  function encomendarItem(xid, previsto) {
+    var x = pendencia(xid);
+    if (!x) return null;
+    x.fase = 'esperando';
+    if (previsto) x.previsto = previsto;
+    salvar();
+    return x;
+  }
+  function mudarViaItem(xid, via) {
+    var x = pendencia(xid);
+    if (!x) return;
+    x.via = via;
+    salvar();
+  }
+  /* A mesa traz para o catálogo o que os eventos disseram: itens nascidos no
+     não dá e compras riscadas na rua. Idempotente — roda a cada abertura. */
+  function absorverCompras() {
+    var mudou = false;
+    vista.itensExtras.forEach(function (x) {
+      if (!achar(cat().pendencias, x.id)) { cat().pendencias.push(JSON.parse(JSON.stringify(x))); mudou = true; }
+    });
+    Object.keys(vista.compradas).forEach(function (xid) {
+      var x = achar(cat().pendencias, xid);
+      if (x && !x.resolvida) { x.resolvida = 'chegou'; mudou = true; }
+    });
+    if (mudou) salvar();
+    return mudou;
+  }
+  // a lista de compras da rua: itens em falta, via rua, ainda não comprados
+  function itensDaRua() {
+    return pendenciasVivas().filter(function (x) {
+      return x.fase === 'falta' && x.via !== 'internet' && !x.resolvida && !vista.compradas[x.id];
+    });
   }
 
   /* COMPRA PELA INTERNET CONCLUÍDA (§52): cada item da lista vira uma espera
@@ -1412,28 +1524,8 @@ var Modelo = (function () {
      semáforo do Aguardando. Se alguma tarefa dependia da compra, as esperas
      nascem vinculadas a ela: o material que falta segura quem precisa dele,
      não a compra já feita. Só a mesa chama isto (pendência é catálogo). */
-  /* As datas vêm da conclusão (§54): o app pergunta "chega quando?" item a
-     item na hora do concluir. Sem data informada, chute honesto de 7 dias —
-     ajusta-se no Aguardando. */
-  function abrirEsperasDaCompra(tid, datas) {
-    var t = tarefa(tid);
-    if (!t || t.compra !== 'internet' || !(t.compras || []).length) return [];
-    var dependente = tarefasVivas().filter(function (o) {
-      return (o.dependeDe || []).indexOf(tid) !== -1 && estadoDe(o.id) === 'aberta';
-    })[0] || null;
-    var d = new Date(); d.setDate(d.getDate() + 7);
-    var padrao = diaLocal(d);
-    var novas = t.compras.map(function (item, i) {
-      var x = novaPendencia(item);
-      x.projetoId = t.projetoId || null;
-      x.tarefaId = dependente ? dependente.id : null;
-      x.previsto = (datas && datas[i]) || padrao;
-      cat().pendencias.push(x);
-      return x;
-    });
-    salvar();
-    return novas;
-  }
+  // §54 morreu na §56: compra não é mais tarefa, então não há "concluir a
+  // compra" — o item nasce em falta e vira espera ao ser encomendado.
 
   /* Tirar é diferente de resolver (§55): a espera cadastrada errada, ou que
      já não faz sentido, sai sem deixar registro nem gerar tarefa. Com lápide,
@@ -1683,7 +1775,7 @@ var Modelo = (function () {
      conflito impossível por construção. O estado corrente é derivado dos dois
      lados do mesmo jeito, então ninguém precisa "aplicar" nada no outro. */
 
-  var vista = { tarefas: {}, pessoas: {}, extras: [] };
+  var vista = { tarefas: {}, pessoas: {}, extras: [], compradas: {}, itensExtras: [] };
 
   function diarioDe(quem) {
     if (!estado.diarios[quem]) estado.diarios[quem] = { pessoa: quem, eventos: [] };
@@ -1719,7 +1811,7 @@ var Modelo = (function () {
   }
 
   function derivar() {
-    vista = { tarefas: {}, pessoas: {}, extras: [] };
+    vista = { tarefas: {}, pessoas: {}, extras: [], compradas: {}, itensExtras: [] };
 
     cat().tarefas.forEach(function (t) {
       vista.tarefas[t.id] = {
@@ -1739,6 +1831,14 @@ var Modelo = (function () {
 
   function aplicarEvento(ev) {
     var pessoa = vista.pessoas[ev.quem] || (vista.pessoas[ev.quem] = pessoaVazia());
+
+    /* Itens (§56): comprado na bota é evento; o catálogo só aprende quando a
+       mesa absorve — mas a vista já sabe, então a tarefa destrava na hora. */
+    if (ev.tipo === 'comprou' && ev.itemId) vista.compradas[ev.itemId] = true;
+    if (ev.itemNovo && !achar(cat().pendencias, ev.itemNovo.id) &&
+        !vista.itensExtras.some(function (x) { return x.id === ev.itemNovo.id; })) {
+      vista.itensExtras.push(ev.itemNovo);
+    }
 
     // o não dá pode criar um destrave, e criar tarefa no campo é acontecimento,
     // não decisão de mesa — por isso ela nasce dentro do próprio evento
@@ -1901,8 +2001,10 @@ var Modelo = (function () {
   var MOTIVOS_NAO_DA = [
     { v: 'ferramenta_sumiu',  t: 'A ferramenta sumiu',            destrave: 'Procurar a ferramenta: ' },
     { v: 'ferramenta_quebrou', t: 'A ferramenta quebrou',          destrave: 'Consertar ou substituir: ' },
-    { v: 'sem_ferramenta',    t: 'Não tenho essa ferramenta',      destrave: 'Comprar a ferramenta: ' },
-    { v: 'faltou_material',   t: 'Faltou material',                destrave: 'Encomendar o material: ' },
+    // compra não é tarefa (§56): estes dois geram um ITEM em falta, preso à
+    // própria tarefa recusada — ela fica trancada até o item chegar
+    { v: 'sem_ferramenta',    t: 'Não tenho essa ferramenta',      destrave: null, item: true },
+    { v: 'faltou_material',   t: 'Faltou material',                destrave: null, item: true },
     { v: 'terceiro',          t: 'Preciso falar com alguém',       destrave: 'Falar com quem falta: ' },
     { v: 'ja_fiz',            t: 'Já fiz',                         destrave: null },
     { v: 'tempo_virou',       t: 'O tempo virou',                  destrave: null },
@@ -1918,20 +2020,22 @@ var Modelo = (function () {
     if (motivo === 'demora_mais') {
       dados.restanteNovo = Math.round(restanteDe(tid) * 1.5);
     }
+    /* Faltou material / não tenho a ferramenta: nasce um ITEM em falta (§56),
+       vinculado à própria tarefa recusada — ela sai do páreo até o item chegar.
+       O item nasce dentro do evento (a bota não escreve catálogo); a vista o
+       deriva na hora e a mesa o absorve para o catálogo ao abrir. */
+    if (regra && regra.item) {
+      var item = novoItem(nota || (t ? t.texto : 'o que faltou'), 'rua');
+      item.id = 'x_' + dados.tarefaId + '_' + Date.now().toString(36);
+      item.tarefaId = tid;
+      item.projetoId = t ? t.projetoId : null;
+      dados.itemNovo = item;
+    }
     if (regra && regra.destrave) {
       var d = novaTarefa(t ? t.projetoId : null, 0);
       if (t && t.etapa) d.etapa = t.etapa;   // mesma razão da tarefa de pensar
       d.texto = regra.destrave + (nota || (t ? t.texto : ''));
-      /* Destrave de compra nasce COMPRA NA RUA (§52): a maioria se resolve na
-         cidade e cai na folha da rua com o item na lista; virar internet é um
-         toque na mesa. Procurar ferramenta continua sendo no sítio. */
-      if (motivo === 'sem_ferramenta' || motivo === 'faltou_material') {
-        d.compra = 'rua';
-        if (nota) d.compras = [nota];
-      }
-      d.ondePrecisaEstar = (motivo === 'terceiro') ? 'fora'
-                         : (motivo === 'sem_ferramenta' || motivo === 'faltou_material') ? 'fora'
-                         : 'sitio';
+      d.ondePrecisaEstar = (motivo === 'terceiro') ? 'fora' : 'sitio';
       d.duracaoTotal = d.restanteEstimado = 20;
       d.esforco = 'leve';
       d.exigeClima = 'indiferente';
@@ -2367,8 +2471,10 @@ var Modelo = (function () {
     blocoDe: blocoDe, janelaDoPreset: janelaDoPreset,
 
     pendenciasAbertas: pendenciasAbertas, nivelPendencia: nivelPendencia,
-    esperarPara: esperarPara, esperasDe: esperasDe, abrirEsperasDaCompra: abrirEsperasDaCompra,
+    esperarPara: esperarPara, esperasDe: esperasDe,
     desfazerPendencia: desfazerPendencia,
+    faltarItem: faltarItem, comprarItem: comprarItem, encomendarItem: encomendarItem,
+    mudarViaItem: mudarViaItem, absorverCompras: absorverCompras, itensDaRua: itensDaRua,
     textoPendencia: textoPendencia, inserirPendencia: inserirPendencia,
     resolverPendencia: resolverPendencia,
 
