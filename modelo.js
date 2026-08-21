@@ -1412,19 +1412,22 @@ var Modelo = (function () {
      semáforo do Aguardando. Se alguma tarefa dependia da compra, as esperas
      nascem vinculadas a ela: o material que falta segura quem precisa dele,
      não a compra já feita. Só a mesa chama isto (pendência é catálogo). */
-  function abrirEsperasDaCompra(tid) {
+  /* As datas vêm da conclusão (§54): o app pergunta "chega quando?" item a
+     item na hora do concluir. Sem data informada, chute honesto de 7 dias —
+     ajusta-se no Aguardando. */
+  function abrirEsperasDaCompra(tid, datas) {
     var t = tarefa(tid);
     if (!t || t.compra !== 'internet' || !(t.compras || []).length) return [];
     var dependente = tarefasVivas().filter(function (o) {
       return (o.dependeDe || []).indexOf(tid) !== -1 && estadoDe(o.id) === 'aberta';
     })[0] || null;
-    var d = new Date(); d.setDate(d.getDate() + 7);   // chute honesto; a data se ajusta no Aguardando
-    var previsto = diaLocal(d);
-    var novas = t.compras.map(function (item) {
+    var d = new Date(); d.setDate(d.getDate() + 7);
+    var padrao = diaLocal(d);
+    var novas = t.compras.map(function (item, i) {
       var x = novaPendencia(item);
       x.projetoId = t.projetoId || null;
       x.tarefaId = dependente ? dependente.id : null;
-      x.previsto = previsto;
+      x.previsto = (datas && datas[i]) || padrao;
       cat().pendencias.push(x);
       return x;
     });
@@ -1675,8 +1678,16 @@ var Modelo = (function () {
     return estado.diarios[quem];
   }
 
+  /* POR ONDE (§54): todo evento carrega a superfície em que nasceu — bota,
+     mesa-execucao (a consulta aberta no PC), mesa-organizacao (o catálogo),
+     rua, folha-diarista, sementeira. É matéria-prima do modo analisar: dizer
+     onde o trabalho de verdade acontece. Quem desenha a tela diz quem é. */
+  var fonteVia = null;
+  function quandoRegistrar(fn) { fonteVia = fn; }
+
   function registrar(quem, tipo, dados) {
     var ev = { id: id('ev'), quando: agora(), quem: quem, tipo: tipo };
+    if (fonteVia) { try { var v = fonteVia(); if (v) ev.via = v; } catch (e) {} }
     Object.keys(dados || {}).forEach(function (k) { ev[k] = dados[k]; });
     diarioDe(quem).eventos.push(ev);
     salvar();   // já refaz a vista
@@ -2294,7 +2305,7 @@ var Modelo = (function () {
     temTarefaAtiva: temTarefaAtiva,
 
     // sincronização
-    quandoSalvar: quandoSalvar, receberCatalogo: receberCatalogo, unirDiario: unirDiario,
+    quandoSalvar: quandoSalvar, quandoRegistrar: quandoRegistrar, receberCatalogo: receberCatalogo, unirDiario: unirDiario,
     fotografarCatalogo: fotografarCatalogo, fotoDoCatalogo: fotoDoCatalogo, voltarAFoto: voltarAFoto,
     catalogoVazio: catalogoVazio, versaoDoCatalogo: versaoDoCatalogo, relerSeOutraAbaGravou: relerSeOutraAbaGravou,
     usoIniciar: usoIniciar, usoTela: usoTela, usoFechar: usoFechar, usoRetomar: usoRetomar,

@@ -2276,6 +2276,14 @@ input[type="number"][readonly] { -moz-appearance: textfield; }
 }
 
 .compra-vias { display: flex; gap: 6px; flex-wrap: wrap; }
+/* "chega quando?" — uma data por item, na caixa do concluir */
+.concluir-data, .c-data-compra {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  font-size: 14px; color: var(--neblina); margin: 0 0 8px; max-width: 480px;
+}
+.concluir-data input, .c-data-compra input { font-family: var(--mono); font-size: 13px; padding: 5px 8px; }
+.c-data-compra { margin: 0 0 10px; text-align: left; }
+.confirma-concluir { margin: 10px 0 14px; }
 
 /* a previsão (§53): leitura, nunca registro */
 .c-previsao {

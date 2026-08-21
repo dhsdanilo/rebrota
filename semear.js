@@ -318,6 +318,7 @@
 
   Sync.configurar({ escreveCatalogo: false, pessoa: EU });
   M.quandoSalvar(function () { Sync.marcarSujo(); });
+  M.quandoRegistrar(function () { return 'sementeira'; });
   M.usoIniciar(EU, 'sementeira'); M.usoTela('plantar');
   document.addEventListener('visibilitychange', function () {
     if (document.visibilityState === 'hidden') M.usoFechar(); else M.usoRetomar();

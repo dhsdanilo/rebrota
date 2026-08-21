@@ -25,6 +25,7 @@
   var acaoProjeto = null;          // { pid, tipo } esperando confirmação
   var cancelandoTarefa = null;     // id da tarefa com o cancelar destravado
   var apagandoTarefa = null;       // id da tarefa com o apagar destravado
+  var concluindoTarefa = null;     // id da tarefa com o concluir aberto (nota + datas de compra)
   var avisoCascata = '';           // o que a última ação moveu de vaga
   var planejamentoAberto = null;   // pid com o planejamento concluído reaberto
   var filtroProjetos = '';         // grupo aberto na página de projetos
@@ -1639,6 +1640,7 @@
           : '<button type="button" class="bt-linha bt-mini" data-acao="editar-passo" data-id="' + t.id + '">editar</button>') +
       '</div>' +
 
+      (concluindoTarefa === t.id ? caixaConcluir(t) : '') +
       (M.juntandoDinheiro(t) && !aberto && !fechada(t)
         ? '<div class="passo-avisos"><span class="aviso-linha aviso-diarista">juntando dinheiro · faltam ' + esc(M.moeda(M.faltaDinheiro(t))) + '</span></div>' : '') +
       (M.esperasDe(t.id).length && !aberto
@@ -1680,6 +1682,32 @@
         : '<div class="passo-marcas">' + marcasDe(t, numeros) + '</div>' +
           (t.recado ? '<p class="passo-recado">' + esc(t.recado) + '</p>' : '')) +
       '</li>';
+  }
+
+  /* CONCLUIR COM NOTA (§54): a conclusão na mesa abre uma caixa com anotação
+     opcional — "o Zé fez", "custou R$ 340" — que vira a anotação do terminou
+     e aparece na trilha. Compra pela internet pergunta aqui mesmo "chega
+     quando?", uma data por item: as esperas nascem com as datas certas, sem
+     passar pelo Aguardando. */
+  function dataMais7() {
+    var d = new Date(); d.setDate(d.getDate() + 7);
+    return M.diaLocal(d);
+  }
+  function caixaConcluir(t) {
+    var compraNet = t.compra === 'internet' && (t.compras || []).length;
+    return '<div class="confirma confirma-concluir">' +
+      '<p class="confirma-texto">' + (t.separada ? 'Concluir como feita pelo diarista.' : 'Concluir.') +
+        (compraNet ? ' Chega quando? Uma data por item — cada um vira uma espera no Aguardando.' : '') + '</p>' +
+      (compraNet ? t.compras.map(function (item, i) {
+          return '<label class="concluir-data">' + esc(item) +
+            '<input type="date" id="dataCompra_' + t.id + '_' + i + '" value="' + dataMais7() + '"></label>';
+        }).join('') : '') +
+      '<input type="text" class="confirma-campo" id="notaConcluir_' + t.id + '"' +
+        ' placeholder="anotação — opcional: quem fez, o que descobriu, quanto custou">' +
+      '<div class="confirma-acoes">' +
+        '<button type="button" class="bt-forte" data-acao="confirmar-concluir" data-id="' + t.id + '">concluir</button>' +
+        '<button type="button" class="bt-fraco" data-acao="voltar-concluir">deixa quieto</button>' +
+      '</div></div>';
   }
 
   function marcasDe(t, numeros) {
@@ -1838,7 +1866,7 @@
       /* Fora não tem condições (§42): sair é planejado, não sorteado — a folha
          da rua é a lista, e ele decide. O que sobra para a rua: o que é, o
          lugar, o que comprar, quando precisa, dependência, tags, nota. */
-      (naRua ? '' :
+      (naRua || t.compra ? '' :
       grupo('Condições', '',
         (noPc ? '' :
         linhaCond('Clima',
@@ -2928,7 +2956,7 @@
     return campo ? campo.value.trim() : '';
   }
 
-  function fecharFicha() { passoAberto = null; passoEditando = null; cancelandoTarefa = null; apagandoTarefa = null; }
+  function fecharFicha() { passoAberto = null; passoEditando = null; cancelandoTarefa = null; apagandoTarefa = null; concluindoTarefa = null; }
 
   // largura, não user-agent: o que muda o comportamento é o tamanho da tela
   function naMesa() { return window.matchMedia('(min-width: 721px)').matches; }
@@ -3116,20 +3144,33 @@
 
     // concluir e reabrir também pelo PC: nem tudo é feito com o celular na mão
     if (acao === 'concluir-tarefa') {
+      concluindoTarefa = tid;
+      cancelandoTarefa = null; apagandoTarefa = null;
+      desenharPalco();
+      var campoNota = document.getElementById('notaConcluir_' + tid);
+      if (campoNota) campoNota.focus();
+      return;
+    }
+    if (acao === 'voltar-concluir') { concluindoTarefa = null; return desenharPalco(); }
+    if (acao === 'confirmar-concluir') {
+      var tarefaC = M.tarefa(tid);
+      if (!tarefaC) { concluindoTarefa = null; return desenharPalco(); }
+      var notaC = valorDoCampo('notaConcluir_' + tid);
       // delegada: concluir fora da folha também é "ele fez" — senão o registro mentia
-      var tarefaDel = M.tarefa(tid);
-      if (tarefaDel && tarefaDel.separada) M.fecharDiarista(tid, 'feita');
-      else M.terminar('pe_eu', tid, '');
+      if (tarefaC.separada) M.fecharDiarista(tid, 'feita', null, notaC);
+      else M.terminar('pe_eu', tid, notaC);
       M.limparKit(tid);
-      /* Compra pela internet concluída: uma espera por item, cada uma com a
-         própria data (§52). Nascem com ~7 dias e o Aguardando abre para
-         acertar as datas na hora — é lá que elas se editam. */
-      var esperasNovas = M.abrirEsperasDaCompra(tid);
+      /* Compra pela internet: as esperas nascem AGORA, com as datas dadas na
+         própria caixa (§54) — nada de ir acertar no Aguardando depois. */
+      var datasC = (tarefaC.compra === 'internet')
+        ? (tarefaC.compras || []).map(function (x, i) { return valorDoCampo('dataCompra_' + tid + '_' + i); })
+        : null;
+      var esperasNovas = M.abrirEsperasDaCompra(tid, datasC);
       if (esperasNovas.length) {
         avisoCascata = 'Abri ' + esperasNovas.length + (esperasNovas.length === 1 ? ' espera' : ' esperas') +
-          ', uma por item. Acerte as datas de entrega aqui.';
-        tela = { tipo: 'pendencias', id: null };
+          ' no Aguardando, com as datas que você deu.';
       }
+      concluindoTarefa = null;
       return apurarVagas();
     }
     if (acao === 'reabrir-tarefa')  { M.reabrir('pe_eu', tid); return apurarVagas(); }
@@ -3781,6 +3822,7 @@
     if (acaoProjeto)     { acaoProjeto = null; return desenharPalco(); }
     if (cancelandoTarefa) { cancelandoTarefa = null; return desenharPalco(); }
     if (apagandoTarefa)  { apagandoTarefa = null; return desenharPalco(); }
+    if (concluindoTarefa) { concluindoTarefa = null; return desenharPalco(); }
     if (passoAberto)     { fecharFicha(); return desenharPalco(); }
     if (projetoEditando) { projetoEditando = null; desenharPalco(); }
   });
@@ -4023,6 +4065,16 @@
     Sync.configurar({ escreveCatalogo: naMesa(), pessoa: 'pe_eu' });
   });
   M.quandoSalvar(function () { Sync.marcarSujo(); });
+
+  /* POR ONDE (§54): todo evento diz a superfície em que nasceu. A consulta
+     aberta no PC é mesa-execucao; o catálogo é mesa-organizacao; o resto diz
+     o próprio nome. É registro para o modo analisar, nunca aparece em tela. */
+  M.quandoRegistrar(function () {
+    if (!$campo.hidden) return naMesa() ? 'mesa-execucao' : 'bota';
+    if (tela.tipo === 'rua') return 'rua';
+    if (tela.tipo === 'diarista') return 'folha-diarista';
+    return naMesa() ? 'mesa-organizacao' : 'bota';
+  });
 
   // ── uso: uma linha por sessão, para o modo analisar (§38) ──
   M.usoIniciar('pe_eu', naMesa() ? 'mesa' : 'bota');
