@@ -351,8 +351,59 @@ var Motor = (function () {
     return escolher(molhado, agora).tarefa != null;
   }
 
+  /* A VITRINE (§58): até três tarefas para a VÉSPERA — leitura, nunca oferta.
+     O uso real mostrou que ele decide na noite anterior, com a cabeça fria, e
+     acorda com o plano pronto; a vitrine dá o cardápio sem pedir nada de
+     volta. Só filtros estruturais e o dia-alvo (mês, dia da semana): clima e
+     tempo disponível são do dia seguinte, e o dia seguinte decide. Fora fica
+     de fora (rua é a folha da rua). Nada gruda, nada custa. */
+  function vitrine(quando) {
+    var alvo = quando || new Date();
+    var pool = M.tarefasVivas().filter(function (t) {
+      if (M.estadoDe(t.id) !== 'aberta' || t.tipo === 'compra') return false;
+      if (t.ondePrecisaEstar === 'fora') return false;
+      if (!emitindo(t) || !M.desimpedida(t)) return false;
+      var j = M.janelaDe(t);
+      if (j.dias.indexOf(alvo.getDay()) === -1) return false;
+      if (j.meses.indexOf(alvo.getMonth() + 1) === -1) return false;
+      if (periodicoAdiantado(t, alvo)) return false;
+      return true;
+    });
+
+    var neutra = situacaoVazia();
+    var usadas = {}, lista = [];
+    function poe(t, rotulo) {
+      if (t && !usadas[t.id] && lista.length < 3) { usadas[t.id] = true; lista.push({ tarefa: t, rotulo: rotulo }); }
+    }
+
+    // 1. a mais urgente: data marcada até o dia-alvo, ou rotina vencida
+    var urgentes = pool.filter(function (t) { var f = faixaDe(t, alvo); return f === 1 || f === 2; });
+    urgentes.sort(function (a, b) {
+      var fa = faixaDe(a, alvo), fb = faixaDe(b, alvo);
+      if (fa !== fb) return fa - fb;
+      return fa === 1 ? folgaDe(a, alvo) - folgaDe(b, alvo)
+                      : atrasoPeriodico(b, alvo) - atrasoPeriodico(a, alvo);
+    });
+    if (urgentes[0]) {
+      poe(urgentes[0], faixaDe(urgentes[0], alvo) === 1 ? 'data marcada' : 'rotina · já passou da hora');
+    }
+
+    // 2. e 3.: a cascata das frentes — titular, depois reserva/planejamento
+    VAGAS.forEach(function (papel) {
+      var proj = projetoComPapel(papel);
+      if (proj) poe(candidatoDoProjeto(proj.id, pool), papel === 'planejamento' ? 'em planejamento' : papel);
+    });
+
+    // completa com as avulsas de mais peso
+    var resto = pool.filter(function (t) { return !usadas[t.id] && !t.projetoId; });
+    resto.sort(function (a, b) { return peso(b, neutra) - peso(a, neutra); });
+    resto.forEach(function (t) { poe(t, 'avulsa'); });
+
+    return lista;
+  }
+
   return {
-    TEMPOS: TEMPOS, temposDe: temposDe,
+    TEMPOS: TEMPOS, temposDe: temposDe, vitrine: vitrine,
     situacaoVazia: situacaoVazia,
     escolher: escolher,
     escolherSegundaPorta: escolherSegundaPorta,

@@ -2263,6 +2263,12 @@ var Modelo = (function () {
     return eventosEmOrdem().filter(function (ev) { return ev.tipo === 'aportou' && ev.projetoId === pid; }).reverse();
   }
 
+  /* A vitrine registrada (§58): o que foi mostrado na véspera, para o modo
+     analisar cruzar um dia "o que vi ontem" com "o que fiz hoje". */
+  function verVitrine(quem, tarefas, dia) {
+    return registrar(quem, 'vitrine', { tarefas: tarefas, dia: dia });
+  }
+
   function registrarClima(quem, tempo, barro) {
     return registrar(quem, 'clima', { dia: hoje(), tempo: tempo, barro: !!barro });
   }
@@ -2509,7 +2515,7 @@ var Modelo = (function () {
     ofertar: ofertar, ofertaDe: ofertaDe,
     iniciar: iniciar, terminar: terminar, parar: parar,
     naoDeu: naoDeu, naoQuero: naoQuero, encerrar: encerrar, devolverTempo: devolverTempo,
-    registrarClima: registrarClima, climaDeHoje: climaDeHoje,
+    registrarClima: registrarClima, climaDeHoje: climaDeHoje, verVitrine: verVitrine,
 
 
     carregar: carregar, salvar: salvar, tudo: tudo, cat: cat, estaVazio: estaVazio,

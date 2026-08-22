@@ -554,7 +554,7 @@
       return '<div class="abertura">' + frase +
         '<button type="button" class="c-acao porta-unica" data-acao="ir-executar">encontrar tarefa</button>' +
         botaoDaRua() +
-        vagasDaAbertura() + avisoDeNuvem() +
+        vitrineDaAbertura() + avisoDeNuvem() +
         '</div>';
     }
 
@@ -571,7 +571,7 @@
           '<span class="porta-nome">organizar</span>' +
           '<span class="porta-sub">mexer nos projetos e no plano</span>' +
         '</button>' +
-      '</div>' + linkDaRua() + vagasDaAbertura() + avisoDeNuvem() + avisoDeCopia() + '</div>';
+      '</div>' + linkDaRua() + vagasDaAbertura() + vitrineDaAbertura() + avisoDeNuvem() + avisoDeCopia() + '</div>';
   }
 
   /* Aparelho sem sincronização diz isso na entrada, uma linha, sem alarme —
@@ -614,6 +614,65 @@
         (ICONES_TEMPO[Tempo.tempoDe(d.code)] || '') +
         '<i>' + d.max + '°</i></span>';
     }).join('');
+  }
+
+  /* A VITRINE (§58): a véspera dentro do app. Até três tarefas para pensar —
+     sem botão, sem oferta, sem custo. Antes das 16 h fala de hoje; depois, de
+     amanhã (ele olha na cama, à noite, e dorme com o plano). A previsão do
+     tempo entra como aviso, nunca como filtro: quem decide o dia é o dia. */
+  function vitrineDaAbertura() {
+    if (typeof Motor === 'undefined') return '';
+    var agoraD = new Date();
+    var alvo = new Date();
+    var titulo = 'para hoje';
+    if (agoraD.getHours() >= 16) { alvo.setDate(alvo.getDate() + 1); titulo = 'para amanhã'; }
+    var lista = Motor.vitrine(alvo);
+    if (!lista.length) return '';
+
+    // a previsão do dia-alvo, para o aviso de clima
+    var prevDia = null;
+    if (typeof Tempo !== 'undefined' && Tempo.semana()) {
+      var alvoDia = M.diaLocal(alvo);
+      prevDia = Tempo.semana().filter(function (d) { return d.dia === alvoDia; })[0] || null;
+    }
+
+    var cards = lista.map(function (v) {
+      var t = v.tarefa;
+      var p = t.projetoId ? M.projeto(t.projetoId) : null;
+      var meta = [];
+      if (p) meta.push(p.nome || 'projeto sem nome');
+      meta.push(M.duracao(M.restanteDe(t.id) || t.duracaoTotal));
+      var avisoClima = '';
+      if (prevDia) {
+        var tempoAlvo = Tempo.tempoDe(prevDia.code);
+        if (t.exigeClima === 'firme' && (tempoAlvo === 'chuva_fina' || tempoAlvo === 'chuva_forte')) {
+          avisoClima = 'pede tempo firme · chuva na previsão';
+        } else if (t.podeNoCalor === false && prevDia.max >= 30) {
+          avisoClima = 'não no calor · previsão de ' + prevDia.max + '°';
+        }
+      }
+      return '<div class="vitrine-item">' +
+        '<span class="vitrine-etiqueta">' + esc(v.rotulo) + '</span>' +
+        '<span class="vitrine-texto">' + esc(t.texto || 'tarefa sem texto') + '</span>' +
+        '<span class="vitrine-meta">' + esc(meta.join(' · ')) +
+          (avisoClima ? '<em>' + esc(avisoClima) + '</em>' : '') + '</span>' +
+        '</div>';
+    }).join('');
+
+    // registrada uma vez por dia-alvo (e de novo só se o cardápio mudou)
+    try {
+      var ids = lista.map(function (v) { return v.tarefa.id; }).join(',');
+      var marca = M.diaLocal(alvo) + '|' + ids;
+      if (localStorage.getItem('app-sitio-vitrine') !== marca) {
+        localStorage.setItem('app-sitio-vitrine', marca);
+        M.verVitrine('pe_eu', lista.map(function (v) { return v.tarefa.id; }), M.diaLocal(alvo));
+      }
+    } catch (e) {}
+
+    return '<div class="vitrine">' +
+      '<div class="vitrine-titulo">' + titulo + '</div>' + cards +
+      '<p class="vitrine-nota">para pensar — a escolha é sua</p>' +
+      '</div>';
   }
 
   function vagasDaAbertura() {
