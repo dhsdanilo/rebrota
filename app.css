@@ -2346,15 +2346,26 @@ input[type="number"][readonly] { -moz-appearance: textfield; }
 
 /* o painel da previsão (§61) */
 .previsao-painel { max-width: 420px; }
+/* o botão perto do polegar: só no celular — na mesa a barra está à mão */
+.previsao-bt { margin-right: 8px; }
+@media (min-width: 721px) { .previsao-bt { display: none; } }
 .topo-previsao { cursor: pointer; }
 .prev-agora { font-size: 15px; margin-bottom: 12px; }
 .prev-agora b { font-family: var(--display); font-size: 26px; font-weight: 500; margin-right: 6px; }
 .prev-agora span { display: block; font-family: var(--mono); font-size: 11px; color: var(--neblina-fraca); margin-top: 4px; }
-.prev-tabela { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 11.5px; }
-.prev-tabela th { text-align: left; color: var(--neblina-fraca); font-weight: 500; padding: 4px 6px; }
-.prev-tabela td { padding: 6px; border-top: 1px solid var(--musgo); color: var(--neblina); }
-.prev-tabela .prev-icone svg { width: 15px; height: 15px; vertical-align: -3px; margin-right: 4px; }
-.prev-alerta td { color: var(--casca); }
+.prev-grade {
+  display: grid;
+  grid-template-columns: 3em 1.6em 5em 1fr auto;
+  gap: 0 10px; align-items: center;
+  font-family: var(--mono); font-size: 11.5px; white-space: nowrap;
+}
+.prev-cab { color: var(--neblina-fraca); padding: 2px 0 6px; }
+.prev-cel { padding: 8px 0; border-top: 1px solid var(--musgo); color: var(--neblina); }
+.prev-cel b { font-weight: 500; }
+.prev-icone svg { width: 15px; height: 15px; display: block; }
+.prev-num { text-align: right; }
+.prev-alerta { color: var(--casca) !important; }
+.prev-alerta svg { color: var(--casca); }
 
 /* as duas portas da bota (§60): sorteio e rua, peso igual */
 .portas-bota { display: flex; gap: 10px; }
@@ -2577,9 +2588,8 @@ a.bt-icone { text-decoration: none; }
 
   .coluna-projetos { position: static; max-height: none; }
 
-  /* De bota sobra só o bilhete: exportar, importar e a bancada de prova são
-     trabalho de mesa e não têm o que fazer no bolso. O bilhete fica porque o
-     incômodo aparece justamente durante o uso, e anotar depois é anotar pior. */
+  /* De bota sobram o bilhete e a previsão: exportar, importar e a bancada de
+     prova são trabalho de mesa e não têm o que fazer no bolso. */
   .ferramentas .bt-icone { display: none; }
   .ferramentas { right: 12px; bottom: 12px; }
   .bilhete-bt { width: 44px; height: 44px; }

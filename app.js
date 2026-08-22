@@ -788,9 +788,9 @@
               '</div>'
             : '<div class="vitrine-acoes">' +
                 (!delegada && M.desimpedida(t)
-                  ? (new Date().getHours() >= 5
+                  ? ((function () { var hA = new Date().getHours(); return hA >= 5 && hA < 18; })()
                       ? '<button type="button" class="bt-forte bt-mini" data-acao="vitrine-vamos" data-id="' + t.id + '">vamos</button>'
-                      : '<span class="vitrine-madrugada">antes das 5, sem aceitar — delegar e feita valem</span>') +
+                      : '<span class="vitrine-madrugada">aceitar é das 5 às 18 — delegar e feita valem</span>') +
                     '<button type="button" class="bt-fraco bt-mini" data-acao="vitrine-feita-abrir" data-id="' + t.id + '">feita</button>'
                   : '') +
                 (!delegada && t.etapa === 'execucao'
@@ -4281,33 +4281,38 @@
         '<span>umidade ' + la.umid + '% · vento ' + la.vento + ' km/h · rajadas ' + la.rajada + ' km/h</span></div>';
     }
     if (dias) {
-      html += '<table class="prev-tabela"><tr><th></th><th></th><th>mín–máx</th><th>chuva</th><th>rajadas</th></tr>' +
+      html += '<div class="prev-grade">' +
+        '<span class="prev-cab"></span><span class="prev-cab"></span>' +
+        '<span class="prev-cab">mín–máx</span><span class="prev-cab">chuva</span><span class="prev-cab prev-num">rajadas</span>' +
         dias.map(function (d, i) {
           var dt = new Date(d.dia + 'T00:00:00');
           var nome = i === 0 ? 'hoje' : M.NOMES_DIA[dt.getDay()];
           var alertaDia = d.code >= 95 || (d.rajadaMax || 0) >= 60;
-          return '<tr' + (alertaDia ? ' class="prev-alerta"' : '') + '>' +
-            '<td>' + esc(nome) + '</td>' +
-            '<td class="prev-icone">' + (ICONES_TEMPO[Tempo.tempoDe(d.code)] || '') + ' ' + esc(Tempo.rotulo(Tempo.tempoDe(d.code))) + '</td>' +
-            '<td>' + d.min + '–' + d.max + '°</td>' +
-            '<td>' + (d.chuvaProb !== null && d.chuvaProb !== undefined ? d.chuvaProb + '%' : '—') +
-              (d.chuvaMm ? ' · ' + d.chuvaMm + ' mm' : '') + '</td>' +
-            '<td>' + (d.rajadaMax ? d.rajadaMax + ' km/h' : '—') + '</td>' +
-            '</tr>';
-        }).join('') + '</table>';
+          var cls = alertaDia ? ' prev-alerta' : '';
+          var rotuloDia = Tempo.rotulo(Tempo.tempoDe(d.code));
+          return '<span class="prev-cel' + cls + '"><b>' + esc(nome) + '</b></span>' +
+            '<span class="prev-cel prev-icone' + cls + '" title="' + esc(rotuloDia) + '">' +
+              (ICONES_TEMPO[Tempo.tempoDe(d.code)] || '') + '</span>' +
+            '<span class="prev-cel' + cls + '">' + d.min + '–' + d.max + '°</span>' +
+            '<span class="prev-cel' + cls + '">' + (d.chuvaProb !== null && d.chuvaProb !== undefined ? d.chuvaProb + '%' : '—') +
+              (d.chuvaMm ? ' · ' + d.chuvaMm + '' + ' mm' : '') + '</span>' +
+            '<span class="prev-cel prev-num' + cls + '">' + (d.rajadaMax ? d.rajadaMax + ' km/h' : '—') + '</span>';
+        }).join('') + '</div>';
     }
     var a = Tempo.alerta();
     if (a) html += '<p class="alerta-tempo" style="margin-top:12px">' + esc(a.texto) + '</p>';
     $previsaoCorpo.innerHTML = html || '<p class="aviso">Sem previsão agora — sem internet, ela cala.</p>';
   }
 
-  document.getElementById('topoPrevisao').addEventListener('click', function () {
+  function alternarPrevisao() {
     if (!$previsaoPainel.hidden) { $previsaoPainel.hidden = true; return; }
     $bilhete.hidden = true; $semear.hidden = true; $nuvem.hidden = true;
     Tempo.buscar();
     desenharPrevisaoPainel();
     $previsaoPainel.hidden = false;
-  });
+  }
+  document.getElementById('topoPrevisao').addEventListener('click', alternarPrevisao);
+  document.getElementById('btPrevisao').addEventListener('click', alternarPrevisao);
   document.getElementById('btFecharPrevisao').addEventListener('click', function () { $previsaoPainel.hidden = true; });
 
   // ── bilhete sobre o app ───────────────────────────────────────────

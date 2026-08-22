@@ -14,7 +14,7 @@
 <link rel="apple-touch-icon" href="icone.svg">
 <!-- ?v= sobe a cada mudança: sem isso o navegador serve o arquivo velho do
      cache e a correção parece não ter funcionado -->
-<link rel="stylesheet" href="app.css?v=129">
+<link rel="stylesheet" href="app.css?v=130">
 </head>
 <body>
 
@@ -161,6 +161,15 @@
       <a href="celular.html?tela=semear" target="_blank">a Sementeira</a>
     </div>
   </span>
+  <!-- a previsão perto do polegar (§61): mesmo painel da barra, no canto -->
+  <button type="button" class="bilhete-bt previsao-bt" id="btPrevisao" aria-label="previsão do tempo"
+          title="Previsão do tempo, detalhada.">
+    <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.6"
+         stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+      <path d="M5 12.5h8.7a3 3 0 0 0 .4-6 4.5 4.5 0 0 0-8.7-1.2A3.6 3.6 0 0 0 5 12.5z"/>
+      <path d="M7 15v1.8M10.2 15.5v1.8M13.4 15v1.8"/>
+    </svg>
+  </button>
   <button type="button" class="bilhete-bt" id="btBilhete" aria-label="anotações">✎</button>
 </div>
 
@@ -213,12 +222,12 @@
   <ul class="bilhete-lista" id="bilheteLista"></ul>
 </div>
 
-<script src="modelo.js?v=129"></script>
-<script src="tempo.js?v=129"></script>
-<script src="sync.js?v=129"></script>
-<script src="motor.js?v=129"></script>
-<script src="dados.js?v=129"></script>
-<script src="campo.js?v=129"></script>
-<script src="app.js?v=129"></script>
+<script src="modelo.js?v=130"></script>
+<script src="tempo.js?v=130"></script>
+<script src="sync.js?v=130"></script>
+<script src="motor.js?v=130"></script>
+<script src="dados.js?v=130"></script>
+<script src="campo.js?v=130"></script>
+<script src="app.js?v=130"></script>
 </body>
 </html>
