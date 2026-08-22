@@ -578,11 +578,14 @@ var Modelo = (function () {
       guardado: 0,
       peso: 2,               // 1 baixa · 2 normal · 3 alta — desempate
 
-      /* COMPRA (§52): "como vai comprar?" — rua ou internet. A via decide o
-         local sozinha (rua = fora, internet = computador), e a lista do que
-         comprar é própria: comprar não é levar. */
-      compra: '',            // '' (não é compra) | 'rua' | 'internet'
-      compras: [],           // o que comprar, um por linha
+      /* O PASSO-COMPRA (§57): tipo 'compra' aparece na lista do projeto como
+         um passo — ordenável, com dependência —, mas não é tarefa: o motor
+         nunca o oferece e ninguém o conclui. Ele se resolve pelos ITENS (§56):
+         vazio tranca quem depende; com tudo comprado/chegado, vira feito
+         sozinho. (compra/compras abaixo são o resto morto da §52.) */
+      tipo: '',              // '' (tarefa) | 'compra'
+      compra: '',
+      compras: [],
 
       ondePrecisaEstar: 'sitio',
       onde: '',              // texto livre; era zona + ponto, que diziam o mesmo
@@ -1483,6 +1486,29 @@ var Modelo = (function () {
   function comprarItem(quem, xid) {
     return registrar(quem, 'comprou', { itemId: xid });
   }
+  /* A lista dita na conclusão (§57): "o que comprar?" respondido ali mesmo,
+     uma linha por item. É EVENTO — funciona na bota — e a mesa absorve. */
+  function listarCompra(quem, compraId, descricoes) {
+    var t = tarefa(compraId);
+    var linhas = (descricoes || []).map(function (x) { return String(x).trim(); }).filter(Boolean);
+    if (!t || !linhas.length) return null;
+    var base = Date.now().toString(36);
+    var itens = linhas.map(function (d, i) {
+      var x = novoItem(d, 'rua');
+      x.id = 'x_' + compraId + '_' + base + i;
+      x.tarefaId = compraId;
+      x.projetoId = t.projetoId || null;
+      return x;
+    });
+    return registrar(quem, 'listou', { tarefaId: compraId, itensNovos: itens });
+  }
+  // as compras vazias que dependem desta tarefa: é para elas que se pede a lista
+  function comprasVaziasDependentesDe(tid) {
+    return tarefasVivas().filter(function (o) {
+      return o.tipo === 'compra' && (o.dependeDe || []).indexOf(tid) !== -1 &&
+        estadoDe(o.id) === 'aberta' && estadoDaCompra(o.id).fase === 'vazia';
+    });
+  }
   // encomendei (internet): ganha a data e vira espera de sempre — mesa
   function encomendarItem(xid, previsto) {
     var x = pendencia(xid);
@@ -1607,6 +1633,17 @@ var Modelo = (function () {
      'precisaAjuda', 'boaComCriancas', 'perigosaComCriancas'].forEach(function (k) {
       t[k] = anterior[k];
     });
+  }
+
+  function inserirCompra(pid, etapa) {
+    var passos = pid ? passosDe(pid) : avulsas();
+    var t = novaTarefa(pid, passos.length + 1);
+    t.tipo = 'compra';
+    t.texto = '';
+    t.etapa = etapa || 'execucao';
+    cat().tarefas.push(t);
+    salvar();
+    return t;
   }
 
   function inserirPasso(pid, modelo) {
@@ -1835,10 +1872,12 @@ var Modelo = (function () {
     /* Itens (§56): comprado na bota é evento; o catálogo só aprende quando a
        mesa absorve — mas a vista já sabe, então a tarefa destrava na hora. */
     if (ev.tipo === 'comprou' && ev.itemId) vista.compradas[ev.itemId] = true;
-    if (ev.itemNovo && !achar(cat().pendencias, ev.itemNovo.id) &&
-        !vista.itensExtras.some(function (x) { return x.id === ev.itemNovo.id; })) {
-      vista.itensExtras.push(ev.itemNovo);
-    }
+    (ev.itensNovos || (ev.itemNovo ? [ev.itemNovo] : [])).forEach(function (novo) {
+      if (!achar(cat().pendencias, novo.id) &&
+          !vista.itensExtras.some(function (x) { return x.id === novo.id; })) {
+        vista.itensExtras.push(novo);
+      }
+    });
 
     // o não dá pode criar um destrave, e criar tarefa no campo é acontecimento,
     // não decisão de mesa — por isso ela nasce dentro do próprio evento
@@ -2108,7 +2147,7 @@ var Modelo = (function () {
      registro é honesto sobre quem fez. Só tarefa que já existe: de projeto em
      vaga de execução ou avulsa, aberta. Coisa nova vai na lata, fora do app. */
   function podeSeparar(t) {
-    if (!t || t.separada || t.etapa !== 'execucao') return false;
+    if (!t || t.separada || t.etapa !== 'execucao' || t.tipo === 'compra') return false;
     if (estadoDe(t.id) !== 'aberta') return false;
     if (!t.projetoId) return true;
     var p = projeto(t.projetoId);
@@ -2169,7 +2208,7 @@ var Modelo = (function () {
      não cobrança: só aparece quando ele diz que vai sair. Ordem é a rota dele. */
   function tarefasDaRua() {
     return tarefasVivas().filter(function (t) {
-      if (t.ondePrecisaEstar !== 'fora' || t.separada) return false;
+      if (t.ondePrecisaEstar !== 'fora' || t.separada || t.tipo === 'compra') return false;
       if (estadoDe(t.id) !== 'aberta') return false;
       if (!desimpedida(t)) return false;
       if (!t.projetoId) return true;
@@ -2266,7 +2305,32 @@ var Modelo = (function () {
     return vista.tarefas[tid] || { estado: 'aberta', restante: 0, recado: '', coletado: {}, sessoes: 0 };
   }
 
-  function estadoDe(tid)   { return vistaDe(tid).estado; }
+  function estadoDe(tid) {
+    var t = achar(cat().tarefas, tid) || achar(vista.extras, tid);
+    if (t && t.tipo === 'compra') {
+      var doDiario = vistaDe(tid).estado;
+      if (doDiario === 'encerrada') return 'encerrada';   // cancelado à mão vale
+      return estadoDaCompra(tid).completa ? 'feita' : 'aberta';
+    }
+    return vistaDe(tid).estado;
+  }
+
+  /* O estado do passo-compra, derivado dos itens:
+       vazia     — sem item nenhum: a lista ainda vem (tranca quem depende)
+       lista     — há item em falta para comprar
+       esperando — tudo comprado/encomendado; falta chegar
+       completa  — tudo na mão: o passo está feito, sozinho */
+  function estadoDaCompra(tid) {
+    var itens = pendenciasVivas().filter(function (x) { return x.tarefaId === tid; });
+    function resolvido(x) { return !!x.resolvida || !!vista.compradas[x.id]; }
+    var abertos = itens.filter(function (x) { return !resolvido(x); });
+    var emFalta = abertos.filter(function (x) { return x.fase === 'falta'; });
+    var fase = !itens.length ? 'vazia'
+      : !abertos.length ? 'completa'
+      : emFalta.length ? 'lista' : 'esperando';
+    return { fase: fase, completa: fase === 'completa', itens: itens.length,
+             resolvidos: itens.length - abertos.length, emFalta: emFalta.length };
+  }
   function restanteDe(tid) { return vistaDe(tid).restante; }
   function recadoDe(tid)   { return vistaDe(tid).recado; }
 
@@ -2475,6 +2539,8 @@ var Modelo = (function () {
     desfazerPendencia: desfazerPendencia,
     faltarItem: faltarItem, comprarItem: comprarItem, encomendarItem: encomendarItem,
     mudarViaItem: mudarViaItem, absorverCompras: absorverCompras, itensDaRua: itensDaRua,
+    inserirCompra: inserirCompra, estadoDaCompra: estadoDaCompra,
+    listarCompra: listarCompra, comprasVaziasDependentesDe: comprasVaziasDependentesDe,
     textoPendencia: textoPendencia, inserirPendencia: inserirPendencia,
     resolverPendencia: resolverPendencia,
 

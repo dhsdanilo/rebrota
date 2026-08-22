@@ -2280,6 +2280,14 @@ input[type="number"][readonly] { -moz-appearance: textfield; }
 }
 
 .confirma-concluir { margin: 10px 0 14px; }
+/* o passo-compra (§57): mesmo lugar das tarefas, cara própria */
+.passo-compra { border-left: 2px solid var(--casca); }
+.passo-compra .passo-ordem { color: var(--casca); }
+.compra-selo {
+  font-family: var(--mono); font-size: 10px; letter-spacing: .05em;
+  color: var(--casca); border: 1px solid var(--casca); border-radius: 999px;
+  padding: 2px 9px; white-space: nowrap;
+}
 /* itens de compra (§56) */
 .ponto-falta { background: var(--neblina-fraca); }
 .item-vias { display: inline-flex; gap: 4px; }

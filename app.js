@@ -1391,7 +1391,9 @@
         // incluir uma tarefa é caminhada demais (fica nos dois lugares)
         (podeAdicionar && !recolhido
           ? '<button type="button" class="bt-fraco bt-mini secao-adicionar" data-acao="nova-tarefa" data-id="' + p.id +
-            '" data-etapa="' + etapa + '">adicionar tarefa</button>'
+            '" data-etapa="' + etapa + '">adicionar tarefa</button>' +
+            '<button type="button" class="bt-linha bt-mini secao-adicionar" data-acao="nova-compra" data-id="' + p.id +
+            '" data-etapa="' + etapa + '" title="Um passo de compra: aparece na ordem, tranca quem depende dele e se resolve pelos itens.">adicionar compra</button>'
           : '') +
       '</div>' +
       (recolhido ? '' :
@@ -1407,6 +1409,8 @@
             : '<div class="rodape-acoes">' +
               '<button type="button" class="bt-fraco" data-acao="nova-tarefa" data-id="' + p.id +
               '" data-etapa="' + etapa + '">adicionar tarefa</button>' +
+              '<button type="button" class="bt-linha" data-acao="nova-compra" data-id="' + p.id +
+              '" data-etapa="' + etapa + '">adicionar compra</button>' +
             '</div>')) +
       '</div>';
   }
@@ -1575,6 +1579,7 @@
     // Em consulta também não: arrastar reordena e muda etapa, e isso é escrita.
     var arrasta = !aberto && !emConsulta(t.projetoId);
     return '<li class="passo passo-' + situacao + (pronta ? ' passo-pronta' : '') +
+      (t.tipo === 'compra' ? ' passo-compra' : '') +
       (aberto ? ' passo-aberto' : '') +
       '" draggable="' + (arrasta ? 'true' : 'false') + '" data-tarefa="' + t.id + '">' +
       '<div class="passo-linha">' +
@@ -1586,10 +1591,15 @@
         /* O título é o campo — como no projeto. Duro, ele abre e fecha a ficha;
            solto, aceita digitação no mesmo lugar. A duração idem: formatada
            enquanto se lê, em minutos enquanto se edita. */
-        '<input type="text" class="passo-texto" placeholder="tarefa sem texto"' +
+        '<input type="text" class="passo-texto" placeholder="' +
+          (t.tipo === 'compra' ? 'compra sem nome — Comprar as madeiras' : 'tarefa sem texto') + '"' +
           (solto ? '' : ' readonly data-acao="abrir-ficha"') +
           ' data-alvo="tarefa" data-id="' + t.id + '" data-campo="texto"' +
           ' value="' + esc(t.texto) + '">' +
+        (t.tipo === 'compra'
+          ? '<span class="compra-selo" title="Passo de compra (§57): não é sorteado — se resolve pelos ' +
+            'itens. Vazio, tranca quem depende dele; com tudo na mão, fica feito sozinho.">▤ compra</span>'
+          : '') +
         /* Etapa e duração na barra do título: é o que se lê de relance antes de
            decidir se vale abrir a ficha. Soltas, viram os próprios controles —
            por isso nenhuma das duas tem seção lá dentro. */
@@ -1610,12 +1620,12 @@
         /* O LOCAL vem antes do tempo, na própria linha (§46): é ele que decide o
            resto da ficha, e escondido no fim ele era esquecido. Fora, o tempo
            não entra — coisa de rua é rápida e o tempo serve ao sorteio do dia. */
-        (solto
+        (solto && t.tipo !== 'compra'
           ? '<select class="passo-local-edita" title="Onde esta tarefa precisa ser feita — decide o resto da ficha."' +
             ' data-alvo="tarefa" data-id="' + t.id + '" data-campo="ondePrecisaEstar">' +
             opcoes(M.LOCAIS, t.ondePrecisaEstar) + '</select>'
           : '') +
-        (t.ondePrecisaEstar === 'fora' ? ''
+        (t.ondePrecisaEstar === 'fora' || t.tipo === 'compra' ? ''
           : solto
           ? seletorDeTempo(t)
           : '<span class="passo-tempo" title="' + esc(AJUDA_DURACAO) + '">' +
@@ -1630,7 +1640,7 @@
           ? '<button type="button" class="bt-linha bt-mini" data-acao="separar-diarista" data-id="' + t.id + '">delegar</button>'
           : '') +
         // as duas ações da linha, com nome: concluir de um lado do editar
-        (emConsulta(t.projetoId) || solto ? ''
+        (emConsulta(t.projetoId) || solto || t.tipo === 'compra' ? ''
           : pronta
           ? '<button type="button" class="bt-linha bt-mini" data-acao="reabrir-tarefa" data-id="' + t.id + '">reabrir</button>'
           : '<button type="button" class="bt-linha bt-mini bt-concluir" data-acao="concluir-tarefa" data-id="' + t.id + '">' +
@@ -1685,6 +1695,9 @@
         /* Feita ou cancelada, as condições já não importam — mas o que foi
            levado importa: no meio da tarefa de hoje, saber com que ferramenta e
            quanto material a anterior foi feita é consulta de verdade. */
+        : t.tipo === 'compra'
+        ? '<div class="passo-marcas">' + marcasDaCompra(t, numeros) + '</div>' +
+          (t.recado ? '<p class="passo-recado">' + esc(t.recado) + '</p>' : '')
         : pronta ? (marcasDoLevado(t) ? '<div class="passo-marcas">' + marcasDoLevado(t) + '</div>' : '')
         : '<div class="passo-marcas">' + marcasDe(t, numeros) + '</div>' +
           (t.recado ? '<p class="passo-recado">' + esc(t.recado) + '</p>' : '')) +
@@ -1750,6 +1763,33 @@
       '<button type="button" class="bt-linha bt-mini" data-acao="pendencia-tirar" data-id="' + x.id + '"' +
         ' title="Apaga a espera sem registro — para a que foi criada errada ou já não faz sentido.">tirar</button>' +
       '</div>';
+  }
+
+  /* A linha do passo-compra diz em que pé a compra está — vazia, lista,
+     esperando entrega, tudo na mão — e o que segura a lista. */
+  function marcasDaCompra(t, numeros) {
+    var e = M.estadoDaCompra(t.id);
+    var presas = (t.dependeDe || []).filter(function (d) { return M.estadoDe(d) !== 'feita'; });
+    var m = [];
+    if (e.fase === 'vazia') {
+      m.push(['▤', presas.length
+        ? 'a lista vem depois de ' + presas.map(function (d) {
+            var alvo = M.tarefa(d);
+            return (numeros && numeros[d]) || (alvo ? alvo.texto : '?');
+          }).join(' e ')
+        : 'sem itens ainda — abra e liste o que comprar']);
+    } else if (e.fase === 'lista') {
+      m.push(['▤', e.itens + (e.itens === 1 ? ' item' : ' itens') +
+        (e.resolvidos ? ' · ' + e.resolvidos + ' na mão' : '') +
+        ' · ' + e.emFalta + ' por comprar']);
+    } else if (e.fase === 'esperando') {
+      m.push(['▤', 'tudo encomendado · esperando entrega']);
+    } else {
+      m.push(['▤', 'tudo na mão']);
+    }
+    return m.map(function (x) {
+      return '<span class="marca"><i>' + x[0] + '</i>' + esc(x[1]) + '</span>';
+    }).join('');
   }
 
   function marcasDe(t, numeros) {
@@ -1857,12 +1897,13 @@
     var noSitio = t.ondePrecisaEstar === 'sitio';
     var noPc = t.ondePrecisaEstar === 'computador';
     var naRua = t.ondePrecisaEstar === 'fora';
+    var ehCompra = t.tipo === 'compra';
 
     return [
-      /* Compra não é tarefa (§56): o que falta comprar são ITENS, no bloco de
-         compras e esperas da ficha aberta — nada de grupo de compra aqui. */
+      /* Passo-compra (§57): a ficha é só os itens (no bloco acima), a
+         dependência, tags e nota — nada de condições de tarefa. */
       // o local mora na linha da tarefa (§46); aqui fica só o ponto exato
-      noPc ? '' :
+      (noPc || ehCompra) ? '' :
       grupo('Onde', 'grade',
         (campoTexto('tarefa', t.id, 'onde', 'Lugar', t.onde,
           { dica: 'trecho rente à estrada', travado: travado,
@@ -1872,7 +1913,7 @@
         '"fora" ou "computador", o app nem pergunta clima, chão, companhia e energia.'),
 
       // dinheiro só na avulsa (§41): obra tem o envelope do projeto
-      (t.projetoId ? '' :
+      (t.projetoId || ehCompra ? '' :
       grupo('Dinheiro', '',
         '<div class="grade">' +
         campoTexto('tarefa', t.id, 'custo', 'Custo, por cima', t.custo,
@@ -1889,7 +1930,7 @@
       /* Fora não tem condições (§42): sair é planejado, não sorteado — a folha
          da rua é a lista, e ele decide. O que sobra para a rua: o que é, o
          lugar, o que comprar, quando precisa, dependência, tags, nota. */
-      (naRua || t.compra ? '' :
+      (naRua || t.compra || ehCompra ? '' :
       grupo('Condições', '',
         (noPc ? '' :
         linhaCond('Clima',
@@ -1955,7 +1996,7 @@
         'não bater com a situação que você informou, ela não é oferecida — e você nem fica sabendo ' +
         'que ela existia, que é justamente o alívio.')),
 
-      (noPc || t.compra) ? '' :
+      (noPc || t.compra || ehCompra) ? '' :
       grupo('Levar', 'grade',
         campoLista('tarefa', t.id, 'ferramentas', 'Ferramentas', t.ferramentas, 'cavadeira\nmarreta\nEPI', travado,
           'Uma por linha. O que precisa estar na mão para começar, incluindo o EPI — que é ' +
@@ -1966,7 +2007,7 @@
         'A folha que você confere antes de sair. Não é inventário do sítio nem controle de estoque: ' +
         'é só o que precisa ir junto nesta tarefa.'),
 
-      blocoQuando(t, travado),
+      ehCompra ? '' : blocoQuando(t, travado),
 
       grupo('Dependência', '', fichasDependencia(t, travado),
         'Tarefas que precisam terminar antes desta. A ordem da lista é preferência sua e muda ' +
@@ -3135,6 +3176,14 @@
       return desenhar();
     }
 
+    if (acao === 'nova-compra') {
+      var compraNova = M.inserirCompra(tid || null, el.getAttribute('data-etapa') || 'execucao');
+      passoAberto = passoEditando = compraNova.id;
+      desenhar();
+      var liC = $palco.querySelector('[data-tarefa="' + compraNova.id + '"]');
+      if (liC) { liC.scrollIntoView({ block: 'center', behavior: 'smooth' }); var campoC = liC.querySelector('.passo-texto'); if (campoC) campoC.focus(); }
+      return;
+    }
     if (acao === 'nova-tarefa' || acao === 'novo-passo') {
       var pid = tid || null;
       var etapa = el.getAttribute('data-etapa') || 'execucao';
@@ -3205,6 +3254,15 @@
       else M.terminar('pe_eu', tid, notaC);
       M.limparKit(tid);
       concluindoTarefa = null;
+      /* A compra vazia que dependia desta tarefa pede a lista AGORA (§57):
+         a ficha dela abre com o campo de item pronto para escrever. */
+      var vazias = M.comprasVaziasDependentesDe(tid);
+      if (vazias.length) {
+        passoAberto = vazias[0].id;
+        faltando = vazias[0].id;
+        avisoCascata = (avisoCascata ? avisoCascata + ' ' : '') +
+          'A compra "' + (vazias[0].texto || 'sem nome') + '" espera a lista do que comprar.';
+      }
       return apurarVagas();
     }
     if (acao === 'reabrir-tarefa')  { M.reabrir('pe_eu', tid); return apurarVagas(); }

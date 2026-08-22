@@ -537,6 +537,7 @@ var Campo = (function () {
     : cena.fase === 'naoquero'  ? marcacaoNaoQuero()
     : cena.fase === 'terminar'  ? marcacaoTerminar()
     : cena.fase === 'encerrar'  ? marcacaoEncerrar()
+    : cena.fase === 'listar'    ? marcacaoListar()
     : cena.fase === 'projeto'   ? marcacaoProjeto()
     : cena.fase === 'encerrado' ? marcacaoEncerrado()
     : '';
@@ -593,6 +594,17 @@ var Campo = (function () {
     var ativa = M.tarefaAtivaDe(EU);
 
     if (acao === 'consultar') return consultar();
+    if (acao === 'confirmar-listar') {
+      var linhasL = (($.querySelector('#cListar') || {}).value || '').split('\n');
+      if (cena.listar && linhasL.some(function (x) { return x.trim(); })) {
+        M.listarCompra(EU, cena.listar.id, linhasL);
+        if (window.matchMedia('(min-width: 721px)').matches) M.absorverCompras();
+        cena.avisoPendente = 'A lista de "' + (cena.listar.texto || 'compra') + '" ficou guardada.';
+      }
+      cena.listar = null;
+      return depoisDeFechar();
+    }
+    if (acao === 'pular-listar') { cena.listar = null; return depoisDeFechar(); }
     if (acao === 'mesma-coisa') {
       var u = ultimaConsulta();
       if (!u) { cena.fase = 'pergunta'; return desenhar(); }
@@ -649,12 +661,13 @@ var Campo = (function () {
     if (acao === 'terminei' && ativa) { cena.fase = 'terminar'; return desenhar(); }
     if (acao === 'confirmar-terminei' && ativa) {
       var nota = ($.querySelector('#cAnotacao') || {}).value || '';
-      M.terminar(EU, ativa.id, nota.trim());
-      M.limparKit(ativa.id);
-      return depoisDeFechar();
+      var tidFeita = ativa.id;
+      M.terminar(EU, tidFeita, nota.trim());
+      M.limparKit(tidFeita);
+      return depoisDeTerminar(tidFeita);
     }
 
-    if (acao === 'zerou-acabou' && t) { M.terminar(EU, t.id, ''); return depoisDeFechar(); }
+    if (acao === 'zerou-acabou' && t) { M.terminar(EU, t.id, ''); return depoisDeTerminar(t.id); }
     if (acao === 'zerou-faltou' && t) {
       M.devolverTempo(EU, t.id, Math.round(t.duracaoTotal * 0.25));
       return depoisDeFechar();
@@ -712,6 +725,28 @@ var Campo = (function () {
       cena.fase = 'encerrado';
       return desenhar();
     }
+  }
+
+  /* A compra vazia que dependia da tarefa terminada pede a lista aqui mesmo
+     (§57): um item por linha, dita se quiser. Dá para deixar para a mesa. */
+  function depoisDeTerminar(tid) {
+    var vazias = M.comprasVaziasDependentesDe(tid);
+    if (vazias.length) { cena.listar = vazias[0]; cena.fase = 'listar'; return desenhar(); }
+    return depoisDeFechar();
+  }
+
+  function marcacaoListar() {
+    var c = cena.listar;
+    if (!c) { cena.fase = 'pergunta'; return marcacaoPergunta(); }
+    return '<div class="c-caixa">' +
+      '<p class="c-titulo">O que comprar?</p>' +
+      '<p class="c-nota" style="text-align:left;margin:0 0 14px">A compra <b>' +
+        esc(c.texto || 'sem nome') + '</b> espera a lista. Um item por linha — pode ditar. ' +
+        'Dá para completar depois, na mesa.</p>' +
+      '<textarea class="c-campo" id="cListar" rows="5" placeholder="6 tábuas de peroba 3 m&#10;2 dobradiças reforçadas"></textarea>' +
+      '<button type="button" class="c-acao" data-acao="confirmar-listar">guardar a lista</button>' +
+      '<button type="button" class="c-bt c-bt-largo" data-acao="pular-listar">depois, na mesa</button>' +
+      '</div>';
   }
 
   /* Depois de fechar uma tarefa o app já traz a próxima — é isso que ocupa a
