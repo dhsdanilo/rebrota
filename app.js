@@ -1720,7 +1720,11 @@
     if (x.fase === 'falta') {
       return '<div class="espera-item espera-falta">' +
         '<span class="ponto ponto-falta"></span>' +
-        '<span class="espera-texto">falta comprar <b>' + esc(x.descricao) + '</b></span>' +
+        // o texto é campo: o item nasce vago ("madeiras — conforme medição")
+        // e ganha as quantidades reais depois que a medição acontece (§56)
+        '<span class="espera-texto">falta comprar</span>' +
+        '<input type="text" class="espera-texto-edita" data-alvo="pendencia" data-campo="descricao"' +
+          ' data-id="' + x.id + '" value="' + esc(x.descricao) + '">' +
         '<span class="item-vias">' +
           '<button type="button" class="filtro' + (x.via !== 'internet' ? ' filtro-on' : '') + '" data-acao="item-via" data-id="' + x.id + '" data-valor="rua">rua</button>' +
           '<button type="button" class="filtro' + (x.via === 'internet' ? ' filtro-on' : '') + '" data-acao="item-via" data-id="' + x.id + '" data-valor="internet">internet</button>' +

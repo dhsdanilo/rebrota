@@ -2283,6 +2283,7 @@ input[type="number"][readonly] { -moz-appearance: textfield; }
 /* itens de compra (§56) */
 .ponto-falta { background: var(--neblina-fraca); }
 .item-vias { display: inline-flex; gap: 4px; }
+.palco .espera-texto-edita { flex: 1; min-width: 160px; max-width: 380px; padding: 5px 8px; font-size: 14px; }
 .espera-adders { display: flex; gap: 8px; flex-wrap: wrap; }
 .pendencia-falta { display: flex; flex-direction: column; gap: 4px; align-items: stretch; }
 .pendencia-falta .espera-item { flex-wrap: wrap; }
