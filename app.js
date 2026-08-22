@@ -543,7 +543,7 @@
     if (!naMesa()) {
       return '<div class="abertura">' + frase +
         '<div class="portas-bota">' +
-          '<button type="button" class="porta-b" data-acao="ir-executar">sorteio' +
+          '<button type="button" class="porta-b" data-acao="ir-executar">sortear' +
             '<span>o app escolhe</span></button>' +
           (M.tarefasDaRua().length + M.itensDaRua().length
             ? '<button type="button" class="porta-b" data-acao="ir-rua">vai sair?' +
