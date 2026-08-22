@@ -2335,6 +2335,27 @@ input[type="number"][readonly] { -moz-appearance: textfield; }
 .c-assumida { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .c-assumida-valor { font-size: 16px; color: var(--neblina); }
 
+/* o clima na entrada da bota (§61) */
+.clima-entrada {
+  font-family: var(--mono); font-size: 12px; letter-spacing: .03em;
+  color: var(--neblina-fraca); margin: 20px 0 0; text-align: center;
+}
+.clima-entrada .bt-mini { margin-left: 6px; }
+.clima-chips { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; margin-top: 8px; }
+.vitrine-madrugada { font-family: var(--mono); font-size: 11px; color: var(--neblina-fraca); align-self: center; }
+
+/* o painel da previsão (§61) */
+.previsao-painel { max-width: 420px; }
+.topo-previsao { cursor: pointer; }
+.prev-agora { font-size: 15px; margin-bottom: 12px; }
+.prev-agora b { font-family: var(--display); font-size: 26px; font-weight: 500; margin-right: 6px; }
+.prev-agora span { display: block; font-family: var(--mono); font-size: 11px; color: var(--neblina-fraca); margin-top: 4px; }
+.prev-tabela { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 11.5px; }
+.prev-tabela th { text-align: left; color: var(--neblina-fraca); font-weight: 500; padding: 4px 6px; }
+.prev-tabela td { padding: 6px; border-top: 1px solid var(--musgo); color: var(--neblina); }
+.prev-tabela .prev-icone svg { width: 15px; height: 15px; vertical-align: -3px; margin-right: 4px; }
+.prev-alerta td { color: var(--casca); }
+
 /* as duas portas da bota (§60): sorteio e rua, peso igual */
 .portas-bota { display: flex; gap: 10px; }
 .porta-b {

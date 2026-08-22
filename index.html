@@ -14,7 +14,7 @@
 <link rel="apple-touch-icon" href="icone.svg">
 <!-- ?v= sobe a cada mudança: sem isso o navegador serve o arquivo velho do
      cache e a correção parece não ter funcionado -->
-<link rel="stylesheet" href="app.css?v=128">
+<link rel="stylesheet" href="app.css?v=129">
 </head>
 <body>
 
@@ -164,6 +164,15 @@
   <button type="button" class="bilhete-bt" id="btBilhete" aria-label="anotações">✎</button>
 </div>
 
+<!-- a previsão detalhada (§61): abre pelo toque na barra da semana -->
+<div class="bilhete previsao-painel" id="previsaoPainel" hidden>
+  <div class="bilhete-topo">
+    <strong>Previsão</strong>
+    <button type="button" class="bilhete-x" id="btFecharPrevisao" aria-label="fechar">×</button>
+  </div>
+  <div id="previsaoCorpo"></div>
+</div>
+
 <!-- sincronização: um token do GitHub, colado uma vez por aparelho. Fica só
      aqui, no localStorage — nunca no repositório, nunca no export. -->
 <div class="bilhete nuvem" id="nuvem" hidden>
@@ -204,12 +213,12 @@
   <ul class="bilhete-lista" id="bilheteLista"></ul>
 </div>
 
-<script src="modelo.js?v=128"></script>
-<script src="tempo.js?v=128"></script>
-<script src="sync.js?v=128"></script>
-<script src="motor.js?v=128"></script>
-<script src="dados.js?v=128"></script>
-<script src="campo.js?v=128"></script>
-<script src="app.js?v=128"></script>
+<script src="modelo.js?v=129"></script>
+<script src="tempo.js?v=129"></script>
+<script src="sync.js?v=129"></script>
+<script src="motor.js?v=129"></script>
+<script src="dados.js?v=129"></script>
+<script src="campo.js?v=129"></script>
+<script src="app.js?v=129"></script>
 </body>
 </html>

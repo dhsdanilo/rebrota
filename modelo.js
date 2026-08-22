@@ -1812,7 +1812,7 @@ var Modelo = (function () {
      conflito impossível por construção. O estado corrente é derivado dos dois
      lados do mesmo jeito, então ninguém precisa "aplicar" nada no outro. */
 
-  var vista = { tarefas: {}, pessoas: {}, extras: [], compradas: {}, itensExtras: [], separadas: {} };
+  var vista = { tarefas: {}, pessoas: {}, extras: [], compradas: {}, itensExtras: [], separadas: {}, folhaFechada: {}, folhaOrdem: null };
 
   function diarioDe(quem) {
     if (!estado.diarios[quem]) estado.diarios[quem] = { pessoa: quem, eventos: [] };
@@ -1848,7 +1848,7 @@ var Modelo = (function () {
   }
 
   function derivar() {
-    vista = { tarefas: {}, pessoas: {}, extras: [], compradas: {}, itensExtras: [], separadas: {} };
+    vista = { tarefas: {}, pessoas: {}, extras: [], compradas: {}, itensExtras: [], separadas: {}, folhaFechada: {}, folhaOrdem: null };
 
     cat().tarefas.forEach(function (t) {
       vista.tarefas[t.id] = {
@@ -1876,6 +1876,14 @@ var Modelo = (function () {
        a tarefa do páreo; o catálogo aprende quando a mesa abrir. */
     if (ev.tipo === 'separou' && ev.tarefaId && (cat().absorvidas || []).indexOf(ev.id) === -1) {
       vista.separadas[ev.tarefaId] = { para: DIARISTA, dia: ev.dia || diaSeguinte() };
+    }
+    /* A folha fechada pela bota (§61): o evento tira a tarefa da folha na hora;
+       a mesa limpa o catálogo ao absorver. */
+    if (ev.folhaFechada && ev.tarefaId && (cat().absorvidas || []).indexOf(ev.id) === -1) {
+      vista.folhaFechada[ev.tarefaId] = true;
+    }
+    if (ev.tipo === 'folha_ordem' && (cat().absorvidas || []).indexOf(ev.id) === -1) {
+      vista.folhaOrdem = ev.ids || null;
     }
     (ev.itensNovos || (ev.itemNovo ? [ev.itemNovo] : [])).forEach(function (novo) {
       if (!achar(cat().pendencias, novo.id) &&
@@ -2192,21 +2200,52 @@ var Modelo = (function () {
   /* Fechar o dia: o que ele fez entra como dele. `como`: feita · metade
      (com o que sobrou, em minutos) · nao_fez. Em todos os casos a tarefa sai
      da folha e volta ao páreo do Dan, se ainda estiver aberta. */
-  function fecharDiarista(tid, como, sobrouMin, nota) {
+  function fecharDiarista(tid, como, sobrouMin, nota, porEvento) {
+    var sep = separadaDe(tid);
+    if (!sep) return null;
+    var dia = sep.dia;
     var t = tarefa(tid);
-    if (!t || !t.separada) return null;
-    var dia = t.separada.dia;
-    t.separada = null; t.ultimoToque = agora();
+    if (!porEvento && t && t.separada) { t.separada = null; t.ultimoToque = agora(); }
+    var extra = porEvento ? { folhaFechada: true } : null;
     var ev = null;
     if (como === 'feita') {
-      ev = registrar(DIARISTA, 'terminou', { tarefaId: tid, anotacao: nota || '', dia: dia });
+      ev = registrar(DIARISTA, 'terminou', completar({ tarefaId: tid, anotacao: nota || '', dia: dia }, extra || {}));
     } else if (como === 'metade') {
-      ev = registrar(DIARISTA, 'parou', { tarefaId: tid, restante: Math.max(5, Number(sobrouMin) || 0),
-        avanco: 'metade', motivo: 'saiu', nota: nota || '', dia: dia });
+      ev = registrar(DIARISTA, 'parou', completar({ tarefaId: tid, restante: Math.max(5, Number(sobrouMin) || 0),
+        avanco: 'metade', motivo: 'saiu', nota: nota || '', dia: dia }, extra || {}));
+    } else if (porEvento) {
+      ev = registrar(DIARISTA, 'folha_nao_fez', { tarefaId: tid, dia: dia, folhaFechada: true });
     } else {
       salvar();
     }
     return ev;
+  }
+
+  /* A mesa aplica o que a bota fez na folha: fechamentos e reordenação. */
+  function absorverFolha() {
+    var mudou = false;
+    var ordemFinal = null;
+    eventosEmOrdem().forEach(function (ev) {
+      var absorvido = (cat().absorvidas || []).indexOf(ev.id) !== -1;
+      if (ev.folhaFechada && ev.tarefaId && !absorvido) {
+        var t = tarefa(ev.tarefaId);
+        if (t && t.separada) { t.separada = null; t.ultimoToque = agora(); }
+        cat().absorvidas.push(ev.id);
+        delete vista.folhaFechada[ev.tarefaId];
+        mudou = true;
+      }
+      if (ev.tipo === 'folha_ordem' && !absorvido) {
+        ordemFinal = ev.ids || null;
+        cat().absorvidas.push(ev.id);
+        mudou = true;
+      }
+    });
+    if (ordemFinal) {
+      reordenarSeparadas(ordemFinal.filter(function (id) { var t = tarefa(id); return t && t.separada; }));
+      vista.folhaOrdem = null;
+    }
+    if (mudou) salvar();
+    return mudou;
   }
   /* A FOLHA DA RUA (§43): tudo que é "fora" e está em jogo — avulsa ou projeto
      em vaga (planejamento inclusive: orçar na loja é rua). Aproveitar a viagem,
@@ -2229,9 +2268,28 @@ var Modelo = (function () {
   /* Separada, pelo catálogo OU por evento ainda não absorvido. É o que o
      motor e a vitrine consultam. */
   function separadaDe(tid) {
+    if (vista.folhaFechada[tid]) return null;   // fechada pela bota: voltou ao páreo
     var t = tarefa(tid);
     if (t && t.separada) return t.separada;
     return vista.separadas[tid] || null;
+  }
+  /* A folha como os dois lados a veem: catálogo + delegadas por evento, menos
+     as fechadas por evento. A ordem pode vir de um evento da bota. */
+  function folhaDoDiarista() {
+    var lista = tarefasVivas().filter(function (t) { return !!separadaDe(t.id); });
+    var ordemEv = vista.folhaOrdem;
+    lista.sort(function (a, b) {
+      if (ordemEv) {
+        var ia = ordemEv.indexOf(a.id), ib = ordemEv.indexOf(b.id);
+        if (ia !== -1 || ib !== -1) return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+      }
+      var sa = (a.separada && a.separada.ordem) || 500, sb = (b.separada && b.separada.ordem) || 500;
+      return sa - sb;
+    });
+    return lista;
+  }
+  function reordenarFolhaPorEvento(quem, ids) {
+    return registrar(quem, 'folha_ordem', { ids: ids });
   }
   // delegar pela bota (§60): evento; a mesa monta a folha ao absorver
   function separarPorEvento(quem, tid) {
@@ -2350,8 +2408,11 @@ var Modelo = (function () {
     return registrar(quem, 'vitrine', { tarefas: tarefas, dia: dia });
   }
 
+  /* Barro pode ficar em aberto (§61): quem registra o clima pela entrada da
+     bota não respondeu sobre o chão — null deixa a consulta perguntar. */
   function registrarClima(quem, tempo, barro) {
-    return registrar(quem, 'clima', { dia: hoje(), tempo: tempo, barro: !!barro });
+    return registrar(quem, 'clima', { dia: hoje(), tempo: tempo,
+      barro: (barro === null || barro === undefined) ? null : !!barro });
   }
 
   function climaDeHoje() {
@@ -2582,6 +2643,7 @@ var Modelo = (function () {
     definirDiaDiarista: definirDiaDiarista, fecharDiarista: fecharDiarista, minutosSeparados: minutosSeparados,
     tarefasDaRua: tarefasDaRua, reordenarRua: reordenarRua,
     separadaDe: separadaDe, separarPorEvento: separarPorEvento, absorverSeparadas: absorverSeparadas,
+    folhaDoDiarista: folhaDoDiarista, reordenarFolhaPorEvento: reordenarFolhaPorEvento, absorverFolha: absorverFolha,
     perguntaEmpacou: perguntaEmpacou, empacar: empacar, notaEmpacou: notaEmpacou,
     semear: semear, absorverSementes: absorverSementes, sementesDe: sementesDe,
     anotar: anotar, riscarAnotacao: riscarAnotacao, anotacoes: anotacoes,

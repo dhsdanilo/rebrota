@@ -15,8 +15,8 @@ var Tempo = (function () {
   'use strict';
 
   var CHAVE = 'app-sitio-tempo';
-  // o sítio: Sete Barras, Vale do Ribeira (piso de vale, ~70 m)
-  var LAT = -24.3878, LON = -47.9264;
+  // o sítio: bairro na serra de Sete Barras, Vale do Ribeira (Barra do Ribeirão da Serra, geocodificada em 21/08; o nome não aparece em tela nenhuma)
+  var LAT = -24.26335, LON = -47.95204;
   var VALIDADE_MS = 30 * 60 * 1000;      // não pedir de novo antes de meia hora
   var FRESCO_MS = 3 * 60 * 60 * 1000;    // "lá fora agora" só com leitura de até 3 h
 
@@ -107,7 +107,8 @@ var Tempo = (function () {
     if (!dados || !dados.atual) return null;
     if (Date.now() - dados.em > FRESCO_MS) return null;
     var t = tempoDe(dados.atual.code);
-    return { temp: dados.atual.temp, tempo: t, rotulo: rotulo(t), calor: dados.atual.temp >= 30 };
+    return { temp: dados.atual.temp, tempo: t, rotulo: rotulo(t), calor: dados.atual.temp >= 30,
+             umid: dados.atual.umid, vento: dados.atual.vento, rajada: dados.atual.rajada };
   }
 
   // os próximos dias — ou null; o primeiro é hoje

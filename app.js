@@ -550,7 +550,7 @@
               '<span>' + (M.tarefasDaRua().length + M.itensDaRua().length) + ' na rua</span></button>'
             : '') +
         '</div>' +
-        alertaDoTempo() + vitrineDaAbertura() + avisoDeNuvem() +
+        alertaDoTempo() + climaDaEntrada() + vitrineDaAbertura() + linkDoDiarista() + avisoDeNuvem() +
         '</div>';
     }
 
@@ -687,6 +687,54 @@
     }).join('');
   }
 
+  /* O clima na entrada da bota (§61): durante o dia, o de HOJE — previsão, ou
+     o que ele registrou — com o "não é isso?" para corrigir ali mesmo; das 18h
+     em diante, o de AMANHÃ (a vitrine já virou, o clima vira junto). Corrigir
+     registra o clima do dia (o chão fica em aberto: a consulta pergunta). */
+  var climaTrocando = false;
+  function climaDaEntrada() {
+    if (naMesa() || typeof Tempo === 'undefined') return '';
+    var h = new Date().getHours();
+    if (h >= 18) {
+      var dias = Tempo.semana();
+      var am = dias && dias[1];
+      if (!am) return '';
+      return '<p class="clima-entrada">amanhã: ' + esc(Tempo.rotulo(Tempo.tempoDe(am.code))) +
+        ' · ' + am.min + '–' + am.max + '°' +
+        (am.chuvaProb !== null && am.chuvaProb !== undefined ? ' · chuva ' + am.chuvaProb + '%' : '') +
+        (am.rajadaMax >= 40 ? ' · rajadas ' + am.rajadaMax + ' km/h' : '') + '</p>';
+    }
+    var ROT = { sol: 'sol', calor: 'sol forte · calor', nublado: 'nublado', chuva_fina: 'chuva fina', chuva_forte: 'chuva forte' };
+    var chips = '';
+    if (climaTrocando) {
+      chips = '<span class="clima-chips">' + Object.keys(ROT).map(function (v) {
+        return '<button type="button" class="filtro" data-acao="clima-corrigir" data-valor="' + v + '">' + esc(ROT[v]) + '</button>';
+      }).join('') + '</span>';
+    }
+    var reg = M.climaDeHoje();
+    if (reg) {
+      return '<p class="clima-entrada">hoje: ' + esc(ROT[reg.tempo] || reg.tempo) + ' · você informou' +
+        (climaTrocando ? '' : ' <button type="button" class="bt-linha bt-mini" data-acao="clima-trocar">mudou?</button>') +
+        '</p>' + chips;
+    }
+    var la = Tempo.agora();
+    if (!la) return '';
+    var rotAgora = la.calor && la.tempo === 'sol' ? 'sol forte' : la.rotulo;
+    return '<p class="clima-entrada">hoje: ' + la.temp + '° · ' + esc(rotAgora) +
+      (climaTrocando ? '' : ' <button type="button" class="bt-linha bt-mini" data-acao="clima-trocar">não é isso?</button>') +
+      '</p>' + chips;
+  }
+
+  /* A folha do diarista chega à bota (§61): quando há tarefa separada, um
+     caminho miúdo na entrada. As ações da folha viram eventos por lá. */
+  function linkDoDiarista() {
+    if (naMesa()) return '';
+    var n = M.folhaDoDiarista().length;
+    if (!n) return '';
+    return '<p class="rua-link"><button type="button" class="bt-linha" data-acao="ir-diarista">folha do diarista · ' +
+      n + (n === 1 ? ' separada' : ' separadas') + '</button></p>';
+  }
+
   function vitrineDaAbertura() {
     if (typeof Motor === 'undefined') return '';
     var v = itensDaVitrine();
@@ -740,7 +788,9 @@
               '</div>'
             : '<div class="vitrine-acoes">' +
                 (!delegada && M.desimpedida(t)
-                  ? '<button type="button" class="bt-forte bt-mini" data-acao="vitrine-vamos" data-id="' + t.id + '">vamos</button>' +
+                  ? (new Date().getHours() >= 5
+                      ? '<button type="button" class="bt-forte bt-mini" data-acao="vitrine-vamos" data-id="' + t.id + '">vamos</button>'
+                      : '<span class="vitrine-madrugada">antes das 5, sem aceitar — delegar e feita valem</span>') +
                     '<button type="button" class="bt-fraco bt-mini" data-acao="vitrine-feita-abrir" data-id="' + t.id + '">feita</button>'
                   : '') +
                 (!delegada && t.etapa === 'execucao'
@@ -2537,11 +2587,11 @@
      como texto puro para mandar; imprime limpa. Fechar o dia é aqui também:
      feita · pela metade · não fez, em nome dele. */
   function marcacaoDiarista() {
-    var lista = M.separadas();
+    var lista = M.folhaDoDiarista();
     if (!lista.length) {
       return '<h2>Diarista</h2><p class="palco-sub">Nada separado. Abra uma tarefa de execução (projeto em vaga ou avulsa) e use <em>separar para o diarista</em>.</p>';
     }
-    var dia = lista[0].separada.dia;
+    var dia = (M.separadaDe(lista[0].id) || {}).dia || M.hoje();
     return [
       // o que só sai no papel: o título que ELE lê, não o nosso
       '<div class="folha-papel"><h1>Tarefas de ' + esc(M.formatarData(dia)) + '</h1>' +
@@ -2549,7 +2599,9 @@
       '<h2>Folha do diarista</h2>',
       '<p class="palco-sub">Só o que ele precisa para fazer sem perguntar. Separada, a tarefa sai do seu páreo até você fechar o dia.</p>',
       '<div class="folha-cabeca">',
-        '<label class="folha-dia">para o dia <input type="date" id="diaDiarista" value="' + esc(dia) + '"></label>',
+        (naMesa()
+          ? '<label class="folha-dia">para o dia <input type="date" id="diaDiarista" value="' + esc(dia) + '"></label>'
+          : '<span class="folha-dia">para o dia ' + esc(M.formatarData(dia)) + '</span>'),
         '<span class="folha-total">~' + esc(M.duracao(M.minutosSeparados())) + ' · ' + lista.length + (lista.length === 1 ? ' tarefa' : ' tarefas') + '</span>',
         '<button type="button" class="bt-fraco bt-mini" data-acao="diarista-copiar">copiar a folha</button>',
         '<button type="button" class="bt-fraco bt-mini" onclick="window.print()">imprimir</button>',
@@ -2588,7 +2640,9 @@
           '</li>';
       }).join(''),
       '</ol>',
-      '<div class="rodape-acoes"><button type="button" class="bt-linha" data-acao="diarista-desfazer-tudo">ele não veio — devolver tudo ao meu páreo</button></div>'
+      (naMesa()
+        ? '<div class="rodape-acoes"><button type="button" class="bt-linha" data-acao="diarista-desfazer-tudo">ele não veio — devolver tudo ao meu páreo</button></div>'
+        : '<div class="rua-pe"><button type="button" class="voltar-lista rua-voltar" data-acao="voltar-inicio">← voltar</button></div>')
     ].join('');
   }
 
@@ -2699,8 +2753,8 @@
   }
 
   function textoDaFolha() {
-    var lista = M.separadas();
-    var linhas = ['Rebrota — folha do diarista · ' + M.formatarData(lista[0].separada.dia), ''];
+    var lista = M.folhaDoDiarista();
+    var linhas = ['Rebrota — folha do diarista · ' + M.formatarData((M.separadaDe(lista[0].id) || {}).dia || M.hoje()), ''];
     lista.forEach(function (t, i) {
       var p = t.projetoId ? M.projeto(t.projetoId) : null;
       linhas.push((i + 1) + '. ' + (t.texto || 'tarefa sem texto') + (p ? ' (' + p.nome + ')' : ''));
@@ -2921,7 +2975,8 @@
        empilhada em cima dela era a "lista de projetos" que o celular não
        deveria ter (§13) — e o que se quer no carro é só o que é de rua. */
     var naRua = tela.tipo === 'rua' && !naMesa();
-    document.body.classList.toggle('sem-coluna', tela.tipo === null || naRua);
+    var botaSozinha = !naMesa() && (tela.tipo === 'rua' || tela.tipo === 'diarista');
+    document.body.classList.toggle('sem-coluna', tela.tipo === null || botaSozinha);
     document.body.classList.toggle('na-rua', naRua);
     // de dia a folha é papel (sol no carro); de noite o papel ofusca, e ela fica escura
     var h = new Date().getHours();
@@ -3505,17 +3560,18 @@
       var como = el.getAttribute('data-valor');
       var sobrou = como === 'metade' ? valorDoCampo('sobrou_' + tid) : null;
       if (como === 'metade' && !sobrou) { var c = document.getElementById('sobrou_' + tid); if (c) c.focus(); return; }
-      M.fecharDiarista(tid, como, sobrou, valorDoCampo('nota_' + tid));
+      M.fecharDiarista(tid, como, sobrou, valorDoCampo('nota_' + tid), !naMesa());
       colherAvisos();
       return desenhar();
     }
     if (acao === 'diarista-metade') { diaristaMetade = tid; return desenharPalco(); }
     if (acao === 'diarista-mover') {
-      var ids = M.separadas().map(function (t) { return t.id; });
+      var ids = M.folhaDoDiarista().map(function (t) { return t.id; });
       var i = ids.indexOf(tid), j = i + Number(el.getAttribute('data-valor'));
       if (i < 0 || j < 0 || j >= ids.length) return;
       ids.splice(j, 0, ids.splice(i, 1)[0]);
-      M.reordenarSeparadas(ids);
+      if (naMesa()) M.reordenarSeparadas(ids);
+      else M.reordenarFolhaPorEvento('pe_eu', ids);
       return desenharPalco();
     }
     if (acao === 'tempo') {
@@ -3557,6 +3613,14 @@
       M.tirarTag(alvoTag, el.getAttribute('data-valor'));
       return desenharPalco();
     }
+    if (acao === 'clima-trocar') { climaTrocando = true; return desenhar(); }
+    if (acao === 'clima-corrigir') {
+      var tempoNovo = el.getAttribute('data-valor');
+      M.registrarClima('pe_eu', tempoNovo, tempoNovo === 'chuva_forte' ? true : null);
+      climaTrocando = false;
+      return desenhar();
+    }
+    if (acao === 'ir-diarista') { tela = { tipo: 'diarista', id: null }; return desenhar(); }
     if (acao === 'vitrine-abrir') {
       vitrineAberta = vitrineAberta === tid ? null : tid;
       vitrineFeita = null; vitrineEmpacando = null;
@@ -4202,6 +4266,50 @@
     }
   });
 
+  // ── a previsão detalhada (§61): tudo a que se tem direito ─────────
+  var $previsaoPainel = document.getElementById('previsaoPainel');
+  var $previsaoCorpo = document.getElementById('previsaoCorpo');
+
+  function desenharPrevisaoPainel() {
+    if (typeof Tempo === 'undefined') return;
+    var la = Tempo.agora();
+    var dias = Tempo.semana();
+    var html = '';
+    if (la) {
+      html += '<div class="prev-agora"><b>' + la.temp + '°</b> · ' +
+        esc(la.calor && la.tempo === 'sol' ? 'sol forte' : la.rotulo) +
+        '<span>umidade ' + la.umid + '% · vento ' + la.vento + ' km/h · rajadas ' + la.rajada + ' km/h</span></div>';
+    }
+    if (dias) {
+      html += '<table class="prev-tabela"><tr><th></th><th></th><th>mín–máx</th><th>chuva</th><th>rajadas</th></tr>' +
+        dias.map(function (d, i) {
+          var dt = new Date(d.dia + 'T00:00:00');
+          var nome = i === 0 ? 'hoje' : M.NOMES_DIA[dt.getDay()];
+          var alertaDia = d.code >= 95 || (d.rajadaMax || 0) >= 60;
+          return '<tr' + (alertaDia ? ' class="prev-alerta"' : '') + '>' +
+            '<td>' + esc(nome) + '</td>' +
+            '<td class="prev-icone">' + (ICONES_TEMPO[Tempo.tempoDe(d.code)] || '') + ' ' + esc(Tempo.rotulo(Tempo.tempoDe(d.code))) + '</td>' +
+            '<td>' + d.min + '–' + d.max + '°</td>' +
+            '<td>' + (d.chuvaProb !== null && d.chuvaProb !== undefined ? d.chuvaProb + '%' : '—') +
+              (d.chuvaMm ? ' · ' + d.chuvaMm + ' mm' : '') + '</td>' +
+            '<td>' + (d.rajadaMax ? d.rajadaMax + ' km/h' : '—') + '</td>' +
+            '</tr>';
+        }).join('') + '</table>';
+    }
+    var a = Tempo.alerta();
+    if (a) html += '<p class="alerta-tempo" style="margin-top:12px">' + esc(a.texto) + '</p>';
+    $previsaoCorpo.innerHTML = html || '<p class="aviso">Sem previsão agora — sem internet, ela cala.</p>';
+  }
+
+  document.getElementById('topoPrevisao').addEventListener('click', function () {
+    if (!$previsaoPainel.hidden) { $previsaoPainel.hidden = true; return; }
+    $bilhete.hidden = true; $semear.hidden = true; $nuvem.hidden = true;
+    Tempo.buscar();
+    desenharPrevisaoPainel();
+    $previsaoPainel.hidden = false;
+  });
+  document.getElementById('btFecharPrevisao').addEventListener('click', function () { $previsaoPainel.hidden = true; });
+
   // ── bilhete sobre o app ───────────────────────────────────────────
   /* Fica por cima de tudo, inclusive da tela de execução: o incômodo aparece
      durante o uso, e anotar depois é anotar pior. */
@@ -4419,7 +4527,7 @@
     // a linha da nuvem na entrada acompanha o estado (hora, erro), sem mexer no resto
     if (!mudouLocal && tela.tipo === null && $campo.hidden && !s.ocupado) return desenhar();
     if (!mudouLocal) return;
-    if (naMesa()) { M.absorverSementes(); M.absorverCompras(); M.absorverSeparadas(); }
+    if (naMesa()) { M.absorverSementes(); M.absorverCompras(); M.absorverSeparadas(); M.absorverFolha(); }
     M.cascatearVagas(); colherAvisos();
     // a frente de campo lê o estado a cada toque; a mesa precisa redesenhar
     if ($campo.hidden) desenhar(); else desenharLista();
@@ -4432,7 +4540,7 @@
   colherAvisos();       // ... e dito, não engolido
   conferirProposta();
   desenharProposta();
-  if (naMesa()) { M.absorverSementes(); M.absorverCompras(); M.absorverSeparadas(); }
+  if (naMesa()) { M.absorverSementes(); M.absorverCompras(); M.absorverSeparadas(); M.absorverFolha(); }
   voltarAoLugar();
   // a bota abre na entrada, de propósito — salvo se você disse que ia sair e a rua ainda tem coisa
   if (!naMesa() && aindaNaRua()) tela = { tipo: 'rua', id: null };
