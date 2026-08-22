@@ -139,7 +139,7 @@ var Motor = (function () {
      de frentes que impede o volume de obrigação de crescer. */
   function emitindo(t) {
     if (t.tipo === 'compra') return false;   // passo-compra não se oferece: se compra (§57)
-    if (t.separada) return false;   // está na folha do diarista: não é do Dan hoje
+    if (M.separadaDe(t.id)) return false;   // na folha do diarista (ou delegada pela bota, §60)
     if (!t.projetoId) return true;
     var p = M.projeto(t.projetoId);
     if (!p || VAGAS.indexOf(p.papel) === -1) return false;
@@ -357,9 +357,10 @@ var Motor = (function () {
      volta. Só filtros estruturais e o dia-alvo (mês, dia da semana): clima e
      tempo disponível são do dia seguinte, e o dia seguinte decide. Fora fica
      de fora (rua é a folha da rua). Nada gruda, nada custa. */
-  function vitrine(quando) {
+  function vitrine(quando, excluir) {
     var alvo = quando || new Date();
     var pool = M.tarefasVivas().filter(function (t) {
+      if (excluir && excluir[t.id]) return false;
       if (M.estadoDe(t.id) !== 'aberta' || t.tipo === 'compra') return false;
       if (t.ondePrecisaEstar === 'fora') return false;
       if (!emitindo(t) || !M.desimpedida(t)) return false;

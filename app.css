@@ -2323,16 +2323,62 @@ input[type="number"][readonly] { -moz-appearance: textfield; }
   .previsao-dia svg { width: 14px; height: 14px; }
 }
 
-/* a vitrine (§58): a véspera — leitura, sem botão, sem custo */
+/* o alerta do tempo (§59): seco, em casca — nunca vermelho, nunca push */
+.alerta-tempo {
+  font-family: var(--mono); font-size: 12px; letter-spacing: .03em;
+  color: var(--casca); border: 1px solid var(--casca); border-radius: var(--raio);
+  padding: 8px 12px; margin: 22px 0 0; text-align: center;
+}
+.previsao-dia-alerta { border: 1px solid var(--casca); border-radius: var(--raio); }
+.previsao-dia-alerta svg { color: var(--casca); }
+/* o clima assumido pela previsão (§59) */
+.c-assumida { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.c-assumida-valor { font-size: 16px; color: var(--neblina); }
+
+/* as duas portas da bota (§60): sorteio e rua, peso igual */
+.portas-bota { display: flex; gap: 10px; }
+.porta-b {
+  flex: 1; min-height: 64px; padding: 10px 12px;
+  background: var(--mata); border: 1px solid var(--musgo); border-radius: 4px;
+  color: var(--neblina); font-size: 17px; cursor: pointer; text-align: center;
+}
+.porta-b:hover { border-color: var(--neblina-fraca); }
+.porta-b span {
+  display: block; margin-top: 2px;
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: .03em; color: var(--neblina-fraca);
+}
+
+/* a vitrine (§58, viva na §60): a véspera — a lista do dia, congelada */
 .vitrine { margin: 30px 0 0; text-align: left; }
 .vitrine-titulo {
   font-family: var(--mono); font-size: 11px; text-transform: uppercase;
   letter-spacing: .12em; color: var(--neblina-fraca); margin-bottom: 10px;
 }
-.vitrine-item {
-  display: flex; flex-direction: column; gap: 3px;
-  padding: 10px 0; border-top: 1px solid var(--musgo);
+.vitrine-item { border-top: 1px solid var(--musgo); }
+.vitrine-cabeca {
+  display: flex; flex-direction: column; gap: 3px; width: 100%;
+  padding: 12px 0; background: none; border: none; color: inherit;
+  text-align: left; cursor: pointer; font: inherit;
 }
+.vitrine-feita .vitrine-cabeca { cursor: default; }
+.vitrine-feita .vitrine-texto { text-decoration: line-through; color: var(--neblina-fraca); }
+.vitrine-feita .vitrine-etiqueta { color: var(--dentro); }
+.vitrine-corpo { padding: 0 0 14px; display: flex; flex-direction: column; gap: 8px; }
+.vitrine-ficha-linha { font-family: var(--mono); font-size: 11.5px; letter-spacing: .02em; color: var(--neblina-fraca); }
+.vitrine-ficha-linha b { color: var(--neblina); font-weight: 500; margin-right: 8px; }
+.vitrine-acoes { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+.vitrine-acoes .bt-mini { min-height: 42px; padding: 8px 18px; font-size: 15px; }
+.vitrine-empacou-bt { color: var(--casca); border-color: var(--casca); }
+.vitrine-caixa { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 4px; }
+.vitrine-caixa input { flex: 1; min-width: 200px; padding: 9px 10px; }
+.vitrine-caixa .bt-mini { min-height: 42px; padding: 8px 16px; font-size: 15px; }
+.vitrine-mais {
+  display: block; width: 100%; min-height: 52px; margin-top: 12px;
+  background: var(--mata); border: 1px solid var(--musgo); border-radius: 4px;
+  color: var(--neblina); font-size: 16px; cursor: pointer;
+}
+.vitrine-mais:hover { border-color: var(--rebrota); }
+.aviso-empacou { color: var(--casca); }
 .vitrine-etiqueta { font-family: var(--mono); font-size: 10px; letter-spacing: .05em; color: var(--casca); }
 .vitrine-texto { font-size: 17px; line-height: 1.3; }
 .vitrine-meta { font-family: var(--mono); font-size: 11px; letter-spacing: .03em; color: var(--neblina-fraca); }

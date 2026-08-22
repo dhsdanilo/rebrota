@@ -45,27 +45,61 @@ var Tempo = (function () {
   var ROTULOS = { sol: 'sol', nublado: 'nublado', chuva_fina: 'chuva fina', chuva_forte: 'chuva forte' };
   function rotulo(t) { return ROTULOS[t] || t; }
 
+  /* Vento, rajada, umidade, chuva e tempestade (§59): o Vale do Ribeira em
+     ano de El Niño derruba galho e destelha — acompanhar isso é parte do
+     sítio. Mesmas variáveis que o Windy mostra (o modelo de base, ECMWF,
+     também alimenta o best-match do Open-Meteo). */
   function buscar() {
     if (!navigator.onLine) return Promise.resolve(dados);
-    if (dados && Date.now() - dados.em < VALIDADE_MS) return Promise.resolve(dados);
+    if (dados && Date.now() - dados.em < VALIDADE_MS && dados.v === 2) return Promise.resolve(dados);
     var url = 'https://api.open-meteo.com/v1/forecast?latitude=' + LAT + '&longitude=' + LON +
-      '&current=temperature_2m,weather_code' +
-      '&daily=weather_code,temperature_2m_max,temperature_2m_min' +
+      '&current=temperature_2m,relative_humidity_2m,weather_code,wind_speed_10m,wind_gusts_10m' +
+      '&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,' +
+      'precipitation_probability_max,wind_speed_10m_max,wind_gusts_10m_max' +
       '&timezone=America%2FSao_Paulo&forecast_days=5';
     return fetch(url).then(function (r) { return r.json(); }).then(function (j) {
       dados = {
-        em: Date.now(),
-        atual: { temp: Math.round(j.current.temperature_2m), code: j.current.weather_code },
+        em: Date.now(), v: 2,
+        atual: { temp: Math.round(j.current.temperature_2m), code: j.current.weather_code,
+                 umid: Math.round(j.current.relative_humidity_2m),
+                 vento: Math.round(j.current.wind_speed_10m),
+                 rajada: Math.round(j.current.wind_gusts_10m) },
         dias: (j.daily.time || []).map(function (d, i) {
           return { dia: d, code: j.daily.weather_code[i],
                    max: Math.round(j.daily.temperature_2m_max[i]),
-                   min: Math.round(j.daily.temperature_2m_min[i]) };
+                   min: Math.round(j.daily.temperature_2m_min[i]),
+                   chuvaMm: Math.round((j.daily.precipitation_sum[i] || 0) * 10) / 10,
+                   chuvaProb: j.daily.precipitation_probability_max ? j.daily.precipitation_probability_max[i] : null,
+                   ventoMax: Math.round(j.daily.wind_speed_10m_max[i] || 0),
+                   rajadaMax: Math.round(j.daily.wind_gusts_10m_max[i] || 0) };
         })
       };
       guardar();
       avisar();
       return dados;
     }).catch(function () { return dados; });
+  }
+
+  /* O ALERTA (§59): tempestade prevista (código WMO 95+) ou rajada de 60 km/h+
+     nos próximos dias. Sem push (regra 3): aparece quando o app abre. */
+  var NOMES_DIA_T = ['domingo', 'segunda', 'terça', 'quarta', 'quinta', 'sexta', 'sábado'];
+  function alerta() {
+    var dias = semana();
+    if (!dias) return null;
+    for (var i = 0; i < dias.length; i++) {
+      var d = dias[i];
+      var tempestade = d.code >= 95;
+      var ventania = (d.rajadaMax || 0) >= 60;
+      if (!tempestade && !ventania) continue;
+      var dt = new Date(d.dia + 'T00:00:00');
+      var nome = i === 0 ? 'hoje' : i === 1 ? 'amanhã' : NOMES_DIA_T[dt.getDay()];
+      var partes = [];
+      if (tempestade) partes.push('tempestade na previsão de ' + nome);
+      if (ventania) partes.push((tempestade ? '' : 'vento forte ' + nome + ' — ') + 'rajadas de ' + d.rajadaMax + ' km/h');
+      if (d.chuvaMm) partes.push(d.chuvaMm + ' mm de chuva');
+      return { dia: d.dia, nome: nome, texto: partes.join(' · ') };
+    }
+    return null;
   }
 
   // a leitura de agora — ou null, se a última busca já não diz nada de agora
@@ -84,5 +118,5 @@ var Tempo = (function () {
   }
 
   carregar();
-  return { buscar: buscar, agora: agora, semana: semana, ouvir: ouvir, tempoDe: tempoDe, rotulo: rotulo };
+  return { buscar: buscar, agora: agora, semana: semana, ouvir: ouvir, tempoDe: tempoDe, rotulo: rotulo, alerta: alerta };
 })();

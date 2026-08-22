@@ -244,16 +244,6 @@
       n + (n === 1 ? ' coisa' : ' coisas') + ' na rua</button></p>';
   }
 
-  /* Na bota a rua é a segunda porta da entrada — botão de verdade, não link
-     miúdo: é por ele que se entra no carro (§51). "Fora" saiu da consulta;
-     a resposta para rua É a folha, não um sorteio. */
-  function botaoDaRua() {
-    var n = M.tarefasDaRua().length + M.itensDaRua().length;
-    if (!n) return '';
-    return '<button type="button" class="porta-rua" data-acao="ir-rua">vai sair?' +
-      '<span class="porta-rua-n">' + n + (n === 1 ? ' coisa' : ' coisas') + ' na rua</span></button>';
-  }
-
   /* Vaga vazia é convite, não buraco: leva direto para a escolha. */
   function itemVagaAberta(v) {
     var prontas = M.planejadas().filter(M.aptaParaExecucao).length;
@@ -552,9 +542,15 @@
        dentro da própria tarefa, na trilha. */
     if (!naMesa()) {
       return '<div class="abertura">' + frase +
-        '<button type="button" class="c-acao porta-unica" data-acao="ir-executar">encontrar tarefa</button>' +
-        botaoDaRua() +
-        vitrineDaAbertura() + avisoDeNuvem() +
+        '<div class="portas-bota">' +
+          '<button type="button" class="porta-b" data-acao="ir-executar">sorteio' +
+            '<span>o app escolhe</span></button>' +
+          (M.tarefasDaRua().length + M.itensDaRua().length
+            ? '<button type="button" class="porta-b" data-acao="ir-rua">vai sair?' +
+              '<span>' + (M.tarefasDaRua().length + M.itensDaRua().length) + ' na rua</span></button>'
+            : '') +
+        '</div>' +
+        alertaDoTempo() + vitrineDaAbertura() + avisoDeNuvem() +
         '</div>';
     }
 
@@ -571,7 +567,7 @@
           '<span class="porta-nome">organizar</span>' +
           '<span class="porta-sub">mexer nos projetos e no plano</span>' +
         '</button>' +
-      '</div>' + linkDaRua() + vagasDaAbertura() + vitrineDaAbertura() + avisoDeNuvem() + avisoDeCopia() + '</div>';
+      '</div>' + linkDaRua() + alertaDoTempo() + vagasDaAbertura() + vitrineDaAbertura() + avisoDeNuvem() + avisoDeCopia() + '</div>';
   }
 
   /* Aparelho sem sincronização diz isso na entrada, uma linha, sem alarme —
@@ -609,8 +605,12 @@
     caixa.innerHTML = dias.map(function (d, i) {
       var dt = new Date(d.dia + 'T00:00:00');
       var nome = i === 0 ? 'hoje' : M.NOMES_DIA[dt.getDay()];
-      return '<span class="previsao-dia" title="' + esc(nome + ' · ' + Tempo.rotulo(Tempo.tempoDe(d.code)) +
-          ' · ' + d.min + '–' + d.max + '°') + '"><b>' + esc(nome) + '</b>' +
+      var detalhe = nome + ' · ' + Tempo.rotulo(Tempo.tempoDe(d.code)) + ' · ' + d.min + '–' + d.max + '°' +
+        (d.chuvaProb !== null && d.chuvaProb !== undefined ? ' · chuva ' + d.chuvaProb + '%' : '') +
+        (d.chuvaMm ? ' (' + d.chuvaMm + ' mm)' : '') +
+        (d.rajadaMax ? ' · rajadas ' + d.rajadaMax + ' km/h' : '');
+      return '<span class="previsao-dia' + (d.code >= 95 || (d.rajadaMax || 0) >= 60 ? ' previsao-dia-alerta' : '') +
+        '" title="' + esc(detalhe) + '"><b>' + esc(nome) + '</b>' +
         (ICONES_TEMPO[Tempo.tempoDe(d.code)] || '') +
         '<i>' + d.max + '°</i></span>';
     }).join('');
@@ -620,30 +620,99 @@
      sem botão, sem oferta, sem custo. Antes das 16 h fala de hoje; depois, de
      amanhã (ele olha na cama, à noite, e dorme com o plano). A previsão do
      tempo entra como aviso, nunca como filtro: quem decide o dia é o dia. */
+  /* O alerta do tempo (§59): uma linha seca, em casca, quando há tempestade
+     ou ventania na previsão. Sem push, sem vermelho: aparece quando se abre. */
+  function alertaDoTempo() {
+    var a = (typeof Tempo !== 'undefined') ? Tempo.alerta() : null;
+    if (!a) return '';
+    return '<p class="alerta-tempo">' + esc(a.texto) + '</p>';
+  }
+
+  /* A VITRINE VIVA (§60). A lista do dia é CONGELADA: calculada uma vez e
+     guardada — nada de trocar as sugestões no meio do dia. A virada é às 18 h
+     (ele não faz nada de bota depois disso): dali em diante a vitrine fala de
+     amanhã. Cada tarefa abre num toque — ver a ficha, VAMOS (vira a tarefa
+     ativa de sempre), FEITA (com anotação) e DELEGAR (evento; a mesa monta a
+     folha). Acabaram as três antes da hora? O botão "fazer mais" puxa as
+     próximas. E a tarefa que mora na vitrine dias seguidos sem ninguém
+     encostar ganha a pergunta: "empacou?" — a resposta é dele para ele mesmo,
+     e reaparece na mesa como aviso na linha, para refinar o projeto. */
+  var CHAVE_VITRINE = 'app-sitio-vitrine2';
+  var vitrineAberta = null;     // tarefa da vitrine com a ficha aberta
+  var vitrineFeita = null;      // tarefa com a caixinha do feita aberta
+  var vitrineEmpacando = null;  // tarefa com o campo do empacou aberto
+
+  function alvoDaVitrine() {
+    var alvo = new Date();
+    if (alvo.getHours() >= 18) { alvo.setDate(alvo.getDate() + 1); return { alvo: alvo, titulo: 'para amanhã' }; }
+    return { alvo: alvo, titulo: 'para hoje' };
+  }
+  function lerMarcaVitrine() {
+    try { return JSON.parse(localStorage.getItem(CHAVE_VITRINE)); } catch (e) { return null; }
+  }
+  function salvarMarcaVitrine(m) {
+    try { localStorage.setItem(CHAVE_VITRINE, JSON.stringify(m)); } catch (e) {}
+  }
+  function itensDaVitrine() {
+    var av = alvoDaVitrine();
+    var diaAlvo = M.diaLocal(av.alvo);
+    var marca = lerMarcaVitrine();
+    if (!marca || marca.dia !== diaAlvo) {
+      var lista = Motor.vitrine(av.alvo);
+      marca = { dia: diaAlvo, itens: lista.map(function (v) { return { id: v.tarefa.id, rotulo: v.rotulo }; }) };
+      salvarMarcaVitrine(marca);
+      if (lista.length) M.verVitrine('pe_eu', marca.itens.map(function (x) { return x.id; }), diaAlvo);
+    }
+    return { dia: diaAlvo, titulo: av.titulo, alvo: av.alvo, itens: marca.itens };
+  }
+
+  function fichaDaVitrine(t) {
+    var linhas = [];
+    var local = M.LOCAIS.filter(function (l) { return l.v === t.ondePrecisaEstar; })[0];
+    var onde = [local ? local.t : '', t.onde].filter(Boolean).join(' · ');
+    if (onde) linhas.push(['onde', onde]);
+    if ((t.ferramentas || []).length) linhas.push(['ferramentas', t.ferramentas.join(', ')]);
+    if ((t.materiais || []).length) linhas.push(['materiais', t.materiais.join(', ')]);
+    var cond = [];
+    if (t.exigeClima === 'firme') cond.push('só com tempo firme');
+    if (t.exigeClima === 'tolera_chuva_fina') cond.push('tolera chuva fina');
+    if (t.exigeSoloFirme) cond.push('chão firme');
+    if (t.podeNoCalor === false) cond.push('não no calor');
+    if (!t.podeParar) cond.push('não pode parar');
+    if (t.esforco === 'pesado') cond.push('pesado');
+    if (cond.length) linhas.push(['condições', cond.join(' · ')]);
+    if (M.recadoDe(t.id)) linhas.push(['nota', M.recadoDe(t.id)]);
+    return linhas.map(function (l) {
+      return '<span class="vitrine-ficha-linha"><b>' + esc(l[0]) + '</b>' + esc(l[1]) + '</span>';
+    }).join('');
+  }
+
   function vitrineDaAbertura() {
     if (typeof Motor === 'undefined') return '';
-    var agoraD = new Date();
-    var alvo = new Date();
-    var titulo = 'para hoje';
-    if (agoraD.getHours() >= 16) { alvo.setDate(alvo.getDate() + 1); titulo = 'para amanhã'; }
-    var lista = Motor.vitrine(alvo);
-    if (!lista.length) return '';
+    var v = itensDaVitrine();
+    if (!v.itens.length) return '';
 
-    // a previsão do dia-alvo, para o aviso de clima
     var prevDia = null;
     if (typeof Tempo !== 'undefined' && Tempo.semana()) {
-      var alvoDia = M.diaLocal(alvo);
-      prevDia = Tempo.semana().filter(function (d) { return d.dia === alvoDia; })[0] || null;
+      prevDia = Tempo.semana().filter(function (d) { return d.dia === v.dia; })[0] || null;
     }
 
-    var cards = lista.map(function (v) {
-      var t = v.tarefa;
+    var todasFechadas = true;
+    var cards = v.itens.map(function (item) {
+      var t = M.tarefa(item.id);
+      if (!t) return '';
+      var e = M.estadoDe(t.id);
+      var feita = e === 'feita' || e === 'encerrada';
+      var delegada = !!M.separadaDe(t.id);
+      if (!feita) todasFechadas = false;
       var p = t.projetoId ? M.projeto(t.projetoId) : null;
+      var aberta = vitrineAberta === t.id && !feita;
+
       var meta = [];
       if (p) meta.push(p.nome || 'projeto sem nome');
       meta.push(M.duracao(M.restanteDe(t.id) || t.duracaoTotal));
       var avisoClima = '';
-      if (prevDia) {
+      if (prevDia && !feita) {
         var tempoAlvo = Tempo.tempoDe(prevDia.code);
         if (t.exigeClima === 'firme' && (tempoAlvo === 'chuva_fina' || tempoAlvo === 'chuva_forte')) {
           avisoClima = 'pede tempo firme · chuva na previsão';
@@ -651,27 +720,56 @@
           avisoClima = 'não no calor · previsão de ' + prevDia.max + '°';
         }
       }
-      return '<div class="vitrine-item">' +
-        '<span class="vitrine-etiqueta">' + esc(v.rotulo) + '</span>' +
-        '<span class="vitrine-texto">' + esc(t.texto || 'tarefa sem texto') + '</span>' +
-        '<span class="vitrine-meta">' + esc(meta.join(' · ')) +
-          (avisoClima ? '<em>' + esc(avisoClima) + '</em>' : '') + '</span>' +
+      var estadoTexto = feita ? '' : delegada ? 'delegada · na folha do diarista'
+        : !M.desimpedida(t) ? (M.porQueEspera(t) || '') : '';
+
+      var corpo = '';
+      if (aberta) {
+        corpo = '<div class="vitrine-corpo">' + fichaDaVitrine(t) +
+          (vitrineFeita === t.id
+            ? '<div class="vitrine-caixa">' +
+                '<input type="text" id="vitrineNota_' + t.id + '" placeholder="anotação — opcional">' +
+                '<button type="button" class="bt-forte bt-mini" data-acao="vitrine-feita-ok" data-id="' + t.id + '">feita</button>' +
+                '<button type="button" class="bt-linha bt-mini" data-acao="vitrine-fechar-caixas">deixa</button>' +
+              '</div>'
+            : vitrineEmpacando === t.id
+            ? '<div class="vitrine-caixa">' +
+                '<input type="text" id="vitrineEmpacou_' + t.id + '" placeholder="o que houve? — para você mesmo ler na mesa">' +
+                '<button type="button" class="bt-forte bt-mini" data-acao="vitrine-empacou-ok" data-id="' + t.id + '">guardar</button>' +
+                '<button type="button" class="bt-linha bt-mini" data-acao="vitrine-fechar-caixas">deixa</button>' +
+              '</div>'
+            : '<div class="vitrine-acoes">' +
+                (!delegada && M.desimpedida(t)
+                  ? '<button type="button" class="bt-forte bt-mini" data-acao="vitrine-vamos" data-id="' + t.id + '">vamos</button>' +
+                    '<button type="button" class="bt-fraco bt-mini" data-acao="vitrine-feita-abrir" data-id="' + t.id + '">feita</button>'
+                  : '') +
+                (!delegada && t.etapa === 'execucao'
+                  ? '<button type="button" class="bt-linha bt-mini" data-acao="vitrine-delegar" data-id="' + t.id + '"' +
+                      ' title="Vai para a folha do diarista de amanhã. A mesa monta a folha.">delegar</button>'
+                  : '') +
+                (M.perguntaEmpacou(t.id)
+                  ? '<button type="button" class="bt-linha bt-mini vitrine-empacou-bt" data-acao="vitrine-empacou-abrir" data-id="' + t.id + '">empacou?</button>'
+                  : '') +
+              '</div>') +
+          '</div>';
+      }
+
+      return '<div class="vitrine-item' + (feita ? ' vitrine-feita' : '') + (aberta ? ' vitrine-viva' : '') + '">' +
+        '<button type="button" class="vitrine-cabeca" data-acao="vitrine-abrir" data-id="' + t.id + '"' + (feita ? ' disabled' : '') + '>' +
+          '<span class="vitrine-etiqueta">' + esc(feita ? 'feita' : item.rotulo) + '</span>' +
+          '<span class="vitrine-texto">' + esc(t.texto || 'tarefa sem texto') + '</span>' +
+          '<span class="vitrine-meta">' + esc(meta.join(' · ')) +
+            (avisoClima ? '<em>' + esc(avisoClima) + '</em>' : '') +
+            (estadoTexto ? '<em>' + esc(estadoTexto) + '</em>' : '') + '</span>' +
+        '</button>' + corpo +
         '</div>';
     }).join('');
 
-    // registrada uma vez por dia-alvo (e de novo só se o cardápio mudou)
-    try {
-      var ids = lista.map(function (v) { return v.tarefa.id; }).join(',');
-      var marca = M.diaLocal(alvo) + '|' + ids;
-      if (localStorage.getItem('app-sitio-vitrine') !== marca) {
-        localStorage.setItem('app-sitio-vitrine', marca);
-        M.verVitrine('pe_eu', lista.map(function (v) { return v.tarefa.id; }), M.diaLocal(alvo));
-      }
-    } catch (e) {}
-
     return '<div class="vitrine">' +
-      '<div class="vitrine-titulo">' + titulo + '</div>' + cards +
-      '<p class="vitrine-nota">para pensar — a escolha é sua</p>' +
+      '<div class="vitrine-titulo">' + esc(v.titulo) + '</div>' + cards +
+      (todasFechadas
+        ? '<button type="button" class="vitrine-mais" data-acao="vitrine-mais">fazer mais</button>'
+        : '<p class="vitrine-nota">para pensar — a escolha é sua</p>') +
       '</div>';
   }
 
@@ -1711,6 +1809,9 @@
       '</div>' +
 
       (concluindoTarefa === t.id ? caixaConcluir(t) : '') +
+      (M.notaEmpacou(t.id) && !aberto
+        ? '<div class="passo-avisos"><span class="aviso-linha aviso-empacou">empacou · ' +
+          esc(M.notaEmpacou(t.id).nota) + '</span></div>' : '') +
       (M.juntandoDinheiro(t) && !aberto && !fechada(t)
         ? '<div class="passo-avisos"><span class="aviso-linha aviso-diarista">juntando dinheiro · faltam ' + esc(M.moeda(M.faltaDinheiro(t))) + '</span></div>' : '') +
       (M.esperasDe(t.id).length && !aberto
@@ -3456,6 +3557,61 @@
       M.tirarTag(alvoTag, el.getAttribute('data-valor'));
       return desenharPalco();
     }
+    if (acao === 'vitrine-abrir') {
+      vitrineAberta = vitrineAberta === tid ? null : tid;
+      vitrineFeita = null; vitrineEmpacando = null;
+      return desenhar();
+    }
+    if (acao === 'vitrine-fechar-caixas') { vitrineFeita = null; vitrineEmpacando = null; return desenhar(); }
+    if (acao === 'vitrine-vamos') {
+      M.iniciar('pe_eu', tid);
+      $campo.hidden = false;
+      Campo.abrir($campoTela, naMesa() ? { local: 'computador' } : null, sairDoCampo);
+      return;
+    }
+    if (acao === 'vitrine-feita-abrir') {
+      vitrineFeita = tid; vitrineEmpacando = null;
+      desenhar();
+      var vn = document.getElementById('vitrineNota_' + tid); if (vn) vn.focus();
+      return;
+    }
+    if (acao === 'vitrine-feita-ok') {
+      M.terminar('pe_eu', tid, valorDoCampo('vitrineNota_' + tid));
+      M.limparKit(tid);
+      vitrineFeita = null; vitrineAberta = null;
+      colherAvisos();
+      return desenhar();
+    }
+    if (acao === 'vitrine-delegar') {
+      M.separarPorEvento('pe_eu', tid);
+      if (naMesa()) M.absorverSeparadas();
+      return desenhar();
+    }
+    if (acao === 'vitrine-empacou-abrir') {
+      vitrineEmpacando = tid; vitrineFeita = null;
+      desenhar();
+      var ve = document.getElementById('vitrineEmpacou_' + tid); if (ve) ve.focus();
+      return;
+    }
+    if (acao === 'vitrine-empacou-ok') {
+      var notaEmp = valorDoCampo('vitrineEmpacou_' + tid);
+      if (!notaEmp) { var ce = document.getElementById('vitrineEmpacou_' + tid); if (ce) ce.focus(); return; }
+      M.empacar('pe_eu', tid, notaEmp);
+      vitrineEmpacando = null;
+      return desenhar();
+    }
+    if (acao === 'vitrine-mais') {
+      var vAtual = itensDaVitrine();
+      var jaTem = {};
+      vAtual.itens.forEach(function (x) { jaTem[x.id] = true; });
+      var extras = Motor.vitrine(vAtual.alvo, jaTem);
+      if (!extras.length) { avisoCascata = 'Não sobrou mais nada que caiba — por hoje é isso.'; return desenhar(); }
+      var marca = lerMarcaVitrine();
+      extras.forEach(function (x) { marca.itens.push({ id: x.tarefa.id, rotulo: x.rotulo }); });
+      salvarMarcaVitrine(marca);
+      M.verVitrine('pe_eu', extras.map(function (x) { return x.tarefa.id; }), vAtual.dia);
+      return desenhar();
+    }
     if (acao === 'ir-rua') { tela = { tipo: 'rua', id: null }; entrarNaRua(); return desenhar(); }
     if (acao === 'rua-riscar') { M.alternarConferido(tid, el.getAttribute('data-valor')); return desenharPalco(); }
     if (acao === 'rua-comprei') {
@@ -4263,7 +4419,7 @@
     // a linha da nuvem na entrada acompanha o estado (hora, erro), sem mexer no resto
     if (!mudouLocal && tela.tipo === null && $campo.hidden && !s.ocupado) return desenhar();
     if (!mudouLocal) return;
-    if (naMesa()) { M.absorverSementes(); M.absorverCompras(); }
+    if (naMesa()) { M.absorverSementes(); M.absorverCompras(); M.absorverSeparadas(); }
     M.cascatearVagas(); colherAvisos();
     // a frente de campo lê o estado a cada toque; a mesa precisa redesenhar
     if ($campo.hidden) desenhar(); else desenharLista();
@@ -4276,7 +4432,7 @@
   colherAvisos();       // ... e dito, não engolido
   conferirProposta();
   desenharProposta();
-  if (naMesa()) { M.absorverSementes(); M.absorverCompras(); }
+  if (naMesa()) { M.absorverSementes(); M.absorverCompras(); M.absorverSeparadas(); }
   voltarAoLugar();
   // a bota abre na entrada, de propósito — salvo se você disse que ia sair e a rua ainda tem coisa
   if (!naMesa() && aindaNaRua()) tela = { tipo: 'rua', id: null };

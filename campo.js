@@ -29,6 +29,19 @@ var Campo = (function () {
     if (pronto && pronto.local) cena.sit.local = pronto.local;
     var clima = M.climaDeHoje();
     if (clima) { cena.sit.tempo = clima.tempo; cena.sit.barro = clima.barro; }
+    /* A previsão ASSUME o clima do dia (§59, pedido dele): a pergunta vira
+       "Previsão para hoje: 24° · chuva fina" com o "não é isso?" para trocar.
+       Informar continua sendo escolha — a resposta é dele, só vem preenchida
+       pelo que o céu diz. Só na primeira consulta do dia sem clima registrado. */
+    cena.assumida = false;
+    cena.trocarClima = false;
+    if (!clima && typeof Tempo !== 'undefined') {
+      var la = Tempo.agora();
+      if (la) {
+        cena.sit.tempo = (la.calor && la.tempo === 'sol') ? 'calor' : la.tempo;
+        cena.assumida = { temp: la.temp, rotulo: la.calor && la.tempo === 'sol' ? 'sol forte · calor' : la.rotulo };
+      }
+    }
     cena.fase = 'pergunta';
     cena.resp = null;
     cena.rascunho = {};
@@ -150,16 +163,17 @@ var Campo = (function () {
        energia não mudam nada quando o trabalho é um telefonema. */
     if (s.local === 'sitio') {
       var jaTem = !!M.climaDeHoje();
-      /* A previsão MOSTRA e ele confirma (§41, §53): informar o clima continua
-         sendo escolha consciente — confirmar é tocar o botão de sempre. */
-      var la = (typeof Tempo !== 'undefined') ? Tempo.agora() : null;
-      if (la) {
-        partes.push('<p class="c-previsao">lá fora: ' + la.temp + '° · ' +
-          esc(la.calor && la.tempo === 'sol' ? 'sol forte' : la.rotulo) + ' — é isso?</p>');
+      if (cena.assumida && !cena.trocarClima && !jaTem) {
+        // o clima vem assumido da previsão; trocar é um toque
+        partes.push('<div class="c-linha"><span class="c-rotulo">Previsão para hoje</span>' +
+          '<div class="c-assumida"><span class="c-assumida-valor">' +
+            esc(cena.assumida.temp + '° · ' + cena.assumida.rotulo) + '</span>' +
+          '<button type="button" class="c-bt" data-acao="trocar-clima">não é isso?</button></div></div>');
+      } else {
+        partes.push(linha(jaTem ? 'O tempo mudou?' : 'Como está o tempo?',
+          [['sol', 'sol'], ['calor', 'sol forte · calor'], ['nublado', 'nublado'], ['chuva_fina', 'chuva fina'], ['chuva_forte', 'chuva forte']]
+            .map(function (p) { return botao('tempo', p[0], p[1], s.tempo === p[0]); }).join('')));
       }
-      partes.push(linha(jaTem ? 'O tempo mudou?' : 'Como está o tempo?',
-        [['sol', 'sol'], ['calor', 'sol forte · calor'], ['nublado', 'nublado'], ['chuva_fina', 'chuva fina'], ['chuva_forte', 'chuva forte']]
-          .map(function (p) { return botao('tempo', p[0], p[1], s.tempo === p[0]); }).join('')));
 
       // chuva forte hoje implica barro e a pergunta some
       if (s.tempo && s.tempo !== 'chuva_forte') {
@@ -614,6 +628,7 @@ var Campo = (function () {
       return consultar();
     }
     if (acao === 'mudou') { cena.fase = 'pergunta'; return desenhar(); }
+    if (acao === 'trocar-clima') { cena.trocarClima = true; cena.sit.tempo = null; cena.sit.barro = null; return desenhar(); }
     if (acao === 'reabrir')   { cena.fase = 'pergunta'; return desenhar(); }
     if (acao === 'cancelar')  { cena.rascunho = {}; cena.fase = ativa ? 'ativa' : 'resposta'; return desenhar(); }
 

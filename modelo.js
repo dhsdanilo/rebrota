@@ -1812,7 +1812,7 @@ var Modelo = (function () {
      conflito impossível por construção. O estado corrente é derivado dos dois
      lados do mesmo jeito, então ninguém precisa "aplicar" nada no outro. */
 
-  var vista = { tarefas: {}, pessoas: {}, extras: [], compradas: {}, itensExtras: [] };
+  var vista = { tarefas: {}, pessoas: {}, extras: [], compradas: {}, itensExtras: [], separadas: {} };
 
   function diarioDe(quem) {
     if (!estado.diarios[quem]) estado.diarios[quem] = { pessoa: quem, eventos: [] };
@@ -1848,7 +1848,7 @@ var Modelo = (function () {
   }
 
   function derivar() {
-    vista = { tarefas: {}, pessoas: {}, extras: [], compradas: {}, itensExtras: [] };
+    vista = { tarefas: {}, pessoas: {}, extras: [], compradas: {}, itensExtras: [], separadas: {} };
 
     cat().tarefas.forEach(function (t) {
       vista.tarefas[t.id] = {
@@ -1872,6 +1872,11 @@ var Modelo = (function () {
     /* Itens (§56): comprado na bota é evento; o catálogo só aprende quando a
        mesa absorve — mas a vista já sabe, então a tarefa destrava na hora. */
     if (ev.tipo === 'comprou' && ev.itemId) vista.compradas[ev.itemId] = true;
+    /* Delegado pela bota (§60): evento até a mesa absorver — a vista já tira
+       a tarefa do páreo; o catálogo aprende quando a mesa abrir. */
+    if (ev.tipo === 'separou' && ev.tarefaId && (cat().absorvidas || []).indexOf(ev.id) === -1) {
+      vista.separadas[ev.tarefaId] = { para: DIARISTA, dia: ev.dia || diaSeguinte() };
+    }
     (ev.itensNovos || (ev.itemNovo ? [ev.itemNovo] : [])).forEach(function (novo) {
       if (!achar(cat().pendencias, novo.id) &&
           !vista.itensExtras.some(function (x) { return x.id === novo.id; })) {
@@ -2221,6 +2226,82 @@ var Modelo = (function () {
     salvar();
   }
 
+  /* Separada, pelo catálogo OU por evento ainda não absorvido. É o que o
+     motor e a vitrine consultam. */
+  function separadaDe(tid) {
+    var t = tarefa(tid);
+    if (t && t.separada) return t.separada;
+    return vista.separadas[tid] || null;
+  }
+  // delegar pela bota (§60): evento; a mesa monta a folha ao absorver
+  function separarPorEvento(quem, tid) {
+    return registrar(quem, 'separou', { tarefaId: tid, dia: diaSeguinte() });
+  }
+  function absorverSeparadas() {
+    var mudou = false;
+    eventosEmOrdem().forEach(function (ev) {
+      if (ev.tipo !== 'separou') return;
+      if ((cat().absorvidas || []).indexOf(ev.id) !== -1) return;
+      var t = tarefa(ev.tarefaId);
+      if (t && !t.separada && podeSeparar(t)) {
+        separarTarefa(ev.tarefaId, ev.dia);
+      }
+      cat().absorvidas.push(ev.id);
+      delete vista.separadas[ev.tarefaId];
+      mudou = true;
+    });
+    if (mudou) salvar();
+    return mudou;
+  }
+
+  /* EMPACOU (§60): a tarefa que aparece na vitrine dia após dia sem ninguém
+     encostar merece a pergunta — e a resposta é dele para ele mesmo, material
+     para refinar o projeto na mesa e para a revisão. */
+  function diasNaVitrine(tid) {
+    var dias = {};
+    eventosEmOrdem().forEach(function (ev) {
+      if (ev.tipo === 'vitrine' && (ev.tarefas || []).indexOf(tid) !== -1) {
+        dias[ev.dia || diaDe(ev.quando)] = true;
+      }
+    });
+    return Object.keys(dias).length;
+  }
+  function ultimoTrabalho(tid) {
+    var achado = null;
+    eventosEmOrdem().forEach(function (ev) {
+      if (ev.tarefaId !== tid) return;
+      if (['iniciou', 'terminou', 'parou', 'nao_deu', 'encerrou'].indexOf(ev.tipo) !== -1) achado = ev;
+    });
+    return achado;
+  }
+  function ultimoEmpacou(tid) {
+    var achado = null;
+    eventosEmOrdem().forEach(function (ev) {
+      if (ev.tipo === 'empacou' && ev.tarefaId === tid) achado = ev;
+    });
+    return achado;
+  }
+  function perguntaEmpacou(tid) {
+    if (estadoDe(tid) !== 'aberta') return false;
+    if (diasNaVitrine(tid) < 4) return false;
+    var trab = ultimoTrabalho(tid);
+    if (trab && diasDesde(diaDe(trab.quando)) < 4) return false;
+    var emp = ultimoEmpacou(tid);
+    if (emp && diasDesde(diaDe(emp.quando)) < 7) return false;
+    return true;
+  }
+  function empacar(quem, tid, nota) {
+    return registrar(quem, 'empacou', { tarefaId: tid, nota: (nota || '').trim() });
+  }
+  // a nota do empacou aparece na mesa até alguém trabalhar na tarefa de novo
+  function notaEmpacou(tid) {
+    var emp = ultimoEmpacou(tid);
+    if (!emp || !emp.nota) return null;
+    var trab = ultimoTrabalho(tid);
+    if (trab && trab.quando > emp.quando) return null;
+    return { nota: emp.nota, quando: emp.quando };
+  }
+
   function minutosSeparados() {
     return separadas().reduce(function (s, t) { return s + (restanteDe(t.id) || t.duracaoTotal || 0); }, 0);
   }
@@ -2500,6 +2581,8 @@ var Modelo = (function () {
     desfazerSeparacao: desfazerSeparacao, reordenarSeparadas: reordenarSeparadas,
     definirDiaDiarista: definirDiaDiarista, fecharDiarista: fecharDiarista, minutosSeparados: minutosSeparados,
     tarefasDaRua: tarefasDaRua, reordenarRua: reordenarRua,
+    separadaDe: separadaDe, separarPorEvento: separarPorEvento, absorverSeparadas: absorverSeparadas,
+    perguntaEmpacou: perguntaEmpacou, empacar: empacar, notaEmpacou: notaEmpacou,
     semear: semear, absorverSementes: absorverSementes, sementesDe: sementesDe,
     anotar: anotar, riscarAnotacao: riscarAnotacao, anotacoes: anotacoes,
     aportar: aportar, aportesDe: aportesDe,
