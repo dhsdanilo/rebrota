@@ -65,8 +65,7 @@ var Modelo = (function () {
        vários — e é por isso que a promoção daqui para cima volta a ser escolha:
        a escolha é a recompensa de ter concluído a anterior. */
     { v: 'planejada',    t: 'planejada',          estado: 'preparo',   papel: '' },
-    { v: 'titular',      t: 'titular',            estado: 'ativo',     papel: 'titular' },
-    { v: 'reserva',      t: 'reserva',            estado: 'ativo',     papel: 'reserva' },
+    { v: 'ativo',        t: 'ativo',              estado: 'ativo',     papel: 'ativo' },
     // rótulo e valor divergem de propósito: 'suspenso' e 'cancelado' dizem
     // melhor o que aconteceu, e trocar o valor por baixo quebraria os arquivos
     // já exportados sem ganho nenhum
@@ -75,7 +74,11 @@ var Modelo = (function () {
     { v: 'encerrado',    t: 'cancelado',          estado: 'encerrado', papel: '' }
   ];
 
-  var VAGA_UNICA = ['titular', 'reserva', 'planejamento'];
+  /* §62: quantos cabem em cada etapa. Ativos são três e iguais entre si;
+     planejamento são dois; planejada espera a vaga de ativo e são três. Mudas
+     têm o seu teto (TETO_MUDAS). Todos são parede, não conselho (§17). */
+  var TETO_VAGA = { ativo: 3, planejamento: 2 };
+  var TETO_PLANEJADAS = 3;
 
   /* QUANDO — cinco campos que respondem DUAS perguntas diferentes:
        precisa acontecer  → prazo e recorrência, definem a faixa de prioridade
@@ -503,6 +506,9 @@ var Modelo = (function () {
     completar(p, novoProjeto());
     p.muda = completar(p.muda || {}, novaMuda());
     p.muda.despesas = completar(p.muda.despesas || {}, novaMuda().despesas);
+    /* §62: titular e reserva deixaram de existir — são três ATIVOS iguais. O
+       dado antigo (e o aparelho que ainda não atualizou) vira 'ativo' ao entrar. */
+    if (p.papel === 'titular' || p.papel === 'reserva') p.papel = 'ativo';
     return p;
   }
   function costurarSemente(s)  { return completar(s, novaSemente('')); }
@@ -798,8 +804,7 @@ var Modelo = (function () {
      enche. Dinheiro só existe depois de planejar (§36): na fila todo projeto é
      pré-projeto, sem custo — orçar é trabalho da vaga de planejamento. */
   function etiquetaDe(p) {
-    if (p.papel === 'titular')      return { chave: 'titular', texto: 'titular' };
-    if (p.papel === 'reserva')      return { chave: 'reserva', texto: 'reserva' };
+    if (p.papel === 'ativo')        return { chave: 'ativo', texto: 'ativo' };
     if (p.papel === 'planejamento') return { chave: 'planejamento', texto: 'em planejamento' };
     if (p.estado === 'preparo') {
       return aptaParaExecucao(p)
@@ -823,18 +828,13 @@ var Modelo = (function () {
     return achada ? achada.v : p.estado;
   }
 
-  /* Só um projeto por vaga: assumir titular tira o titular de quem o tinha,
-     senão a regra dura da §7 perde o sentido. */
+  /* Vaga cheia é parede (§17, §62): quem chama confere antes com vagaLivre().
+     Já não se expulsa ninguém — expulsar o ocupante era decidir por ele. */
   function definirSituacao(pid, chave) {
     var p = projeto(pid);
     var s = SITUACOES.filter(function (x) { return x.v === chave; })[0];
     if (!p || !s) return;
 
-    if (s.papel && VAGA_UNICA.indexOf(s.papel) !== -1) {
-      cat().projetos.forEach(function (q) {
-        if (q.id !== pid && q.papel === s.papel) { q.papel = ''; q.estado = 'fila'; }
-      });
-    }
     p.estado = s.estado;
     p.papel = s.papel;
     p.ultimoToque = agora();
@@ -927,6 +927,21 @@ var Modelo = (function () {
     return cat().projetos.filter(function (p) { return p.papel === v; })[0] || null;
   }
 
+  // quem ocupa a etapa, do mais antigo ao mais novo no toque
+  function projetosPorPapel(v) {
+    return cat().projetos.filter(function (p) { return p.papel === v; })
+      .sort(function (a, b) { return a.ultimoToque < b.ultimoToque ? -1 : 1; });
+  }
+  function vagaLivre(v) { return projetosPorPapel(v).length < TETO_VAGA[v]; }
+  function vagasLivres(v) { return TETO_VAGA[v] - projetosPorPapel(v).length; }
+
+  function planejadasCheio() { return planejadas().length >= TETO_PLANEJADAS; }
+  function motivoTetoPlanejadas() {
+    return planejadasCheio()
+      ? 'Já há ' + TETO_PLANEJADAS + ' planejadas esperando. Ponha uma em execução ou devolva uma à muda antes de fechar outro planejamento.'
+      : null;
+  }
+
   /* Periódica nunca "fecha" — ela reinicia. Contá-la como aberta trancaria o
      concluir de qualquer projeto que tenha uma rotina dentro. Ativa conta. */
   function tarefasAbertasDe(pid, etapa) {
@@ -980,7 +995,9 @@ var Modelo = (function () {
       var abertas = tarefasAbertasDe(p.id, 'planejamento').length;
       return abertas
         ? (abertas === 1 ? 'Falta 1 tarefa de planejamento.' : 'Faltam ' + abertas + ' tarefas de planejamento.')
-        : 'Planejamento fechado.';
+        : (planejadasCheio()
+            ? 'Planejamento fechado. As ' + TETO_PLANEJADAS + ' vagas de planejada estão cheias: ponha uma em execução para este entrar.'
+            : 'Planejamento fechado.');
     }
 
     var presos = prerequisitosPendentes(p);
@@ -1023,11 +1040,11 @@ var Modelo = (function () {
     while (mexeu) {
       mexeu = false;
 
-      var pl = projetoPorPapel('planejamento');
-      if (pl && planejamentoFechado(pl)) mover(pl, '', 'preparo', 'planejadas');
-
-      var r = projetoPorPapel('reserva');
-      if (!projetoPorPapel('titular') && r) mover(r, 'titular');
+      /* Planejamento fechado vira planejada e libera a vaga — se houver lugar
+         nas planejadas (§62). Cheio, o projeto fica onde está, dizendo por quê. */
+      projetosPorPapel('planejamento').forEach(function (pl) {
+        if (planejamentoFechado(pl) && !planejadasCheio()) mover(pl, '', 'preparo', 'planejadas');
+      });
     }
 
     if (!ordem.length) return [];
@@ -1038,20 +1055,17 @@ var Modelo = (function () {
   }
 
   /* A única promoção que é escolha, junto com a entrada no planejamento. */
-  function promoverParaReserva(pid) {
+  function promoverParaAtivo(pid) {
     var p = projeto(pid);
-    if (!aptaParaExecucao(p)) return [];
-    p.papel = 'reserva';
+    if (!aptaParaExecucao(p) || !vagaLivre('ativo')) return [];
+    p.papel = 'ativo';
     p.estado = 'ativo';
     p.ultimoToque = agora();
     salvar();
-    var movidos = cascatearVagas();
-    // pode ter subido direto a titular se a vaga estava vazia
-    if (!movidos.length) {
-      movidos = [{ projeto: p, vaga: 'reserva' }];
-      avisosCascata = avisosCascata.concat(movidos);
-    }
-    return movidos;
+    var movidos = [{ projeto: p, vaga: 'ativo' }];
+    avisosCascata = avisosCascata.concat(movidos);
+    // a saída de um planejamento que esperava lugar nas planejadas pode ter destravado
+    return movidos.concat(cascatearVagas());
   }
 
   /* Plano velho é plano suspeito: devolve à vaga de planejamento com uma tarefa
@@ -1059,8 +1073,7 @@ var Modelo = (function () {
   function revisarPlano(pid) {
     var p = projeto(pid);
     if (!p) return null;
-    var ocupante = projetoPorPapel('planejamento');
-    if (ocupante && ocupante.id !== pid) return { bloqueado: ocupante };
+    if (!vagaLivre('planejamento')) return { bloqueado: projetosPorPapel('planejamento') };
 
     p.papel = 'planejamento';
     p.estado = 'preparo';
@@ -1132,9 +1145,9 @@ var Modelo = (function () {
     if (p && !(p.ganhos || []).length) {
       p.ganhos = cadeiasVivas(p.muda.vantagens).map(function (c) { return c.join(' → '); });
     }
-    var anterior = projetoPorPapel('planejamento');
-    definirSituacao(pid, 'planejamento');   // expulsa o ocupante e semeia o esqueleto
-    return anterior && anterior.id !== pid ? anterior : null;
+    if (!vagaLivre('planejamento')) return null;   // vaga cheia é parede
+    definirSituacao(pid, 'planejamento');   // semeia o esqueleto
+    return projeto(pid);
   }
 
   // ── muda: teto, portão, estados ───────────────────────────────────
@@ -2164,7 +2177,7 @@ var Modelo = (function () {
     if (estadoDe(t.id) !== 'aberta') return false;
     if (!t.projetoId) return true;
     var p = projeto(t.projetoId);
-    return !!p && (p.papel === 'titular' || p.papel === 'reserva');
+    return !!p && p.papel === 'ativo';
   }
   function separadas() {
     return tarefasVivas().filter(function (t) { return t.separada; })
@@ -2257,7 +2270,7 @@ var Modelo = (function () {
       if (!desimpedida(t)) return false;
       if (!t.projetoId) return true;
       var p = projeto(t.projetoId);
-      return !!p && (p.papel === 'titular' || p.papel === 'reserva' || p.papel === 'planejamento');
+      return !!p && (p.papel === 'ativo' || p.papel === 'planejamento');
     }).sort(function (a, b) { return (a.rua || 0) - (b.rua || 0) || a.ordem - b.ordem; });
   }
   function reordenarRua(ids) {
@@ -2676,12 +2689,16 @@ var Modelo = (function () {
     leituraFria: leituraFria, cadeiasVivas: cadeiasVivas,
     prerequisitosPendentes: prerequisitosPendentes, passoCorrente: passoCorrente,
     resolvida: resolvida, tarefasAbertasDe: tarefasAbertasDe,
-    projetoPorPapel: projetoPorPapel, planejamentoFechado: planejamentoFechado,
+    projetoPorPapel: projetoPorPapel, projetosPorPapel: projetosPorPapel,
+    TETO_VAGA: TETO_VAGA, TETO_PLANEJADAS: TETO_PLANEJADAS,
+    vagaLivre: vagaLivre, vagasLivres: vagasLivres,
+    planejadasCheio: planejadasCheio, motivoTetoPlanejadas: motivoTetoPlanejadas,
+    planejamentoFechado: planejamentoFechado,
     aptaParaExecucao: aptaParaExecucao, planejadas: planejadas,
     oQueFaltaParaSubir: oQueFaltaParaSubir, cascatearVagas: cascatearVagas,
     fecharProjeto: fecharProjeto, retomarProjeto: retomarProjeto,
     promoverParaPlanejamento: promoverParaPlanejamento,
-    promoverParaReserva: promoverParaReserva, revisarPlano: revisarPlano,
+    promoverParaAtivo: promoverParaAtivo, revisarPlano: revisarPlano,
     diasDesde: diasDesde,
     blocoDe: blocoDe, janelaDoPreset: janelaDoPreset,
 

@@ -150,16 +150,28 @@
      informação —, e depois os dois mais recentes, por conveniência. O resto vive
      na página de projetos. Coluna que cresce com o cadastro vira lista infinita,
      e lista infinita é volume de obrigação à vista. */
+  /* §62: três ativos e dois em planejamento, sempre à vista. */
   var VAGAS_COLUNA = [
-    { papel: 'titular', t: 'titular' },
-    { papel: 'reserva', t: 'reserva' },
+    { papel: 'ativo', t: 'ativo' },
     { papel: 'planejamento', t: 'em planejamento' }
   ];
 
+  /* Cada vaga individual, na ordem da coluna: ocupada pelo projeto ou aberta. */
+  function vagasIndividuais() {
+    var lista = [];
+    VAGAS_COLUNA.forEach(function (v) {
+      var ocupantes = M.projetosPorPapel(v.papel);
+      for (var i = 0; i < M.TETO_VAGA[v.papel]; i++) {
+        lista.push({ papel: v.papel, t: v.t, p: ocupantes[i] || null });
+      }
+    });
+    return lista;
+  }
+
   function montarLista() {
-    var linhas = VAGAS_COLUNA.map(function (v) {
-      var p = M.projetoPorPapel(v.papel);
-      return p ? itemProjeto(p) : itemVagaAberta(v);
+    var vagas = vagasIndividuais();
+    var linhas = vagas.map(function (v) {
+      return v.p ? itemProjeto(v.p) : itemVagaAberta(v);
     });
 
     var jaEstao = {};
@@ -170,7 +182,7 @@
         return !jaEstao[p.id] && p.estado !== 'concluido' && p.estado !== 'encerrado';
       })
       .sort(function (a, b) { return a.ultimoToque < b.ultimoToque ? 1 : -1; })
-      .slice(0, 5 - VAGAS_COLUNA.length)
+      .slice(0, 7 - vagas.length)
       .forEach(function (p) { linhas.push(itemProjeto(p)); });
 
     linhas.push('<li><button type="button" class="item-projeto item-vermais" data-abrir="projetos"' +
@@ -214,7 +226,7 @@
       var feitas = passos.filter(function (t) { return M.estadoDe(t.id) === 'feita'; }).length;
       return passos.length ? feitas + ' de ' + passos.length + (passos.length === 1 ? ' tarefa feita' : ' tarefas feitas') : 'sem tarefas ainda';
     }
-    if (p.papel === 'titular' || p.papel === 'reserva') {
+    if (p.papel === 'ativo') {
       nota = xDeY('execucao');
     } else if (p.papel === 'planejamento') {
       nota = xDeY('planejamento');
@@ -462,8 +474,7 @@
   })();
 
   var VAGAS = [
-    { v: 'titular', t: 'titular' },
-    { v: 'reserva', t: 'reserva' },
+    { v: 'ativo', t: 'ativo' },
     { v: 'planejamento', t: 'planejamento' }
   ];
 
@@ -824,9 +835,9 @@
   }
 
   function vagasDaAbertura() {
-    return '<dl class="abertura-vagas">' + VAGAS.map(function (vaga) {
-      var p = M.cat().projetos.filter(function (q) { return q.papel === vaga.v; })[0];
-      return '<div class="abertura-vaga vaga-' + vaga.v + '">' +
+    return '<dl class="abertura-vagas">' + vagasIndividuais().map(function (vaga) {
+      var p = vaga.p;
+      return '<div class="abertura-vaga vaga-' + vaga.papel + '">' +
         '<dt><i class="pino"></i>' + vaga.t + '</dt>' +
         '<dd' + (p ? '' : ' class="abertura-livre"') + '>' +
           esc(p ? (p.nome || 'sem nome') : 'vaga aberta') + '</dd></div>';
@@ -882,7 +893,7 @@
              quanto foi orçado (só na obra rodando — o envelope já disparou e
              some, mas quanto custou é curiosidade legítima) e onde parou. */
           '<div class="palco-meta">' +
-            ((p.papel === 'titular' || p.papel === 'reserva' ||
+            ((p.papel === 'ativo' ||
               p.estado === 'concluido' || p.estado === 'encerrado') &&
              p.custoEstimado !== null && p.custoEstimado !== undefined && Number(p.custoEstimado) > 0
               ? '<span class="palco-custo">orçado em ' + esc(M.moeda(p.custoEstimado)) + '</span>'
@@ -966,7 +977,7 @@
       /* Projeto que já está executando passou por todas as portas: listar o que
          um dia o segurou é história, não restrição. */
       // muda não tem Depende: dependência entre projetos é "como e quando" — planejamento
-      (p.papel === 'titular' || p.papel === 'reserva' || p.estado === 'fila' || p.estado === 'descartado' ||
+      (p.papel === 'ativo' || p.estado === 'fila' || p.estado === 'descartado' ||
        p.estado === 'concluido' || p.estado === 'encerrado')
         ? ''
         : grupo('Dependência', '', fichasPrerequisitos(p, outros, !solto),
@@ -1246,7 +1257,7 @@
 
   var GRUPOS = [
     { chave: 'vagas',      t: 'em andamento',
-      cabe: function (p) { return p.papel === 'titular' || p.papel === 'reserva' || p.papel === 'planejamento'; } },
+      cabe: function (p) { return p.papel === 'ativo' || p.papel === 'planejamento'; } },
     { chave: 'planejada',  t: 'planejadas',
       cabe: function (p) { return p.estado === 'preparo' && !p.papel; } },
     { chave: 'fila',       t: 'mudas',
@@ -1269,7 +1280,7 @@
       var lista = todos.filter(g.cabe);
       if (g.chave === 'planejada') lista = M.planejadas();
       if (g.chave === 'vagas') {
-        var peso = { titular: 0, reserva: 1, planejamento: 2 };
+        var peso = { ativo: 0, planejamento: 1 };
         lista = lista.slice().sort(function (a, b) { return peso[a.papel] - peso[b.papel]; });
       }
       if (!lista.length) return '';
@@ -1294,21 +1305,25 @@
 
   /* Responde "dá para promover alguma coisa agora?" sem ler a lista. */
   function estadoDoFunil() {
-    var vazias = VAGAS_COLUNA.filter(function (v) { return !M.projetoPorPapel(v.papel); });
+    var vazias = VAGAS_COLUNA.filter(function (v) { return M.vagaLivre(v.papel); });
     var prontas = M.planejadas().filter(M.aptaParaExecucao);
 
     if (!vazias.length) {
-      return 'As três vagas estão ocupadas. ' + (prontas.length
+      return 'Os três ativos e os dois em planejamento estão ocupados. ' + (prontas.length
         ? prontas.length + (prontas.length === 1 ? ' planejada espera' : ' planejadas esperam') + ' a próxima abrir.'
         : 'Nada esperando na fila.');
     }
 
-    // 'em planejamento' já carrega o 'em'; titular e reserva não
-    var nomes = vazias.map(function (v) { return v.papel === 'planejamento' ? 'planejamento' : v.t; }).join(' e ');
+    var nomes = vazias.map(function (v) {
+      var n = M.vagasLivres(v.papel);
+      return v.papel === 'planejamento'
+        ? (n === 1 ? '1 vaga de planejamento' : n + ' vagas de planejamento')
+        : (n === 1 ? '1 vaga de ativo' : n + ' vagas de ativo');
+    }).join(' e ');
     var querPlanejamento = vazias.some(function (v) { return v.papel === 'planejamento'; });
     var querExecucao = vazias.some(function (v) { return v.papel !== 'planejamento'; });
 
-    var frases = ['Vaga aberta em ' + nomes + '.'];
+    var frases = ['Abertas: ' + nomes + '.'];
     if (querExecucao) {
       frases.push(prontas.length
         ? (prontas.length === 1 ? '1 planejada está pronta para entrar.' : prontas.length + ' planejadas estão prontas para entrar.')
@@ -1352,12 +1367,12 @@
           ? '<span class="ficha-idade">parado há ' + idade + ' dias</span>' : '') +
       '</button>' +
       (emConsultaGeral() ? '' :
-       M.aptaParaExecucao(p) && !M.projetoPorPapel('reserva')
+       M.aptaParaExecucao(p) && M.vagaLivre('ativo')
         ? '<button type="button" class="bt-forte bt-mini" data-acao="projeto-promover" data-id="' +
           p.id + '">pôr em execução</button>'
         : '') +
       (emConsultaGeral() ? '' :
-       p.estado === 'fila' && M.mudaPronta(p) && !M.projetoPorPapel('planejamento')
+       p.estado === 'fila' && M.mudaPronta(p) && M.vagaLivre('planejamento')
         ? '<button type="button" class="bt-fraco bt-mini" data-acao="projeto-promover" data-id="' +
           p.id + '">planejar</button>'
         : '') +
@@ -1394,14 +1409,14 @@
     if (p.estado === 'descartado') return null;   // reabrir mora no pé, junto do motivo
     if (p.estado === 'parado') return 'retomar';
     if (p.estado === 'concluido' || p.estado === 'encerrado') return 'retomar';
-    if (p.papel === 'titular' || p.papel === 'reserva') return 'concluir';
+    if (p.papel === 'ativo') return 'concluir';
     if (p.papel === 'planejamento') return null;
     return 'promover';
   }
 
-  // muda sobe para planejamento; planejada sobe para reserva
+  // muda sobe para planejamento; planejada sobe para ativo
   function destinoDaPromocao(p) {
-    return p.estado === 'preparo' ? 'reserva' : 'planejamento';
+    return p.estado === 'preparo' ? 'ativo' : 'planejamento';
   }
 
   function saidasDe(p) {
@@ -1422,15 +1437,13 @@
 
     if (k) {
       // o teto de três frentes é parede, não conselho: sem vaga, não promove
-      var ocupada = k === 'promover' && (destinoDaPromocao(p) === 'reserva'
-        ? !!M.projetoPorPapel('reserva') && !!M.projetoPorPapel('titular')
-        : !!M.projetoPorPapel('planejamento'));
+      var ocupada = k === 'promover' && !M.vagaLivre(destinoDaPromocao(p));
 
       var mudaCrua = k === 'promover' && p.estado === 'fila' && !M.mudaPronta(p);
       var trava = (k === 'concluir' && abertas > 0) || ocupada || mudaCrua ||
-                  (k === 'promover' && destinoDaPromocao(p) === 'reserva' && !M.aptaParaExecucao(p));
+                  (k === 'promover' && destinoDaPromocao(p) === 'ativo' && !M.aptaParaExecucao(p));
       var rotulo = k === 'promover'
-        ? (destinoDaPromocao(p) === 'reserva' ? 'pôr em execução' : 'promover a planejamento')
+        ? (destinoDaPromocao(p) === 'ativo' ? 'pôr em execução' : 'promover a planejamento')
         : ACOES[k].rotulo;
       botoes = '<button type="button" class="' + (ACOES[k].forte ? 'bt-forte' : 'bt-fraco') + ' bt-acao' +
         (trava ? ' bt-travado' : '') + '"' + (trava ? ' disabled' : '') +
@@ -1442,7 +1455,7 @@
        preço muda, e um plano pronto pode precisar ser refeito. Só depende de a
        vaga estar livre — é um por vez. */
     if (p.estado === 'preparo' && !p.papel) {
-      var vagaOcupada = M.projetoPorPapel('planejamento');
+      var vagaOcupada = !M.vagaLivre('planejamento');
       botoes += '<button type="button" class="bt-fraco bt-acao' + (vagaOcupada ? ' bt-travado' : '') + '"' +
         (vagaOcupada ? ' disabled' : '') +
         ' data-acao="projeto-revisar" data-id="' + p.id + '">' +
@@ -1453,10 +1466,10 @@
     if (mudaCrua) {
       nota = 'A muda ainda não está pronta. Só muda pronta entra em planejamento.';
     } else if (ocupada) {
-      var dono = M.projetoPorPapel(destinoDaPromocao(p) === 'reserva' ? 'reserva' : 'planejamento');
-      nota = 'A vaga está com ' + (dono.nome || 'outro projeto') +
-        '. Conclua, suspenda ou cancele um dos que estão andando primeiro.';
-    } else if ((p.papel === 'titular' || p.papel === 'reserva') && abertas) {
+      var donos = M.projetosPorPapel(destinoDaPromocao(p)).map(function (q) { return q.nome || 'outro projeto'; });
+      nota = (destinoDaPromocao(p) === 'ativo' ? 'Os três ativos são ' : 'As duas vagas de planejamento são de ') +
+        donos.join(', ') + '. Conclua, suspenda ou cancele um dos que estão andando primeiro.';
+    } else if (p.papel === 'ativo' && abertas) {
       nota = abertas === 1 ? 'Falta 1 tarefa aberta.' : 'Faltam ' + abertas + ' tarefas abertas.';
     } else if (p.papel === 'planejamento' || (p.estado === 'preparo' && !p.papel)) {
       nota = M.oQueFaltaParaSubir(p);
@@ -1506,25 +1519,21 @@
     var frases = [cfg.frase];
 
     if (acaoProjeto.tipo === 'promover') {
-      if (destinoDaPromocao(p) === 'reserva') {
-        frases = [M.projetoPorPapel('titular')
-          ? 'Entra como reserva e passa a receber trabalho quando a titular travar.'
-          : 'A vaga de titular está aberta: este projeto assume o comando do dia.'];
+      if (destinoDaPromocao(p) === 'ativo') {
+        var jaAtivos = 3 - M.vagasLivres('ativo');
+        frases = ['Entra como ativo: passa a oferecer trabalho, em igualdade com ' +
+          (jaAtivos ? 'os outros ' + jaAtivos + (jaAtivos === 1 ? ' ativo' : ' ativos') : 'os que vierem') + '.'];
         var idade = M.diasDesde(p.ultimoToque);
         if (idade >= 60) {
           frases.push('Planejado há ' + idade + ' dias — os preços do orçamento são desta época.');
         }
       } else {
-        var anterior = M.projetoPorPapel('planejamento');
-        if (anterior && anterior.id !== p.id) {
-          frases.push((anterior.nome || 'O projeto que estava em planejamento') + ' volta para a fila.');
-        }
         if (M.passosDe(p.id).length) frases[0] = 'Entra em planejamento.';
       }
     }
     // dizer antes quem sobe: a cascata não pode ser surpresa
     if (['concluir', 'suspender', 'cancelar'].indexOf(acaoProjeto.tipo) !== -1 &&
-        (p.papel === 'titular' || p.papel === 'reserva')) {
+        p.papel === 'ativo') {
       var sobe = quemSobe(p);
       if (sobe) frases.push(sobe);
     }
@@ -1541,16 +1550,12 @@
       '</div></div>';
   }
 
-  /* Simula a cascata sem executá-la, só para dizer o que vai acontecer. Só a
-     subida de reserva para titular é automática — a vaga que sobra fica aberta
-     esperando a sua escolha, e isso é dito na cara. */
+  /* Diz o que acontece depois: a vaga de ativo fica aberta esperando a SUA
+     escolha — nada sobe sozinho — e isso é dito na cara. */
   function quemSobe(p) {
-    var reserva = M.projetoPorPapel('reserva');
     var prontas = M.planejadas().filter(M.aptaParaExecucao).length;
 
-    var frase = p.papel === 'titular' && reserva
-      ? (reserva.nome || 'A reserva') + ' assume a vaga de titular. A de reserva fica aberta.'
-      : 'A vaga de ' + (p.papel || 'execução') + ' fica aberta.';
+    var frase = 'A vaga de ativo fica aberta.';
 
     return frase + ' ' + (prontas
       ? (prontas === 1 ? 'Há 1 planejada pronta para entrar.' : 'Há ' + prontas + ' planejadas prontas para entrar.')
@@ -1578,7 +1583,7 @@
     /* Obra rodando não ganha tarefa de planejamento: planejamento já foi. O que
        parecer planejamento agora acontece na execução. A seção fica só como
        registro. Muda também não adiciona (detalhar é da vaga de planejamento). */
-    var executando = p.papel === 'titular' || p.papel === 'reserva';
+    var executando = p.papel === 'ativo';
     var podeAdicionar = !emConsulta(p.id) && p.estado !== 'fila' && !(etapa === 'planejamento' && executando);
     // obra rodando sem nenhuma tarefa de planejamento: a seção não tem o que dizer
     if (etapa === 'planejamento' && executando && !tarefas.length) return '';
@@ -1771,7 +1776,7 @@
 
   function executandoObra(pid) {
     var p = M.projeto(pid);
-    return !!p && (p.papel === 'titular' || p.papel === 'reserva');
+    return !!p && p.papel === 'ativo';
   }
 
   function marcacaoPasso(t, n, numeros, etapaDaSecao) {
@@ -3279,7 +3284,7 @@
     avisoCascata = (avisoCascata ? avisoCascata + ' ' : '') + movidos.map(function (m) {
       return m.vaga === 'planejadas'
         ? (m.projeto.nome || 'O projeto') + ' terminou o planejamento e entrou nas planejadas.'
-        : (m.projeto.nome || 'Um projeto') + ' assume a vaga de ' + m.vaga + '.';
+        : (m.projeto.nome || 'Um projeto') + ' entra como ativo.';
     }).join(' ');
   }
 
@@ -3305,18 +3310,18 @@
     var texto = campo ? campo.value.trim() : '';
     if (cfg.campo && !cfg.opcional && !texto) return;   // motivo é obrigatório
 
-    if (acaoProjeto.tipo === 'promover' && destinoDaPromocao(p) === 'reserva') {
-      M.promoverParaReserva(p.id);
+    if (acaoProjeto.tipo === 'promover' && destinoDaPromocao(p) === 'ativo') {
+      M.promoverParaAtivo(p.id);
       colherAvisos();
       tela = { tipo: 'projeto', id: p.id };
     } else if (acaoProjeto.tipo === 'revisar') {
       var r = M.revisarPlano(p.id);
       avisoCascata = r && r.bloqueado
-        ? 'A vaga de planejamento está com ' + (r.bloqueado.nome || 'outro projeto') + '. Só cabe um por vez.'
+        ? 'As duas vagas de planejamento estão com ' + r.bloqueado.map(function (q) { return q.nome || 'outro projeto'; }).join(' e ') + '.'
         : 'Voltou para o planejamento com a tarefa de revisar o plano.';
     } else if (acaoProjeto.tipo === 'promover') {
-      var saiu = M.promoverParaPlanejamento(p.id);
-      avisoCascata = saiu ? (saiu.nome || 'O projeto anterior') + ' voltou para a fila.' : '';
+      M.promoverParaPlanejamento(p.id);
+      avisoCascata = '';
       tela = { tipo: 'projeto', id: p.id };
     } else if (acaoProjeto.tipo === 'retomar') {
       M.retomarProjeto(p.id);

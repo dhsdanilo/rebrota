@@ -143,7 +143,7 @@
       return '<p class="sitio-envelope">' + esc(M.moeda(p.guardado)) + ' de ' + esc(M.moeda(p.custoEstimado)) + '</p>';
     }
     // rodando ou concluído: só quanto foi orçado — o envelope já disparou
-    if ((p.papel === 'titular' || p.papel === 'reserva' || p.estado === 'concluido') && Number(p.custoEstimado) > 0) {
+    if ((p.papel === 'ativo' || p.estado === 'concluido') && Number(p.custoEstimado) > 0) {
       return '<p class="sitio-envelope">orçado em ' + esc(M.moeda(p.custoEstimado)) + '</p>';
     }
     return '';
@@ -231,8 +231,9 @@
     if (termo) return desenharBusca(termo);
 
     var projetos = M.cat().projetos;
-    var vagas = ['titular', 'reserva', 'planejamento'].map(function (papel) {
-      var p = projetos.filter(function (q) { return q.papel === papel; })[0];
+    var vagas = ['ativo', 'ativo', 'ativo', 'planejamento', 'planejamento'].map(function (papel, i) {
+      var doPapel = projetos.filter(function (q) { return q.papel === papel; });
+      var p = doPapel[i < 3 ? i : i - 3];
       return p ? cartaoProjeto(p) :
         '<article class="sitio-projeto sitio-vaga"><span class="sitio-etiqueta sitio-etiqueta-' + papel + '">' +
           (papel === 'planejamento' ? 'em planejamento' : papel) + '</span><em>vaga aberta</em></article>';

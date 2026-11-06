@@ -364,7 +364,7 @@ select option { background: var(--mata); color: var(--neblina); }
   font-family: var(--mono); font-style: normal; font-size: 11px; color: var(--neblina-fraca);
 }
 .sitio-etiqueta { letter-spacing: .06em; text-transform: uppercase; }
-.sitio-etiqueta-titular, .sitio-etiqueta-reserva { color: var(--rebrota); }
+.sitio-etiqueta-ativo { color: var(--rebrota); }
 .sitio-etiqueta-planejamento { color: var(--casca); }
 .sitio-etiqueta-pronto { color: var(--dentro); }
 .sitio-vaga { padding: 12px 0; display: flex; flex-direction: column; gap: 3px; }
@@ -912,16 +912,14 @@ body.rua-arrastando, body.rua-arrastando * { cursor: grabbing; }
 }
 
 .vaga-titulaR .pino { }
-.vaga-titular .pino      { background: var(--rebrota); border-color: var(--rebrota); }
-.vaga-reserva .pino      { background: var(--musgo);   border-color: var(--rebrota); }
+.vaga-ativo .pino        { background: var(--rebrota); border-color: var(--rebrota); }
 .vaga-planejamento .pino { background: none;           border-color: var(--rebrota); }
 .vaga-pronto .pino       { background: var(--neblina); border-color: var(--neblina); }
 .vaga-juntando .pino     { background: linear-gradient(90deg, var(--neblina-fraca) 50%, transparent 50%); }
 .vaga-pre .pino          { border-style: dotted; }
 .vaga-concluido .pino    { background: var(--musgo); border-color: var(--musgo); }
 
-.vaga-titular .item-nome,
-.vaga-reserva .item-nome { color: var(--neblina); font-weight: 600; }
+.vaga-ativo .item-nome { color: var(--neblina); font-weight: 600; }
 .vaga-concluido .item-nome, .vaga-encerrado .item-nome { color: var(--neblina-fraca); }
 
 /* ── barra do envelope ──────────────────────────────── */

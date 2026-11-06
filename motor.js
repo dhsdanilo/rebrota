@@ -5,7 +5,7 @@
  * A ordem em que as coisas mandam:
  *   1. filtro     — o que é possível nesta situação exata (§6)
  *   2. faixa      — data marcada > periódico vencido > o resto (§7)
- *   3. cascata    — titular > reserva > planejamento, dentro da faixa 3
+ *   3. cascata    — ativos (iguais) > planejamento, dentro da faixa 3
  *   4. peso       — só ordena dentro do que sobrou
  *
  * Cada projeto apresenta UM candidato: o de menor ordem entre os elegíveis.
@@ -88,7 +88,7 @@ var Motor = (function () {
 
   function chovendo(s) { return s.tempo === 'chuva_fina' || s.tempo === 'chuva_forte'; }
 
-  var VAGAS = ['titular', 'reserva', 'planejamento'];
+  var VAGAS = ['ativo', 'planejamento'];
 
   // ── filtro (§6) ───────────────────────────────────────────────────
 
@@ -144,7 +144,7 @@ var Motor = (function () {
     var p = M.projeto(t.projetoId);
     if (!p || VAGAS.indexOf(p.papel) === -1) return false;
     /* A vaga de planejamento é para decidir, não para fazer: execução só sai
-       de titular ou reserva. Sem isto, fechar a última tarefa de planejamento
+       de projeto ativo. Sem isto, fechar a última tarefa de planejamento
        fazia a execução começar a ser oferecida antes de o projeto ser
        promovido — e a promoção é escolha, de propósito. */
     if (t.etapa === 'execucao' && p.papel === 'planejamento') return false;
@@ -228,27 +228,32 @@ var Motor = (function () {
   }
 
   // ── cascata (§7) ──────────────────────────────────────────────────
-  /* Se existe qualquer tarefa elegível na titular, é titular — regra dura, não
-     peso. A reserva só aparece quando a titular está seca, e o planejamento só
-     quando as duas estão. Cada projeto apresenta um candidato só. */
+  /* Cada projeto apresenta um candidato só. Se algum ativo tem tarefa
+     elegível, planejamento não aparece (regra dura, não peso). */
 
   function candidatoDoProjeto(pid, pool) {
     return pool.filter(function (t) { return t.projetoId === pid; })
       .sort(function (a, b) { return a.ordem - b.ordem; })[0] || null;
   }
 
-  function projetoComPapel(papel) {
-    return M.cat().projetos.filter(function (p) { return p.papel === papel; })[0] || null;
+  function projetosComPapel(papel) {
+    return M.projetosPorPapel(papel);
   }
 
+  /* §62: os ativos são iguais — cada um apresenta o seu candidato e o peso
+     arbitra entre eles. Planejamento só entra quando nenhum ativo tem o que
+     oferecer (continua sendo a vaga de decidir, não de fazer). */
   function poolDaFaixa3(pool) {
     // avulsas sempre disputam: são o lastro que responde quando tudo trava
     var candidatos = pool.filter(function (t) { return !t.projetoId; });
 
     for (var i = 0; i < VAGAS.length; i++) {
-      var proj = projetoComPapel(VAGAS[i]);
-      var c = proj ? candidatoDoProjeto(proj.id, pool) : null;
-      if (c) { candidatos.push(c); break; }
+      var achou = false;
+      projetosComPapel(VAGAS[i]).forEach(function (proj) {
+        var c = candidatoDoProjeto(proj.id, pool);
+        if (c) { candidatos.push(c); achou = true; }
+      });
+      if (achou) break;
     }
     return candidatos;
   }
@@ -389,10 +394,11 @@ var Motor = (function () {
       poe(urgentes[0], faixaDe(urgentes[0], alvo) === 1 ? 'data marcada' : 'rotina · já passou da hora');
     }
 
-    // 2. e 3.: a cascata das frentes — titular, depois reserva/planejamento
+    // 2. e 3.: um de cada ativo (iguais entre si), depois o planejamento
     VAGAS.forEach(function (papel) {
-      var proj = projetoComPapel(papel);
-      if (proj) poe(candidatoDoProjeto(proj.id, pool), papel === 'planejamento' ? 'em planejamento' : papel);
+      projetosComPapel(papel).forEach(function (proj) {
+        poe(candidatoDoProjeto(proj.id, pool), papel === 'planejamento' ? 'em planejamento' : papel);
+      });
     });
 
     // completa com as avulsas de mais peso

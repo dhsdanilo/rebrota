@@ -17,7 +17,7 @@ window.DADOS_CLAUDE =
         "resultado": "Corredor acabado, sem obra dentro de casa",
         "ganhos": [],
         "estado": "ativo",
-        "papel": "titular",
+        "papel": "ativo",
         "origem": "avulso",
         "prerequisitos": [],
         "ordemFila": 1,
