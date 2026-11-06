@@ -764,6 +764,10 @@
       var feita = e === 'feita' || e === 'encerrada';
       var delegada = !!M.separadaDe(t.id);
       if (!feita) todasFechadas = false;
+      /* §63: a vitrine mostra só o que está vivo. Feita ou cancelada sai da
+         tela (antes ficava apagada, com a etiqueta "feita") — pode sobrar uma
+         ou nenhuma, e "fazer mais" cobre o resto. */
+      if (feita) return '';
       var p = t.projetoId ? M.projeto(t.projetoId) : null;
       var aberta = vitrineAberta === t.id && !feita;
 
