@@ -1743,6 +1743,50 @@ var Modelo = (function () {
     return movidas;
   }
 
+  /* Quem espera por esta tarefa (direto). Feita ou encerrada continua na
+     conta: o ponto cheio é justamente "este elo já foi cumprido". */
+  function dependentesDe(tid) {
+    return tarefasVivas().filter(function (o) {
+      return (o.dependeDe || []).indexOf(tid) !== -1 && estadoDe(o.id) !== 'encerrada';
+    });
+  }
+
+  /* "tid fica depois de antesId" — o gesto de arrastar uma tarefa sobre a
+     outra. Dentro do mesmo projeto (ou entre avulsas); nunca em ciclo. */
+  function vincularDepois(tid, antesId) {
+    var t = tarefa(tid), a = tarefa(antesId);
+    if (!t || !a) return { ok: false, motivo: 'Não achei uma das tarefas.' };
+    if (t.id === a.id) return { ok: false, motivo: 'Uma tarefa não pode ficar depois dela mesma.' };
+    if ((t.projetoId || '') !== (a.projetoId || '')) {
+      return { ok: false, motivo: 'Só dá para ligar tarefas do mesmo projeto.' };
+    }
+    if ((t.dependeDe || []).indexOf(a.id) !== -1) return { ok: true, ja: true, puxadas: 0 };
+
+    // ciclo: a já depende de t, direta ou indiretamente?
+    var vistos = {}, fila = [a.id];
+    while (fila.length) {
+      var id = fila.shift();
+      if (id === t.id) {
+        return { ok: false, motivo: 'Já existe o caminho contrário: "' + (a.texto || 'sem texto') +
+          '" já espera por "' + (t.texto || 'sem texto') + '". Tire essa ligação primeiro.' };
+      }
+      if (vistos[id]) continue;
+      vistos[id] = true;
+      var x = tarefa(id);
+      if (x) (x.dependeDe || []).forEach(function (d) { fila.push(d); });
+    }
+
+    t.dependeDe = (t.dependeDe || []).concat([a.id]);
+    t.ultimoToque = agora();
+    salvar();
+    var puxadas = 0;
+    // planejamento que depende de execução trava as duas para sempre
+    if (t.etapa === 'planejamento' && a.etapa === 'execucao') {
+      puxadas = moverEtapa(a.id, 'planejamento').length;
+    }
+    return { ok: true, ja: false, puxadas: puxadas };
+  }
+
   function inserirSemente(texto) {
     var s = novaSemente(texto);
     cat().sementes.push(s);
@@ -2702,6 +2746,7 @@ var Modelo = (function () {
     moeda: moeda, duracao: duracao, agora: agora, hoje: hoje,
 
     moverEtapa: moverEtapa,
+    dependentesDe: dependentesDe, vincularDepois: vincularDepois,
     inserirProjeto: inserirProjeto, inserirPasso: inserirPasso,
     removerProjeto: removerProjeto, removerTarefa: removerTarefa,
     reordenar: reordenar,

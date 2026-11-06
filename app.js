@@ -670,8 +670,25 @@
     };
   }
 
+  /* O vínculo sem ler (§65): um ponto por tarefa que espera por esta — vazio
+     enquanto ela não foi feita, cheio quando já foi. Sem árvore, sem recuo. */
+  function eloDaVitrine(t) {
+    var quem = M.dependentesDe(t.id);
+    if (!quem.length) return '';
+    var nomes = quem.map(function (o) { return o.texto || 'tarefa sem texto'; });
+    return '<span class="vitrine-elo" title="destrava: ' + esc(nomes.join(', ')) + '" aria-label="destrava ' +
+      quem.length + (quem.length === 1 ? ' tarefa' : ' tarefas') + '">' +
+      quem.map(function (o) {
+        return '<i class="elo-ponto' + (M.estadoDe(o.id) === 'feita' ? ' elo-feito' : '') + '"></i>';
+      }).join('') + '</span>';
+  }
+
   function fichaDaVitrine(t) {
     var linhas = [];
+    var destrava = M.dependentesDe(t.id);
+    if (destrava.length) {
+      linhas.push(['destrava', destrava.map(function (o) { return o.texto || 'tarefa sem texto'; }).join(' · ')]);
+    }
     var local = M.LOCAIS.filter(function (l) { return l.v === t.ondePrecisaEstar; })[0];
     var onde = [local ? local.t : '', t.onde].filter(Boolean).join(' · ');
     if (onde) linhas.push(['onde', onde]);
@@ -750,10 +767,12 @@
           '</div>';
       }
 
-      return '<div class="vitrine-item' + (feita ? ' vitrine-feita' : '') + (aberta ? ' vitrine-viva' : '') + '">' +
+      var elo = feita ? '' : eloDaVitrine(t);
+      return '<div class="vitrine-item' + (feita ? ' vitrine-feita' : '') + (aberta ? ' vitrine-viva' : '') +
+        (elo ? ' vitrine-liga' : '') + '">' +
         '<button type="button" class="vitrine-cabeca" data-acao="vitrine-abrir" data-id="' + t.id + '"' + (feita ? ' disabled' : '') + '>' +
           '<span class="vitrine-etiqueta">' + esc(feita ? 'feita' : item.rotulo) + '</span>' +
-          '<span class="vitrine-texto">' + esc(t.texto || 'tarefa sem texto') + '</span>' +
+          '<span class="vitrine-texto">' + esc(t.texto || 'tarefa sem texto') + elo + '</span>' +
           '<span class="vitrine-meta">' + esc(meta.join(' · ')) +
             (estadoTexto ? '<em>' + esc(estadoTexto) + '</em>' : '') + '</span>' +
         '</button>' + corpo +
@@ -3534,19 +3553,7 @@
 
     if (acao === 'por-dep') {
       var selDep = $palco.querySelector('[data-entrada="dep"][data-id="' + tid + '"]');
-      var td = M.tarefa(tid);
-      if (selDep && selDep.value && td && td.dependeDe.indexOf(selDep.value) === -1) {
-        td.dependeDe.push(selDep.value);
-        M.salvar();
-        /* Planejamento que depende de execução trava as duas para sempre. O
-           arraste já puxa a corrente; vincular pelo seletor faz o mesmo. */
-        var alvoDep = M.tarefa(selDep.value);
-        if (td.etapa === 'planejamento' && alvoDep && alvoDep.etapa === 'execucao') {
-          var puxadas = M.moverEtapa(selDep.value, 'planejamento').length;
-          avisoCascata = 'Levei ' + (puxadas === 1 ? '1 tarefa' : puxadas + ' tarefas') +
-            ' para o planejamento: execução só é oferecida depois que ele fecha.';
-        }
-      }
+      if (selDep && selDep.value) ligarDepois(tid, selDep.value);
       return desenharPalco();
     }
     if (acao === 'tirar-dep') {
@@ -3561,6 +3568,24 @@
   // ── arrastar para reordenar ───────────────────────────────────────
 
   var arrastando = null;
+  var vinculoAlvo = null;   // o passo sobre o qual o arrastado está parado: vai ligar, não reordenar
+
+  /* Um só caminho para vincular, venha do arraste ou do seletor da ficha. */
+  function ligarDepois(tid, antesId) {
+    var r = M.vincularDepois(tid, antesId);
+    if (!r.ok) { avisoCascata = r.motivo; return false; }
+    if (r.ja) return true;
+    var t = M.tarefa(tid), a = M.tarefa(antesId);
+    avisoCascata = '"' + (t.texto || 'sem texto') + '" fica depois de "' + (a.texto || 'sem texto') + '".' +
+      (r.puxadas ? ' Levei ' + (r.puxadas === 1 ? '1 tarefa' : r.puxadas + ' tarefas') +
+        ' para o planejamento: execução só é oferecida depois que ele fecha.' : '');
+    return true;
+  }
+
+  function limparVinculoAlvo() {
+    if (vinculoAlvo) vinculoAlvo.classList.remove('passo-alvo-vinculo');
+    vinculoAlvo = null;
+  }
 
   function ligarArraste() {
     $palco.addEventListener('dragstart', function (e) {
@@ -3578,9 +3603,19 @@
       var li = e.target.closest('.passo');
       if (li && li !== arrastando) {
         e.preventDefault();
-        var meio = li.getBoundingClientRect().top + li.offsetHeight / 2;
+        var caixa = li.getBoundingClientRect();
+        var rel = (e.clientY - caixa.top) / (caixa.height || 1);
+        // faixa do meio: soltar aqui LIGA (o arrastado fica depois deste);
+        // as bordas continuam reordenando
+        if (rel > 0.3 && rel < 0.7) {
+          if (vinculoAlvo !== li) { limparVinculoAlvo(); vinculoAlvo = li; li.classList.add('passo-alvo-vinculo'); }
+          return;
+        }
+        limparVinculoAlvo();
+        var meio = caixa.top + li.offsetHeight / 2;
         return li.parentNode.insertBefore(arrastando, e.clientY < meio ? li : li.nextSibling);
       }
+      limparVinculoAlvo();
       // lista vazia da outra etapa: sem isto não dá para mover para um
       // planejamento que ainda não tem tarefa nenhuma
       var ul = e.target.closest('.passos');
@@ -3599,6 +3634,13 @@
       var ul = arrastando.closest('.passos');
       var alvo = arrastando;
       arrastando = null;
+
+      if (vinculoAlvo) {
+        var antesId = vinculoAlvo.dataset.tarefa;
+        limparVinculoAlvo();
+        ligarDepois(alvo.dataset.tarefa, antesId);
+        return desenhar();
+      }
       if (!ul) return;
 
       var etapaDestino = ul.getAttribute('data-etapa');
@@ -4017,6 +4059,11 @@
     if (e.target.id === 'diaDiarista' && e.target.value) { M.definirDiaDiarista(e.target.value); return desenhar(); }
     if (e.target.hasAttribute('data-muda')) return escreverMuda(e.target, true);
     if (e.target.hasAttribute('data-campo')) return escrever(e.target);
+    // escolher a tarefa já liga: a escolha é a ação
+    if (e.target.getAttribute('data-entrada') === 'dep' && e.target.value) {
+      ligarDepois(e.target.getAttribute('data-id'), e.target.value);
+      return desenharPalco();
+    }
     // escolher a semente já cria a tarefa: a escolha é a ação
     if (e.target.id === 'selSementeTarefa' && e.target.value) {
       var nascida = M.semearTarefa(e.target.value);
