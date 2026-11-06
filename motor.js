@@ -1,16 +1,15 @@
-/* App do sítio — motor da consulta.
+/* App do sítio — o leque.
  *
- * Recebe a situação informada e devolve UMA tarefa. Nunca uma lista.
+ * §64: o app deixou de escolher. Não há sorteio, nem filtro de situação (tempo
+ * disponível, clima, chão, esforço, companhia): quem julga o que fazer agora é
+ * ele. O motor só diz o que está DISPONÍVEL — o que dá para fazer — e a
+ * vitrine mostra o leque inteiro, sem botão de oferta e sem custo.
  *
- * A ordem em que as coisas mandam:
- *   1. filtro     — o que é possível nesta situação exata (§6)
- *   2. faixa      — data marcada > periódico vencido > o resto (§7)
- *   3. cascata    — ativos (iguais) > planejamento, dentro da faixa 3
- *   4. peso       — só ordena dentro do que sobrou
- *
- * Cada projeto apresenta UM candidato: o de menor ordem entre os elegíveis.
- * Assim o peso nunca embaralha a sequência de uma obra — ele arbitra só entre
- * projetos, avulsas e periódicos.
+ * O que ainda decide se uma tarefa aparece é estrutural:
+ *   - o projeto dela está numa vaga (ativo ou planejamento); sem vaga não emite;
+ *   - nada a segura (dependência, espera, dinheiro, travou, delegada);
+ *   - o dia-alvo cabe no dia da semana e no mês dela (hora do dia não conta);
+ *   - rotina só aparece quando venceu ou entrou na janela de adiantar.
  */
 
 var Motor = (function () {
@@ -18,65 +17,7 @@ var Motor = (function () {
 
   var M = Modelo;
 
-  /* As janelas grandes dependem da hora: oferecer "a manhã" às três da tarde é
-     o app mentindo sobre um tempo que já passou, e o usuário responde uma coisa
-     que não existe. O aparelho sabe que horas são — a §21 só proíbe automatizar
-     o CLIMA, porque informar o tempo é escolha consciente. Que horas são não
-     tem escolha dentro. */
-  var TEMPOS = [
-    { v: 30,  t: '30 min' },
-    { v: 60,  t: '1 h' },
-    { v: 120, t: '2 h' }
-  ];
-
-  function temposDe(quando) {
-    var h = (quando || new Date()).getHours();
-    var lista = TEMPOS.slice();
-
-    if (h < 12) {
-      lista.push({ v: 240, t: 'a manhã' });
-      // depois das dez, "o dia" já não é verdade
-      if (h < 10) lista.push({ v: 480, t: 'o dia' });
-    } else if (h < 18) {
-      lista.push({ v: 240, t: 'a tarde' });
-    } else {
-      lista.push({ v: 180, t: 'a noite' });
-    }
-    return lista;
-  }
-
-  function situacaoVazia() {
-    return {
-      quem: 'pe_eu',
-      local: null,          // 'sitio' | 'computador' | 'fora'
-      minutos: null,
-      tempo: null,          // 'sol' | 'calor' | 'nublado' | 'chuva_fina' | 'chuva_forte'
-      barro: null,
-      criancas: false,
-      ajuda: false,
-      energia: 'normal',    // 'normal' | 'pouca'
-      segundaChamada: false // inclui tolera_chuva_fina
-    };
-  }
-
-  // ── situação do relógio ───────────────────────────────────────────
-
-  function minutosDoDia(d) { return d.getHours() * 60 + d.getMinutes(); }
-
-  function paraMinutos(hhmm) {
-    var p = String(hhmm || '').split(':');
-    return (parseInt(p[0], 10) || 0) * 60 + (parseInt(p[1], 10) || 0);
-  }
-
-  /* Os três eixos do "é possível acontecer": hora do dia, dia da semana e mês
-     do ano. O aparelho sabe os três sem perguntar nada. */
-  function cabeNaJanela(t, agora) {
-    var j = M.janelaDe(t);
-    if (j.dias.indexOf(agora.getDay()) === -1) return false;
-    if (j.meses.indexOf(agora.getMonth() + 1) === -1) return false;
-    var m = minutosDoDia(agora);
-    return m >= paraMinutos(j.de) && m <= paraMinutos(j.ate);
-  }
+  var VAGAS = ['ativo', 'planejamento'];
 
   /* Execução espera o planejamento do próprio projeto terminar. É a regra que
      impede cavar 38 buracos antes de saber se o eucalipto cabe no bolso. */
@@ -86,57 +27,9 @@ var Motor = (function () {
     });
   }
 
-  function chovendo(s) { return s.tempo === 'chuva_fina' || s.tempo === 'chuva_forte'; }
-
-  var VAGAS = ['ativo', 'planejamento'];
-
-  // ── filtro (§6) ───────────────────────────────────────────────────
-
-  function cabeNoTempo(t, minutos) {
-    var restante = M.restanteDe(t.id);
-    return t.podeParar ? minutos >= M.blocoDe(t) : minutos >= restante;
-  }
-
-  function passaNaSituacao(t, s, agora) {
-    if (t.ondePrecisaEstar !== s.local) return false;
-    if (!cabeNaJanela(t, agora)) return false;
-    // fora, o tempo não decide (§46): coisa de rua é rápida e se encaixa na viagem
-    if (s.local !== 'fora' && !cabeNoTempo(t, s.minutos)) return false;
-
-    if (s.energia === 'pouca' && t.esforco !== 'leve') return false;
-    if (t.precisaAjuda && !s.ajuda) return false;
-    if (s.criancas && t.perigosaComCriancas) return false;
-
-    // no computador, clima e chão não dizem nada
-    if (s.local === 'computador') return true;
-    /* Fora também tem estrada precária e sol a pino (§42): clima, calor e chão
-       valem — com o tempo que a consulta já sabe do dia. Se o dia ainda não
-       tem clima (a primeira consulta foi "fora"), não se filtra no escuro. */
-    if (s.local === 'fora' && !s.tempo) return true;
-
-    if (t.exigeSoloFirme && s.barro) return false;
-
-    // calor é o tempo de hoje, não a hora: nublado e fresco às 13 h pode (§41)
-    if (t.podeNoCalor === false && s.tempo === 'calor') return false;
-
-    if (t.exigeClima === 'firme' && chovendo(s)) return false;
-    if (t.exigeClima === 'tolera_chuva_fina') {
-      if (s.tempo === 'chuva_forte') return false;
-      // dá para fazer molhando: só na segunda chamada, com a ressalva na cara
-      if (s.tempo === 'chuva_fina' && !s.segundaChamada) return false;
-    }
-    return true;
-  }
-
-  /* Guardada para a chuva sai do páreo normal em dia seco — capacidade é uma
-     coisa, economia é outra. Vai para a segunda porta. */
-  function noPareoNormal(t, s) {
-    return !(t.guardadaParaChuva && !chovendo(s));
-  }
-
   /* Projeto sem vaga não emite tarefa nenhuma — nem por prazo, nem por
-     periódico. Só as três vagas abertas e as avulsas chegam ao páreo; é o teto
-     de frentes que impede o volume de obrigação de crescer. */
+     periódico. Só as vagas abertas e as avulsas chegam ao leque; é o teto de
+     frentes que impede o volume de obrigação de crescer. */
   function emitindo(t) {
     if (t.tipo === 'compra') return false;   // passo-compra não se oferece: se compra (§57)
     if (M.separadaDe(t.id)) return false;   // na folha do diarista (ou delegada pela bota, §60)
@@ -145,37 +38,14 @@ var Motor = (function () {
     if (!p || VAGAS.indexOf(p.papel) === -1) return false;
     /* A vaga de planejamento é para decidir, não para fazer: execução só sai
        de projeto ativo. Sem isto, fechar a última tarefa de planejamento
-       fazia a execução começar a ser oferecida antes de o projeto ser
-       promovido — e a promoção é escolha, de propósito. */
+       fazia a execução começar a aparecer antes de o projeto ser promovido —
+       e a promoção é escolha, de propósito. */
     if (t.etapa === 'execucao' && p.papel === 'planejamento') return false;
     if (t.etapa === 'execucao' && planejamentoAberto(t.projetoId)) return false;
     return true;
   }
 
-  /* Periódico antes da hora: não antecipável fica de fora até vencer;
-     antecipável só entra pela segunda porta (§6). Antes os dois vinham pelo
-     páreo normal como tarefa comum — feito hoje, aparecia de novo amanhã. */
-  function periodicoAdiantado(t, agora) {
-    return M.periodica(t) && atrasoPeriodico(t, agora) < 0;
-  }
-
-  /* Adiantar tem limite: "até N dias antes de vencer". Feita ontem, a rotina
-     não volta pela segunda porta amanhã — e ninguém precisa dizer "não quero"
-     para uma coisa que acabou de fazer. */
-  function podeAdiantar(t, agora) {
-    var n = (t.prazo && t.prazo.antecipavelDias) || 0;
-    return n > 0 && atrasoPeriodico(t, agora) >= -n;
-  }
-
-  function elegiveis(s, agora) {
-    return M.tarefasVivas().filter(function (t) {
-      if (M.recusadaHaPouco(s.quem, t.id)) return false;
-      if (periodicoAdiantado(t, agora) && !podeAdiantar(t, agora)) return false;
-      return emitindo(t) && M.desimpedida(t) && passaNaSituacao(t, s, agora);
-    });
-  }
-
-  // ── faixas (§7) ───────────────────────────────────────────────────
+  // ── datas ─────────────────────────────────────────────────────────
 
   function diasDeFolga(iso, agora) {
     var alvo = new Date(iso + 'T00:00:00');
@@ -183,6 +53,7 @@ var Motor = (function () {
     return Math.round((alvo - hoje) / 86400000);
   }
 
+  /* 1 = data marcada chegou · 2 = rotina vencida · 3 = o resto (§7) */
   function faixaDe(t, agora) {
     if (t.agendada && t.agendada.em && diasDeFolga(t.agendada.em, agora) <= 0) return 1;
     if (t.prazo && t.prazo.tipo === 'data' && t.prazo.em) {
@@ -203,186 +74,54 @@ var Motor = (function () {
     return -diasDeFolga(M.diaLocal(venc), agora);
   }
 
-  // ── peso da faixa 3 ───────────────────────────────────────────────
-  /* Números são ponto de partida para calibrar no uso, como manda a §7.
-     O encaixe de tempo saiu de propósito: obra grande ocupa 100% de qualquer
-     janela por definição e ganharia sempre. Tempo agora é só filtro. */
-
-  function peso(t, s) {
-    var p = 0;
-    var proj = t.projetoId ? M.projeto(t.projetoId) : null;
-
-    p += 10 * M.destravaQuantas(t.id);
-    if (t.precisaAjuda && s.ajuda) p += 7;
-    if (t.boaComCriancas && s.criancas) p += 5;
-    if (proj && proj.estado === 'ativo') p += 4;
-
-    var restante = M.restanteDe(t.id);
-    if (t.duracaoTotal && restante <= t.duracaoTotal * 0.25) p += 3;
-    if (proj && proj.natureza === 'acumulavel') p -= 2;
-
-    // importância (§41): um ponto para cima ou para baixo — desempata, não manda
-    if (!t.projetoId) p += (Number(t.peso) || 2) - 2;
-
-    return p;
-  }
-
-  // ── cascata (§7) ──────────────────────────────────────────────────
-  /* Cada projeto apresenta um candidato só. Se algum ativo tem tarefa
-     elegível, planejamento não aparece (regra dura, não peso). */
-
-  function candidatoDoProjeto(pid, pool) {
-    return pool.filter(function (t) { return t.projetoId === pid; })
-      .sort(function (a, b) { return a.ordem - b.ordem; })[0] || null;
-  }
-
-  function projetosComPapel(papel) {
-    return M.projetosPorPapel(papel);
-  }
-
-  /* §62: os ativos são iguais — cada um apresenta o seu candidato e o peso
-     arbitra entre eles. Planejamento só entra quando nenhum ativo tem o que
-     oferecer (continua sendo a vaga de decidir, não de fazer). */
-  function poolDaFaixa3(pool) {
-    // avulsas sempre disputam: são o lastro que responde quando tudo trava
-    var candidatos = pool.filter(function (t) { return !t.projetoId; });
-
-    for (var i = 0; i < VAGAS.length; i++) {
-      var achou = false;
-      projetosComPapel(VAGAS[i]).forEach(function (proj) {
-        var c = candidatoDoProjeto(proj.id, pool);
-        if (c) { candidatos.push(c); achou = true; }
-      });
-      if (achou) break;
-    }
-    return candidatos;
-  }
-
-  // ── escolha ───────────────────────────────────────────────────────
-
-  function escolher(s, quando) {
-    var agora = quando || new Date();
-
-    if (M.diaEncerradoPara(s.quem)) return { vazio: 'dia_encerrado' };
-
-    var ativa = M.tarefaAtivaDe(s.quem);
-    if (ativa) return { ativa: ativa };
-
-    // periódico antecipável antes da hora é assunto da segunda porta, só dela
-    var todas = elegiveis(s, agora).filter(function (t) { return !periodicoAdiantado(t, agora); });
-
-    var r = decidir(todas.filter(function (t) { return noPareoNormal(t, s); }), s, agora);
-    if (r) return marcarMolhada(r, s);
-
-    /* Nada no páreo normal. Guardar o dia seco só faz sentido se houver outra
-       coisa para gastar o dia seco com — não havendo, guardar é desperdício e
-       esconder a única tarefa disponível atrás de um botão é pior ainda. */
-    r = decidir(todas, s, agora);
-    if (r) { r.guardada = true; return marcarMolhada(r, s); }
-
-    return { vazio: 'nada', temSegundaPorta: !!segundaPorta(s, agora).length };
-  }
-
-  // a ressalva "você vai se molhar" viaja com a resposta, não só com o botão
-  function marcarMolhada(r, s) {
-    if (s.segundaChamada && r.tarefa && r.tarefa.exigeClima === 'tolera_chuva_fina' && chovendo(s)) {
-      r.molhada = true;
-    }
-    return r;
-  }
-
-  function decidir(pool, s, agora) {
-    var f1 = pool.filter(function (t) { return faixaDe(t, agora) === 1; });
-    if (f1.length) {
-      f1.sort(function (a, b) { return folgaDe(a, agora) - folgaDe(b, agora); });
-      return { tarefa: f1[0], faixa: 1 };
-    }
-
-    /* A oferta anterior gruda enquanto continuar possível. Responder de novo é
-       livre e continua de graça — só não muda a resposta, e é isso que fecha o
-       percorrer por reconsulta. Mudar de verdade a situação (menos tempo, menos
-       energia) tira a tarefa do páreo, e aí ela cai sozinha. Data marcada,
-       acima, passa na frente mesmo assim. */
-    var grudada = M.ofertaDe(s.quem);
-    if (grudada) {
-      var mesma = pool.filter(function (t) { return t.id === grudada; })[0];
-      if (mesma) return { tarefa: mesma, faixa: faixaDe(mesma, agora), grudada: true };
-    }
-
-    var f2 = pool.filter(function (t) { return faixaDe(t, agora) === 2; });
-    if (f2.length) {
-      f2.sort(function (a, b) { return atrasoPeriodico(b, agora) - atrasoPeriodico(a, agora); });
-      return { tarefa: f2[0], faixa: 2 };
-    }
-
-    var f3 = poolDaFaixa3(pool.filter(function (t) { return faixaDe(t, agora) === 3; }));
-    if (!f3.length) return null;
-
-    f3.sort(function (a, b) {
-      var d = peso(b, s) - peso(a, s);
-      return d || (a.criadaEm < b.criadaEm ? -1 : 1);   // empate: a mais antiga
-    });
-    return { tarefa: f3[0], faixa: 3 };
-  }
-
   function folgaDe(t, agora) {
     if (t.agendada && t.agendada.em) return diasDeFolga(t.agendada.em, agora);
     if (t.prazo && t.prazo.em) return diasDeFolga(t.prazo.em, agora);
     return 0;
   }
 
-  /* A segunda porta é aberta pelo usuário, nunca oferecida como sugestão.
-     Descansar é o caminho padrão. */
-  function segundaPorta(s, agora) {
-    return elegiveis(s, agora).filter(function (t) {
-      if (t.guardadaParaChuva && !chovendo(s)) return true;
-      if (periodicoAdiantado(t, agora) && podeAdiantar(t, agora)) return true;
-      return false;
-    });
+  /* Rotina antes da hora: só entra no leque dentro da janela de adiantar
+     ("até N dias antes de vencer"). Feita ontem, não volta amanhã. */
+  function periodicoAdiantado(t, agora) {
+    return M.periodica(t) && atrasoPeriodico(t, agora) < 0;
   }
 
-  function escolherSegundaPorta(s, quando) {
-    var agora = quando || new Date();
-    var lista = segundaPorta(s, agora);
-    lista.sort(function (a, b) { return peso(b, s) - peso(a, s); });
-    return lista[0] || null;
+  function podeAdiantar(t, agora) {
+    var n = (t.prazo && t.prazo.antecipavelDias) || 0;
+    return n > 0 && atrasoPeriodico(t, agora) >= -n;
   }
 
-  /* Chuva e nada limpo: repete o filtro incluindo tolera_chuva_fina e diz a
-     ressalva na cara — "isto dá, mas você vai se molhar". */
-  function temSegundaChamada(s, agora) {
-    if (!chovendo(s)) return false;
-    var molhado = Object.assign({}, s, { segundaChamada: true });
-    return escolher(molhado, agora).tarefa != null;
+  /* Dia da semana e mês — a hora do dia não conta mais (§64). */
+  function cabeNoDia(t, alvo) {
+    var j = M.janelaDe(t);
+    return j.dias.indexOf(alvo.getDay()) !== -1 && j.meses.indexOf(alvo.getMonth() + 1) !== -1;
   }
 
-  /* A VITRINE (§58): até três tarefas para a VÉSPERA — leitura, nunca oferta.
-     O uso real mostrou que ele decide na noite anterior, com a cabeça fria, e
-     acorda com o plano pronto; a vitrine dá o cardápio sem pedir nada de
-     volta. Só filtros estruturais e o dia-alvo (mês, dia da semana): clima e
-     tempo disponível são do dia seguinte, e o dia seguinte decide. Fora fica
-     de fora (rua é a folha da rua). Nada gruda, nada custa. */
-  function vitrine(quando, excluir) {
+  // ── o leque ───────────────────────────────────────────────────────
+
+  /* Todas as tarefas disponíveis dos projetos ativos (e em planejamento), mais
+     as urgentes de qualquer origem — data marcada e rotina vencida, que podem
+     ser avulsas. Avulsa comum fica de fora: ela mora na própria lista. "Fora"
+     também: rua é a folha da rua. Ordem: urgentes primeiro, depois um projeto
+     por vez, na ordem das tarefas dele. */
+  function vitrine(quando) {
     var alvo = quando || new Date();
+
     var pool = M.tarefasVivas().filter(function (t) {
-      if (excluir && excluir[t.id]) return false;
       if (M.estadoDe(t.id) !== 'aberta' || t.tipo === 'compra') return false;
       if (t.ondePrecisaEstar === 'fora') return false;
       if (!emitindo(t) || !M.desimpedida(t)) return false;
-      var j = M.janelaDe(t);
-      if (j.dias.indexOf(alvo.getDay()) === -1) return false;
-      if (j.meses.indexOf(alvo.getMonth() + 1) === -1) return false;
-      if (periodicoAdiantado(t, alvo)) return false;
+      if (!cabeNoDia(t, alvo)) return false;
+      if (periodicoAdiantado(t, alvo) && !podeAdiantar(t, alvo)) return false;
       return true;
     });
 
-    var neutra = situacaoVazia();
     var usadas = {}, lista = [];
     function poe(t, rotulo) {
-      if (t && !usadas[t.id] && lista.length < 3) { usadas[t.id] = true; lista.push({ tarefa: t, rotulo: rotulo }); }
+      if (t && !usadas[t.id]) { usadas[t.id] = true; lista.push({ tarefa: t, rotulo: rotulo }); }
     }
 
-    // 1. a mais urgente: data marcada até o dia-alvo, ou rotina vencida
+    // 1. as urgentes: data marcada (mais perto primeiro), depois rotina vencida (mais atrasada primeiro)
     var urgentes = pool.filter(function (t) { var f = faixaDe(t, alvo); return f === 1 || f === 2; });
     urgentes.sort(function (a, b) {
       var fa = faixaDe(a, alvo), fb = faixaDe(b, alvo);
@@ -390,33 +129,21 @@ var Motor = (function () {
       return fa === 1 ? folgaDe(a, alvo) - folgaDe(b, alvo)
                       : atrasoPeriodico(b, alvo) - atrasoPeriodico(a, alvo);
     });
-    if (urgentes[0]) {
-      poe(urgentes[0], faixaDe(urgentes[0], alvo) === 1 ? 'data marcada' : 'rotina · já passou da hora');
-    }
-
-    // 2. e 3.: um de cada ativo (iguais entre si), depois o planejamento
-    VAGAS.forEach(function (papel) {
-      projetosComPapel(papel).forEach(function (proj) {
-        poe(candidatoDoProjeto(proj.id, pool), papel === 'planejamento' ? 'em planejamento' : papel);
-      });
+    urgentes.forEach(function (t) {
+      poe(t, faixaDe(t, alvo) === 1 ? 'data marcada' : 'rotina · já passou da hora');
     });
 
-    // completa com as avulsas de mais peso
-    var resto = pool.filter(function (t) { return !usadas[t.id] && !t.projetoId; });
-    resto.sort(function (a, b) { return peso(b, neutra) - peso(a, neutra); });
-    resto.forEach(function (t) { poe(t, 'avulsa'); });
+    // 2. um projeto por vez: ativos, depois planejamento
+    VAGAS.forEach(function (papel) {
+      M.projetosPorPapel(papel).forEach(function (proj) {
+        pool.filter(function (t) { return t.projetoId === proj.id; })
+          .sort(function (a, b) { return a.ordem - b.ordem; })
+          .forEach(function (t) { poe(t, papel === 'planejamento' ? 'em planejamento' : 'ativo'); });
+      });
+    });
 
     return lista;
   }
 
-  return {
-    TEMPOS: TEMPOS, temposDe: temposDe, vitrine: vitrine,
-    situacaoVazia: situacaoVazia,
-    escolher: escolher,
-    escolherSegundaPorta: escolherSegundaPorta,
-    segundaPorta: segundaPorta,
-    temSegundaChamada: temSegundaChamada,
-    elegiveis: elegiveis,
-    peso: peso, faixaDe: faixaDe, cabeNaJanela: cabeNaJanela
-  };
+  return { vitrine: vitrine, faixaDe: faixaDe, emitindo: emitindo };
 })();

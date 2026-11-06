@@ -852,7 +852,7 @@ var Modelo = (function () {
 
   /* Esqueleto de planejamento: as mesmas cinco tarefas servem para quase todo
      projeto. Apagar o que não serve é muito mais barato que criar do zero. */
-  var COMERCIAL = { horario: 'personalizado', de: '08:00', ate: '18:00',
+  var COMERCIAL = { horario: 'qualquer', de: '06:00', ate: '18:00',
                     dias: 'util', diasEscolhidos: [1, 2, 3, 4, 5], meses: TODOS_MESES.slice() };
 
   var ESQUELETO = [
@@ -1320,11 +1320,10 @@ var Modelo = (function () {
      de tela; o filtro nunca olha o nome do preset. */
   function janelaDe(t) {
     var q = t.quando || quandoPadrao();
-    var h = HORARIOS.filter(function (x) { return x.v === q.horario; })[0] || HORARIOS[0];
     var d = DIAS_SEMANA.filter(function (x) { return x.v === q.dias; })[0] || DIAS_SEMANA[0];
     return {
-      de:  q.horario === 'personalizado' ? (q.de || '00:00')  : (h.de  || '00:00'),
-      ate: q.horario === 'personalizado' ? (q.ate || '23:59') : (h.ate || '23:59'),
+      de:  '00:00',   // §64: a hora do dia não decide mais nada
+      ate: '23:59',
       dias: q.dias === 'personalizado' ? (q.diasEscolhidos || []) : d.dias,
       meses: (q.meses && q.meses.length) ? q.meses : TODOS_MESES
     };
@@ -1361,16 +1360,6 @@ var Modelo = (function () {
             ', que você deixou de fora dos meses possíveis.');
         }
       }
-    }
-
-    // as duas se contradizem: guardada para a chuva, mas não pode chuva nenhuma
-    if (t.guardadaParaChuva && t.exigeClima === 'firme') {
-      avisos.push('Guardada para a chuva, mas só com tempo firme: num dia de chuva ela não passa, ' +
-        'e num dia seco fica guardada — escolha um dos dois.');
-    }
-
-    if (t.podeParar === false && t.duracaoTotal > 480) {
-      avisos.push('Não pode parar e leva mais de 8 h: nenhuma janela de tempo vai comportar.');
     }
 
     /* Travamento silencioso: execução só é oferecida depois que o planejamento
@@ -1959,6 +1948,7 @@ var Modelo = (function () {
          mesma tarefa na hora. Sai do páreo por umas horas e a grudada solta. */
       pessoa.recusas[ev.tarefaId] = ev.quando;
       pessoa.oferta = null;
+      if (pessoa.tarefaAtiva === ev.tarefaId) pessoa.tarefaAtiva = null;
     }
     // guarda o instante, não o dia: a pausa conta a partir da recusa
     if (ev.tipo === 'nao_quero') pessoa.calado = ev.quando;
@@ -2073,7 +2063,6 @@ var Modelo = (function () {
     { v: 'terceiro',          t: 'Preciso falar com alguém',       destrave: 'Falar com quem falta: ' },
     { v: 'ja_fiz',            t: 'Já fiz',                         destrave: null },
     { v: 'tempo_virou',       t: 'O tempo virou',                  destrave: null },
-    { v: 'demora_mais',       t: 'Demora mais do que eu achava',   destrave: null },
     { v: 'outro',             t: 'Outro motivo',                   destrave: null }
   ];
 
@@ -2082,9 +2071,6 @@ var Modelo = (function () {
     var regra = MOTIVOS_NAO_DA.filter(function (m) { return m.v === motivo; })[0];
     var dados = { tarefaId: tid, motivo: motivo, nota: nota || '' };
 
-    if (motivo === 'demora_mais') {
-      dados.restanteNovo = Math.round(restanteDe(tid) * 1.5);
-    }
     /* Faltou material / não tenho a ferramenta: nasce um ITEM em falta (§56),
        vinculado à própria tarefa recusada — ela sai do páreo até o item chegar.
        O item nasce dentro do evento (a bota não escreve catálogo); a vista o

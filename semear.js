@@ -181,7 +181,7 @@
         if (!lista.length) return '';
         return '<h4>' + titulo + '</h4><ul class="sitio-tarefas">' + lista.map(function (t) {
           return '<li>' + esc(t.texto || 'tarefa sem texto') +
-            '<em>' + esc(M.duracao(t.duracaoTotal)) + (t.onde ? ' · ' + esc(t.onde) : '') +
+            '<em>' + (t.onde ? esc(t.onde) : '') +
               (t.separada ? ' · separada para o ' + esc(M.nomeDe(t.separada.para)) : '') + '</em></li>';
         }).join('') + '</ul>';
       }
@@ -218,8 +218,8 @@
   function linhaAvulsa(t) {
     var ultima = M.periodica(t) ? M.ultimaVezDe(t.id) : null;
     return '<li>' + esc(t.texto || 'tarefa sem texto') +
-      '<em>' + esc(M.duracao(t.duracaoTotal)) +
-        (M.periodica(t) ? ' · a cada ' + esc(t.prazo.cadenciaDias) + ' dias' +
+      '<em>' +
+        (M.periodica(t) ? 'a cada ' + esc(t.prazo.cadenciaDias) + ' dias' +
           (ultima ? ' · última vez ' + esc(M.formatarData(ultima)) : '') : '') +
       '</em></li>';
   }

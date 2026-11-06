@@ -203,7 +203,7 @@
       // a folha do diarista só existe quando há algo separado
       (M.separadas().length
         ? itemSimples('diarista', 'Diarista', M.separadas().length + ' separada' + (M.separadas().length === 1 ? '' : 's') +
-            ' · ' + M.formatarData(M.separadas()[0].separada.dia) + ' · ~' + M.duracao(M.minutosSeparados()))
+            ' · ' + M.formatarData(M.separadas()[0].separada.dia))
         : '');
 
     // a coluna diz o que pede análise: as novas. O resto já tem destino.
@@ -492,8 +492,7 @@
       '<p class="ativa-texto">' + esc(t.texto || 'tarefa sem texto') + '</p>' +
       (recado ? '<p class="ativa-recado">' + esc(recado) + '</p>' : '') +
       '<p class="ativa-meta">' +
-        (proj ? esc(proj.nome || 'projeto sem nome') + ' · ' : '') +
-        'faltam ~' + esc(M.duracao(M.restanteDe(t.id))) +
+        (proj ? esc(proj.nome || 'projeto sem nome') : '') +
       '</p>' +
       /* Na MESA a segunda porta precisa existir: você veio ao PC no meio da
          tarefa justamente para consultar alguma coisa, e sem ela o modo consulta
@@ -553,27 +552,16 @@
        dentro da própria tarefa, na trilha. */
     if (!naMesa()) {
       return '<div class="abertura">' + frase +
-        '<div class="portas-bota">' +
-          '<button type="button" class="porta-b" data-acao="ir-executar">sortear' +
-            '<span>o app escolhe</span></button>' +
-          (M.tarefasDaRua().length + M.itensDaRua().length
-            ? '<button type="button" class="porta-b" data-acao="ir-rua">vai sair?' +
-              '<span>' + (M.tarefasDaRua().length + M.itensDaRua().length) + ' na rua</span></button>'
-            : '') +
-        '</div>' +
-        alertaDoTempo() + climaDaEntrada() + vitrineDaAbertura() + linkDoDiarista() + avisoDeNuvem() +
+        (M.tarefasDaRua().length + M.itensDaRua().length
+          ? '<div class="portas-bota"><button type="button" class="porta-b" data-acao="ir-rua">vai sair?' +
+            '<span>' + (M.tarefasDaRua().length + M.itensDaRua().length) + ' na rua</span></button></div>'
+          : '') +
+        alertaDoTempo() + vitrineDaAbertura() + linkDoDiarista() + avisoDeNuvem() +
         '</div>';
     }
 
     return '<div class="abertura">' + frase +
       '<div class="portas">' +
-        /* Na mesa as duas portas são iguais: o app não tem opinião sobre qual
-           delas você deveria escolher agora. Destacar executar fazia organizar
-           parecer o caminho errado, e organizar é trabalho legítimo. */
-        '<button type="button" class="porta" data-acao="ir-executar">' +
-          '<span class="porta-nome">executar</span>' +
-          '<span class="porta-sub">o app escolhe o que cabe agora</span>' +
-        '</button>' +
         '<button type="button" class="porta" data-acao="ir-organizar">' +
           '<span class="porta-nome">organizar</span>' +
           '<span class="porta-sub">mexer nos projetos e no plano</span>' +
@@ -664,17 +652,22 @@
   function salvarMarcaVitrine(m) {
     try { localStorage.setItem(CHAVE_VITRINE, JSON.stringify(m)); } catch (e) {}
   }
+  /* §64: o leque é AO VIVO — tudo o que está disponível agora, sem lista
+     congelada. A marca do dia serve só para registrar no diário, uma vez por
+     dia, o que foi mostrado (a pergunta "empacou?" lê isso). */
   function itensDaVitrine() {
     var av = alvoDaVitrine();
     var diaAlvo = M.diaLocal(av.alvo);
+    var lista = Motor.vitrine(av.alvo);
     var marca = lerMarcaVitrine();
     if (!marca || marca.dia !== diaAlvo) {
-      var lista = Motor.vitrine(av.alvo);
-      marca = { dia: diaAlvo, itens: lista.map(function (v) { return { id: v.tarefa.id, rotulo: v.rotulo }; }) };
-      salvarMarcaVitrine(marca);
-      if (lista.length) M.verVitrine('pe_eu', marca.itens.map(function (x) { return x.id; }), diaAlvo);
+      salvarMarcaVitrine({ dia: diaAlvo });
+      if (lista.length) M.verVitrine('pe_eu', lista.map(function (v) { return v.tarefa.id; }), diaAlvo);
     }
-    return { dia: diaAlvo, titulo: av.titulo, alvo: av.alvo, itens: marca.itens };
+    return {
+      dia: diaAlvo, titulo: av.titulo, alvo: av.alvo,
+      itens: lista.map(function (v) { return { id: v.tarefa.id, rotulo: v.rotulo }; })
+    };
   }
 
   function fichaDaVitrine(t) {
@@ -684,56 +677,10 @@
     if (onde) linhas.push(['onde', onde]);
     if ((t.ferramentas || []).length) linhas.push(['ferramentas', t.ferramentas.join(', ')]);
     if ((t.materiais || []).length) linhas.push(['materiais', t.materiais.join(', ')]);
-    var cond = [];
-    if (t.exigeClima === 'firme') cond.push('só com tempo firme');
-    if (t.exigeClima === 'tolera_chuva_fina') cond.push('tolera chuva fina');
-    if (t.exigeSoloFirme) cond.push('chão firme');
-    if (t.podeNoCalor === false) cond.push('não no calor');
-    if (!t.podeParar) cond.push('não pode parar');
-    if (t.esforco === 'pesado') cond.push('pesado');
-    if (cond.length) linhas.push(['condições', cond.join(' · ')]);
     if (M.recadoDe(t.id)) linhas.push(['nota', M.recadoDe(t.id)]);
     return linhas.map(function (l) {
       return '<span class="vitrine-ficha-linha"><b>' + esc(l[0]) + '</b>' + esc(l[1]) + '</span>';
     }).join('');
-  }
-
-  /* O clima na entrada da bota (§61): durante o dia, o de HOJE — previsão, ou
-     o que ele registrou — com o "não é isso?" para corrigir ali mesmo; das 18h
-     em diante, o de AMANHÃ (a vitrine já virou, o clima vira junto). Corrigir
-     registra o clima do dia (o chão fica em aberto: a consulta pergunta). */
-  var climaTrocando = false;
-  function climaDaEntrada() {
-    if (naMesa() || typeof Tempo === 'undefined') return '';
-    var h = new Date().getHours();
-    if (h >= 18) {
-      var dias = Tempo.semana();
-      var am = dias && dias[1];
-      if (!am) return '';
-      return '<p class="clima-entrada">amanhã: ' + esc(Tempo.rotulo(Tempo.tempoDe(am.code))) +
-        ' · ' + am.min + '–' + am.max + '°' +
-        (am.chuvaProb !== null && am.chuvaProb !== undefined ? ' · chuva ' + am.chuvaProb + '%' : '') +
-        (am.rajadaMax >= 40 ? ' · rajadas ' + am.rajadaMax + ' km/h' : '') + '</p>';
-    }
-    var ROT = { sol: 'sol', calor: 'sol forte · calor', nublado: 'nublado', chuva_fina: 'chuva fina', chuva_forte: 'chuva forte' };
-    var chips = '';
-    if (climaTrocando) {
-      chips = '<span class="clima-chips">' + Object.keys(ROT).map(function (v) {
-        return '<button type="button" class="filtro" data-acao="clima-corrigir" data-valor="' + v + '">' + esc(ROT[v]) + '</button>';
-      }).join('') + '</span>';
-    }
-    var reg = M.climaDeHoje();
-    if (reg) {
-      return '<p class="clima-entrada">hoje: ' + esc(ROT[reg.tempo] || reg.tempo) + ' · você informou' +
-        (climaTrocando ? '' : ' <button type="button" class="bt-linha bt-mini" data-acao="clima-trocar">mudou?</button>') +
-        '</p>' + chips;
-    }
-    var la = Tempo.agora();
-    if (!la) return '';
-    var rotAgora = la.calor && la.tempo === 'sol' ? 'sol forte' : la.rotulo;
-    return '<p class="clima-entrada">hoje: ' + la.temp + '° · ' + esc(rotAgora) +
-      (climaTrocando ? '' : ' <button type="button" class="bt-linha bt-mini" data-acao="clima-trocar">não é isso?</button>') +
-      '</p>' + chips;
   }
 
   /* A folha do diarista chega à bota (§61): quando há tarefa separada, um
@@ -749,40 +696,24 @@
   function vitrineDaAbertura() {
     if (typeof Motor === 'undefined') return '';
     var v = itensDaVitrine();
-    if (!v.itens.length) return '';
-
-    var prevDia = null;
-    if (typeof Tempo !== 'undefined' && Tempo.semana()) {
-      prevDia = Tempo.semana().filter(function (d) { return d.dia === v.dia; })[0] || null;
+    if (!v.itens.length) {
+      return '<div class="vitrine"><div class="vitrine-titulo">' + esc(v.titulo) + '</div>' +
+        '<p class="vitrine-nota">nada disponível por agora</p></div>';
     }
 
-    var todasFechadas = true;
     var cards = v.itens.map(function (item) {
       var t = M.tarefa(item.id);
       if (!t) return '';
       var e = M.estadoDe(t.id);
       var feita = e === 'feita' || e === 'encerrada';
       var delegada = !!M.separadaDe(t.id);
-      if (!feita) todasFechadas = false;
-      /* §63: a vitrine mostra só o que está vivo. Feita ou cancelada sai da
-         tela (antes ficava apagada, com a etiqueta "feita") — pode sobrar uma
-         ou nenhuma, e "fazer mais" cobre o resto. */
+      /* §63: a vitrine mostra só o que está vivo. */
       if (feita) return '';
       var p = t.projetoId ? M.projeto(t.projetoId) : null;
       var aberta = vitrineAberta === t.id && !feita;
 
       var meta = [];
       if (p) meta.push(p.nome || 'projeto sem nome');
-      meta.push(M.duracao(M.restanteDe(t.id) || t.duracaoTotal));
-      var avisoClima = '';
-      if (prevDia && !feita) {
-        var tempoAlvo = Tempo.tempoDe(prevDia.code);
-        if (t.exigeClima === 'firme' && (tempoAlvo === 'chuva_fina' || tempoAlvo === 'chuva_forte')) {
-          avisoClima = 'pede tempo firme · chuva na previsão';
-        } else if (t.podeNoCalor === false && prevDia.max >= 30) {
-          avisoClima = 'não no calor · previsão de ' + prevDia.max + '°';
-        }
-      }
       var estadoTexto = feita ? '' : delegada ? 'delegada · na folha do diarista'
         : !M.desimpedida(t) ? (M.porQueEspera(t) || '') : '';
 
@@ -824,7 +755,6 @@
           '<span class="vitrine-etiqueta">' + esc(feita ? 'feita' : item.rotulo) + '</span>' +
           '<span class="vitrine-texto">' + esc(t.texto || 'tarefa sem texto') + '</span>' +
           '<span class="vitrine-meta">' + esc(meta.join(' · ')) +
-            (avisoClima ? '<em>' + esc(avisoClima) + '</em>' : '') +
             (estadoTexto ? '<em>' + esc(estadoTexto) + '</em>' : '') + '</span>' +
         '</button>' + corpo +
         '</div>';
@@ -832,9 +762,7 @@
 
     return '<div class="vitrine">' +
       '<div class="vitrine-titulo">' + esc(v.titulo) + '</div>' + cards +
-      (todasFechadas
-        ? '<button type="button" class="vitrine-mais" data-acao="vitrine-mais">fazer mais</button>'
-        : '<p class="vitrine-nota">para pensar — a escolha é sua</p>') +
+      '<p class="vitrine-nota">a escolha é sua</p>' +
       '</div>';
   }
 
@@ -1757,27 +1685,6 @@
     return '<ul class="passos" data-etapa="' + esc(etapa || '') + '">' + html + '</ul>';
   }
 
-  /* A duração em edição é um seletor: 15 · 30 · 60 · 90 · +. Quase toda tarefa
-     cai numa dessas; o "+" abre o número para as outras (e fica marcado quando
-     o valor não é nenhum dos quatro). Tocar é mais rápido que digitar. */
-  var TEMPOS = [15, 30, 60, 90];
-  function seletorDeTempo(t) {
-    var atual = Number(t.duracaoTotal) || 0;
-    var fora = TEMPOS.indexOf(atual) === -1 || tempoLivre === t.id;
-    return '<span class="passo-tempos" title="' + esc(AJUDA_DURACAO) + '">' +
-      TEMPOS.map(function (m) {
-        return '<button type="button" class="tempo' + (!fora && atual === m ? ' tempo-on' : '') + '"' +
-          ' data-acao="tempo" data-id="' + t.id + '" data-valor="' + m + '">' + (m < 60 ? m : m === 60 ? '1h' : '1h30') + '</button>';
-      }).join('') +
-      '<button type="button" class="tempo' + (fora ? ' tempo-on' : '') + '" data-acao="tempo-livre" data-id="' + t.id + '">+</button>' +
-      (fora
-        ? '<input type="number" class="passo-tempo passo-tempo-edita" min="5"' +
-          ' data-alvo="tarefa" data-id="' + t.id + '" data-campo="duracaoTotal" value="' + esc(t.duracaoTotal) + '">'
-        : '') +
-      '</span>';
-  }
-  var tempoLivre = null;   // tarefa com o "+" aberto
-
   function executandoObra(pid) {
     var p = M.projeto(pid);
     return !!p && p.papel === 'ativo';
@@ -1841,11 +1748,6 @@
             ' data-alvo="tarefa" data-id="' + t.id + '" data-campo="ondePrecisaEstar">' +
             opcoes(M.LOCAIS, t.ondePrecisaEstar) + '</select>'
           : '') +
-        (t.ondePrecisaEstar === 'fora' || t.tipo === 'compra' ? ''
-          : solto
-          ? seletorDeTempo(t)
-          : '<span class="passo-tempo" title="' + esc(AJUDA_DURACAO) + '">' +
-            '<i aria-hidden="true">⏱</i>' + esc(M.duracao(t.duracaoTotal)) + '</span>') +
         // delegar ao diarista (§39): decisão de véspera, na própria linha.
         // Em edição a linha só tem salvar: o resto espera a tarefa existir.
         (emConsulta(t.projetoId) || solto ? ''
@@ -2019,24 +1921,7 @@
     // ícone monocromático, na cor do texto — emoji vinha colorido e gritava
     m.push([t.ondePrecisaEstar === 'fora' ? '<svg class="marca-svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 12.5 4.6 8a1.5 1.5 0 0 1 1.4-1h8a1.5 1.5 0 0 1 1.4 1l1.6 4.5"/><rect x="2.5" y="12.5" width="15" height="3.5" rx="1"/><circle cx="6" cy="16.5" r="1.3"/><circle cx="14" cy="16.5" r="1.3"/></svg>' : t.ondePrecisaEstar === 'computador' ? '<svg class="marca-svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2.5" y="4" width="15" height="9.5" rx="1.2"/><path d="M7 17h6M10 13.5V17"/></svg>' : '⚑',
       (local ? local.t : '') + (t.onde ? ' · ' + t.onde : '')]);
-    // só o que é notável: "pode parar" é o caso comum e não merece etiqueta
-    if (!t.podeParar) m.push(['⏱', 'não pode parar']);
-
-    var cond = [];
-    var noSitioL = t.ondePrecisaEstar === 'sitio';
-    if (t.ondePrecisaEstar !== 'computador' && t.exigeClima !== 'indiferente') cond.push(t.exigeClima === 'firme' ? 'tempo firme' : 'tolera chuva fina');
-    if (t.podeNoCalor === false) cond.push('não no calor');
-    if (t.exigeSoloFirme) cond.push('solo firme');
-    if (t.guardadaParaChuva) cond.push('guardada para a chuva');
-    if (noSitioL) cond.push(t.esforco === 'pesado' ? 'pesado' : 'leve');
-    if (cond.length) m.push(['☁', cond.join(' · ')]);
     if ((t.tags || []).length) m.push(['#', t.tags.join(' · ')]);
-
-    var gente = [];
-    if (t.precisaAjuda) gente.push('precisa ajuda');
-    if (t.boaComCriancas) gente.push('boa com crianças');
-    if (t.perigosaComCriancas) gente.push('perigosa com crianças');
-    if (gente.length) m.push(['☻', gente.join(' · ')]);
 
     if (t.compra) m.push(['▤', 'comprar' + (t.compra === 'internet' ? ' pela internet' : '') +
       ((t.compras || []).length ? ': ' + t.compras.join(', ') : '')]);
@@ -2081,10 +1966,6 @@
   function resumoQuando(t) {
     var q = t.quando || {};
     var partes = [];
-    if (q.horario && q.horario !== 'qualquer') {
-      var h = M.HORARIOS.filter(function (x) { return x.v === q.horario; })[0];
-      partes.push(q.horario === 'personalizado' ? q.de + '–' + q.ate : (h ? h.t : ''));
-    }
     if (q.dias && q.dias !== 'qualquer') {
       if (q.dias === 'personalizado') {
         partes.push((q.diasEscolhidos || []).map(function (d) { return M.NOMES_DIA[d]; }).join(' '));
@@ -2128,8 +2009,7 @@
           { dica: 'trecho rente à estrada', travado: travado,
             ajuda: 'O ponto exato. Vem junto da tarefa na hora de sair, para você não ' +
                    'atravessar o sítio e descobrir lá que era do outro lado.' })),
-        'A primeira pergunta da consulta, e a que poda todas as outras: quando você responde ' +
-        '"fora" ou "computador", o app nem pergunta clima, chão, companhia e energia.'),
+        'O ponto exato, para quem vai ao sítio. Computador e rua não precisam.'),
 
       // dinheiro só na avulsa (§41): obra tem o envelope do projeto
       (t.projetoId || ehCompra ? '' :
@@ -2144,76 +2024,7 @@
             ajuda: 'Quanto já está separado para isto. Igual ou maior que o custo, ela entra no páreo.' }) +
         '</div>' +
         (M.juntandoDinheiro(t) ? '<p class="aviso" style="margin:8px 0 0">juntando dinheiro — faltam ' + esc(M.moeda(M.faltaDinheiro(t))) + '</p>' : ''),
-        'A avulsa que custa dinheiro espera o dinheiro, não o app. Mesmo desenho do envelope, em tamanho de tarefa.')) +
-
-      /* Fora não tem condições (§42): sair é planejado, não sorteado — a folha
-         da rua é a lista, e ele decide. O que sobra para a rua: o que é, o
-         lugar, o que comprar, quando precisa, dependência, tags, nota. */
-      (naRua || t.compra || ehCompra ? '' :
-      grupo('Condições', '',
-        (noPc ? '' :
-        linhaCond('Clima',
-          'Como o tempo precisa estar. "Só com tempo firme" desaparece em qualquer chuva. ' +
-          '"Tolera chuva fina" fica guardada para a segunda chamada, quando não sobrou nada limpo, ' +
-          'e aí o app avisa que você vai se molhar. Aqui chove metade do ano, então isto pesa.',
-          campoSelect('tarefa', t.id, 'exigeClima', '', M.CLIMAS, t.exigeClima, travado)) +
-
-        /* Estas duas eram caixas de marca empilhadas embaixo do valor do clima,
-           e liam-se como uma lista em que o primeiro item tinha perdido a
-           caixinha. Viraram pergunta com resposta, como todas as outras. */
-        linhaCond('Pode no calor?',
-          '"Não" some nos dias em que você responde "sol forte · calor" na consulta. É o tempo de hoje, ' +
-          'não a hora: nublado e fresco às 13 h continua valendo.',
-          campoBooleano('tarefa', t.id, 'podeNoCalor', t.podeNoCalor !== false, travado)) +
-
-        linhaCond('Precisa de chão firme?',
-          'Para o que exige pisar sem atolar ou rodar carrinho de mão. Some nos dias em que você ' +
-          'responde "barro" na consulta — e chuva forte já responde barro sozinha.',
-          campoBooleano('tarefa', t.id, 'exigeSoloFirme', t.exigeSoloFirme, travado))) +
-
-        (!noSitio ? '' :
-        linhaCond('Guardar para a chuva?',
-          'Trabalho que dá para fazer em qualquer dia, mas que vale a pena reservar para um dia ' +
-          'de chuva. Fica fora do páreo enquanto o tempo está firme — a não ser que não haja mais ' +
-          'nada, e aí o app oferece assim mesmo em vez de te deixar parado.',
-          campoBooleano('tarefa', t.id, 'guardadaParaChuva', t.guardadaParaChuva, travado))) +
-
-        (!noSitio ? '' :
-        linhaCond('Esforço',
-          'Quanto o corpo vai sentir. Nos dias em que você responder "pouca energia", só as leves ' +
-          'chegam até você — as pesadas nem são cogitadas.',
-          campoSelect('tarefa', t.id, 'esforco', '', M.ESFORCOS, t.esforco, travado))) +
-
-        (t.projetoId ? '' :
-        linhaCond('Importância',
-          'Só para desempatar entre avulsas iguais no resto. Não é ordem: data, rotina vencida e ' +
-          'destrave continuam mandando. Padrão: normal.',
-          campoSelect('tarefa', t.id, 'peso', '', M.PESOS, t.peso, travado))) +
-
-        (noPc ? '' :
-        linhaCond('Companhia',
-          'Quem precisa estar junto e quem não pode. As três marcas são independentes: uma tarefa ' +
-          'pode precisar de ajuda e ainda assim ser boa com as crianças por perto.',
-          linhaMarcas(
-          campoMarca('tarefa', t.id, 'precisaAjuda', 'precisa de ajuda', t.precisaAjuda, travado,
-            'Trabalho de duas pessoas. Só é oferecida nos dias em que você marca "ajuda", e nesses ' +
-            'dias ela sobe na fila: gente disponível é situação escassa e não se desperdiça.') +
-          campoMarca('tarefa', t.id, 'boaComCriancas', 'boa com crianças', t.boaComCriancas, travado,
-            'Trabalho que fica melhor com elas junto. Nos dias em que você marca "crianças", esta ' +
-            'ganha peso e vem na frente — aproveita o tempo com eles em vez de disputar com eles.') +
-          campoMarca('tarefa', t.id, 'perigosaComCriancas', 'perigosa com crianças', t.perigosaComCriancas, travado,
-            'Motosserra, altura, ferramenta cortante, elétrica. Nos dias em que você marca ' +
-            '"crianças", esta simplesmente não existe para o app.')))) +
-
-        linhaCond('Pode interromper?',
-          'Sim: a tarefa aparece mesmo numa janela curta, e o app diz quanto cabe hoje e quanto ' +
-          'sobra depois. Não: ela só aparece quando o tempo disponível cobre a coisa inteira — ' +
-          'concreto não aceita ser deixado pela metade.',
-          campoBooleano('tarefa', t.id, 'podeParar', t.podeParar, travado)),
-
-        'Tudo que precisa ser verdade no dia para esta tarefa aparecer. Se uma só destas linhas ' +
-        'não bater com a situação que você informou, ela não é oferecida — e você nem fica sabendo ' +
-        'que ela existia, que é justamente o alívio.')),
+        'A avulsa que custa dinheiro espera o dinheiro, não o app. Mesmo desenho do envelope, em tamanho de tarefa.')),
 
       (noPc || t.compra || ehCompra) ? '' :
       grupo('Levar', 'grade',
@@ -2375,10 +2186,6 @@
         (t.prazo.antecipavelDias ? ' · adianta até ' + t.prazo.antecipavelDias + ' dias' : '');
     }
 
-    var horario = q.horario === 'personalizado' ? q.de + '–' + q.ate
-      : q.horario === 'qualquer' || !q.horario ? 'qualquer hora'
-      : (M.HORARIOS.filter(function (x) { return x.v === q.horario; })[0] || {}).t;
-
     var dias = q.dias === 'personalizado'
       ? (j.dias.length === 7 ? 'todo dia' : j.dias.map(function (d) { return M.NOMES_DIA[d]; }).join(' '))
       : q.dias === 'qualquer' || !q.dias ? 'todo dia'
@@ -2389,7 +2196,7 @@
 
     return '<div class="grade">' +
       linhaResumo('Precisa acontecer', precisa) +
-      linhaResumo('É possível', horario + ' · ' + dias + ' · ' + meses) +
+      linhaResumo('É possível', dias + ' · ' + meses) +
       '</div>';
   }
 
@@ -2430,26 +2237,18 @@
         M.ultimaVezDe(t.id) || t.prazo.ultimaVez || '', travado);
       precisa += campoTexto('tarefa', t.id, 'prazoAdianta', 'Adiantar até (dias antes)',
         t.prazo.antecipavelDias || 0, { numero: true, min: 0, travado: travado,
-          ajuda: 'Quantos dias antes de vencer esta rotina já pode ser feita, pela porta "quero fazer ' +
-                 'mais". Zero: só quando vencer. Quinze: a partir de quinze dias antes — e nunca no ' +
+          ajuda: 'Quantos dias antes de vencer esta rotina já aparece na vitrine. ' +
+                 'Zero: só quando vencer. Quinze: a partir de quinze dias antes — e nunca no ' +
                  'dia seguinte ao que você acabou de fazer.' });
     }
     precisa += '</div>';
 
     var possivel = '<div class="grade">' +
-      campoSelect('tarefa', t.id, 'qHorario', 'Horário', M.HORARIOS, q.horario, travado,
-        'A que horas isto é possível. O aparelho já sabe que horas são, então isto nunca vira ' +
-        'pergunta na consulta — diferente do clima, que você informa de propósito.') +
       campoSelect('tarefa', t.id, 'qDias', 'Dia da semana', M.DIAS_SEMANA, q.dias, travado,
         'Em que dias isto é possível. Serve principalmente para o que depende dos outros: ' +
         'loja não abre domingo, e pedreiro não atende sábado à noite.') +
       '</div>';
 
-    if (q.horario === 'personalizado') {
-      possivel += '<div class="grade" style="margin-top:12px">' +
-        campoTexto('tarefa', t.id, 'qDe', 'Das', q.de, { travado: travado }) +
-        campoTexto('tarefa', t.id, 'qAte', 'Até', q.ate, { travado: travado }) + '</div>';
-    }
     if (q.dias === 'personalizado') {
       possivel += '<div class="caixinhas">' + M.NOMES_DIA.map(function (nome, i) {
         return marcaMini('qDia', t.id, i, nome, (q.diasEscolhidos || []).indexOf(i) !== -1, travado);
@@ -2611,7 +2410,7 @@
         (naMesa()
           ? '<label class="folha-dia">para o dia <input type="date" id="diaDiarista" value="' + esc(dia) + '"></label>'
           : '<span class="folha-dia">para o dia ' + esc(M.formatarData(dia)) + '</span>'),
-        '<span class="folha-total">~' + esc(M.duracao(M.minutosSeparados())) + ' · ' + lista.length + (lista.length === 1 ? ' tarefa' : ' tarefas') + '</span>',
+        '<span class="folha-total">' + lista.length + (lista.length === 1 ? ' tarefa' : ' tarefas') + '</span>',
         '<button type="button" class="bt-fraco bt-mini" data-acao="diarista-copiar">copiar a folha</button>',
         '<button type="button" class="bt-fraco bt-mini" onclick="window.print()">imprimir</button>',
       '</div>',
@@ -2625,7 +2424,7 @@
             // palavras, não ícones: a folha é lida por ele, no papel. O tempo só
             // na tela (ritmos diferentes — no papel não entra).
             '<div class="folha-texto"><strong>' + esc(t.texto || 'tarefa sem texto') + '</strong>' +
-              '<em class="folha-tempo">' + (p ? esc(p.nome) + ' · ' : '') + esc(M.duracao(M.restanteDe(t.id) || t.duracaoTotal)) + '</em>' +
+              '<em class="folha-tempo">' + (p ? esc(p.nome) : '') + '</em>' +
               (t.onde ? '<span><b>Onde:</b> ' + esc(t.onde) + '</span>' : '') +
               ((t.ferramentas || []).length ? '<span><b>Ferramentas:</b> ' + esc(t.ferramentas.join(', ')) + '</span>' : '') +
               ((t.materiais || []).length ? '<span><b>Materiais:</b> ' + esc(t.materiais.join(', ')) + '</span>' : '') +
@@ -3157,27 +2956,10 @@
 
     // o local decide o resto (§42): trocou, o que não se aplica volta ao neutro e a ficha redesenha
     if (chave === 'ondePrecisaEstar') {
-      if (valor !== 'sitio') { obj.guardadaParaChuva = false; obj.esforco = 'leve'; }
-      if (valor === 'computador' || valor === 'fora') {
-        obj.exigeClima = 'indiferente'; obj.podeNoCalor = true; obj.exigeSoloFirme = false;
-        obj.precisaAjuda = false; obj.boaComCriancas = false; obj.perigosaComCriancas = false;
-        obj.podeParar = true; obj.peso = 2;
-      }
       if (valor === 'computador') obj.onde = '';
       obj.ultimoToque = M.agora(); M.salvar();
       return desenharPalco();
     }
-
-    // boa com crianças e perigosa com crianças não coexistem: marcar uma desmarca a outra
-    if ((chave === 'boaComCriancas' || chave === 'perigosaComCriancas') && valor === true) {
-      var outra = chave === 'boaComCriancas' ? 'perigosaComCriancas' : 'boaComCriancas';
-      obj[outra] = false;
-      var caixa = $palco.querySelector('[data-alvo="tarefa"][data-id="' + obj.id + '"][data-campo="' + outra + '"]');
-      if (caixa) { caixa.checked = false; var rot = caixa.closest('.campo-marca'); if (rot) rot.classList.remove('campo-marca-on'); }
-    }
-
-    // duração recém-cadastrada define o restante: a tarefa ainda não começou
-    if (chave === 'duracaoTotal' && obj.estado === 'aberta') obj.restanteEstimado = valor;
 
     obj.ultimoToque = M.agora();
     M.salvar();
@@ -3206,14 +2988,11 @@
   function escreverQuando(t, chave, valor, el) {
     if (!t.quando) t.quando = { horario: 'qualquer', de: '06:00', ate: '18:00',
                                 dias: 'qualquer', diasEscolhidos: [1,2,3,4,5],
-                                meses: M.TODOS_MESES.slice() };
+                                meses: M.TODOS_MESES.slice() };   // horário guardado, mas sem efeito (§64)
     var q = t.quando;
     var estrutural = false;
 
-    if (chave === 'qHorario') { q.horario = valor; estrutural = true; }
     if (chave === 'qDias')    { q.dias = valor; estrutural = true; }
-    if (chave === 'qDe')      q.de = valor;
-    if (chave === 'qAte')     q.ate = valor;
 
     if (chave === 'qDia' || chave === 'qMes') {
       var lista = chave === 'qDia' ? (q.diasEscolhidos = q.diasEscolhidos || [])
@@ -3583,18 +3362,6 @@
       else M.reordenarFolhaPorEvento('pe_eu', ids);
       return desenharPalco();
     }
-    if (acao === 'tempo') {
-      var tt = M.tarefa(tid); if (!tt) return;
-      tt.duracaoTotal = Number(el.getAttribute('data-valor'));
-      if (M.estadoDe(tid) === 'aberta') tt.restanteEstimado = tt.duracaoTotal;
-      tt.ultimoToque = M.agora(); M.salvar(); tempoLivre = null;
-      return desenharPalco();
-    }
-    if (acao === 'tempo-livre') {
-      tempoLivre = tid; desenharPalco();
-      var caixa = $palco.querySelector('.passo-tempo-edita[data-id="' + tid + '"]'); if (caixa) { caixa.focus(); caixa.select(); }
-      return;
-    }
     if (acao === 'custo-editar') {
       custoEditando = tid; desenharPalco();
       var cc = document.getElementById('c_' + tid + '_custoEstimado'); if (cc) { cc.focus(); cc.select(); }
@@ -3621,13 +3388,6 @@
       var alvoTag = el.getAttribute('data-alvo') === 'projeto' ? M.projeto(tid) : M.tarefa(tid);
       M.tirarTag(alvoTag, el.getAttribute('data-valor'));
       return desenharPalco();
-    }
-    if (acao === 'clima-trocar') { climaTrocando = true; return desenhar(); }
-    if (acao === 'clima-corrigir') {
-      var tempoNovo = el.getAttribute('data-valor');
-      M.registrarClima('pe_eu', tempoNovo, tempoNovo === 'chuva_forte' ? true : null);
-      climaTrocando = false;
-      return desenhar();
     }
     if (acao === 'ir-diarista') { tela = { tipo: 'diarista', id: null }; return desenhar(); }
     if (acao === 'vitrine-abrir') {
@@ -3671,18 +3431,6 @@
       if (!notaEmp) { var ce = document.getElementById('vitrineEmpacou_' + tid); if (ce) ce.focus(); return; }
       M.empacar('pe_eu', tid, notaEmp);
       vitrineEmpacando = null;
-      return desenhar();
-    }
-    if (acao === 'vitrine-mais') {
-      var vAtual = itensDaVitrine();
-      var jaTem = {};
-      vAtual.itens.forEach(function (x) { jaTem[x.id] = true; });
-      var extras = Motor.vitrine(vAtual.alvo, jaTem);
-      if (!extras.length) { avisoCascata = 'Não sobrou mais nada que caiba — por hoje é isso.'; return desenhar(); }
-      var marca = lerMarcaVitrine();
-      extras.forEach(function (x) { marca.itens.push({ id: x.tarefa.id, rotulo: x.rotulo }); });
-      salvarMarcaVitrine(marca);
-      M.verVitrine('pe_eu', extras.map(function (x) { return x.tarefa.id; }), vAtual.dia);
       return desenhar();
     }
     if (acao === 'ir-rua') { tela = { tipo: 'rua', id: null }; entrarNaRua(); return desenhar(); }
@@ -4188,10 +3936,12 @@
 
   /* Sair do campo é voltar para a tela inicial — e colher o que a bota moveu de
      vaga, para a mesa dizer. */
-  function sairDoCampo() {
+  function sairDoCampo(aviso) {
     $campo.hidden = true;
     tela = { tipo: null, id: null };
     fecharFicha();
+    // o clique do botão também chega aqui, com o evento no lugar do aviso
+    if (typeof aviso === 'string' && aviso) avisoCascata = (avisoCascata ? avisoCascata + ' ' : '') + aviso;
     colherAvisos();
     desenhar();
   }

@@ -1,124 +1,42 @@
-/* App do sítio — frente de campo (a consulta).
+/* App do sítio — frente de campo (a tarefa em andamento).
  *
- * Postura de bota: uma mão, polegar, segundos, zero digitação exceto o
- * "não quero" e a linha do travamento. É a identidade do app.
- *
- * O contraste é entre a PERGUNTA — densa, cheia de botões — e a RESPOSTA,
- * que é quase vazia: uma frase grande e três botões. O alívio visual da
- * resposta é o ponto (§15).
+ * Postura de bota: uma mão, polegar, segundos, zero digitação exceto a linha
+ * do travamento. §64: o app não pergunta mais "onde, quanto tempo, que clima"
+ * nem sorteia — quem escolhe é ele, pela vitrine. Esta tela só existe DEPOIS
+ * do "vamos": a folha de trabalho da tarefa aceita, com as saídas dela
+ * (terminei · parei por agora · não dá · encerrar).
  */
 
 var Campo = (function () {
   'use strict';
 
-  var M = Modelo, Mo = Motor;
+  var M = Modelo;
   var EU = 'pe_eu';
 
-  var cena = { fase: 'pergunta', sit: null, resp: null, rascunho: {}, aviso: '' };
+  var cena = { fase: 'ativa', rascunho: {}, aviso: '' };
   var $ = null;
   var sair = null;   // quem abriu diz como se volta para a tela inicial
 
-  /* `pronto.local` vem de quem abriu: no PC, o aparelho já sabe onde você está,
-     e perguntar seria teatro. Não fere a §5, que proíbe pré-marcar a resposta
-     da VÉSPERA — isto é um fato de agora, e continua trocável. */
+  /* Sem tarefa em andamento não há o que mostrar aqui: volta para a entrada,
+     onde a vitrine está. */
   function abrir(alvo, pronto, aoSair) {
     $ = alvo;
     sair = aoSair || null;
-    cena.sit = Mo.situacaoVazia();
-    cena.sit.quem = EU;
-    if (pronto && pronto.local) cena.sit.local = pronto.local;
-    var clima = M.climaDeHoje();
-    if (clima) { cena.sit.tempo = clima.tempo; cena.sit.barro = clima.barro; }
-    /* A previsão ASSUME o clima do dia (§59, pedido dele): a pergunta vira
-       "Previsão para hoje: 24° · chuva fina" com o "não é isso?" para trocar.
-       Informar continua sendo escolha — a resposta é dele, só vem preenchida
-       pelo que o céu diz. Só na primeira consulta do dia sem clima registrado. */
-    cena.assumida = false;
-    cena.trocarClima = false;
-    if (!clima && typeof Tempo !== 'undefined') {
-      var la = Tempo.agora();
-      if (la) {
-        cena.sit.tempo = (la.calor && la.tempo === 'sol') ? 'calor' : la.tempo;
-        cena.assumida = { temp: la.temp, rotulo: la.calor && la.tempo === 'sol' ? 'sol forte · calor' : la.rotulo };
-      }
-    }
-    cena.fase = 'pergunta';
-    cena.resp = null;
     cena.rascunho = {};
     cena.aviso = '';
-    /* Segunda consulta do dia (§5 da spec, enfim): a situação de há pouco vira
-       UMA frase e dois botões — "mesma coisa" consulta na hora; "mudou" abre a
-       pergunta limpa. Só na bota: na mesa o local já vem pronto e a pergunta é
-       curta. Não fere o "sem pré-seleção" (§5): nada vem marcado — a resposta
-       inteira é relida antes de valer de novo. */
-    if (!(pronto && pronto.local) && ultimaConsulta()) cena.fase = 'confirma';
-    responder();
+    cena.listar = null;
+    cena.fase = 'ativa';
+    if (!M.tarefaAtivaDe(EU)) return voltarAoInicio();
     desenhar();
-    if (typeof Tempo !== 'undefined') {
-      Tempo.buscar().then(function () {
-        if (cena.fase === 'pergunta' || cena.fase === 'confirma') desenhar();
-      });
-    }
   }
 
-  /* A última situação respondida, guardada por aparelho (rascunho, como o
-     kit): vale só no dia, e fora do export. */
-  var CHAVE_ULTIMA = 'app-sitio-ultima-consulta';
-  function guardarConsulta(s) {
-    try {
-      localStorage.setItem(CHAVE_ULTIMA, JSON.stringify({
-        dia: M.hoje(), local: s.local, minutos: s.minutos,
-        criancas: s.criancas, ajuda: s.ajuda, energia: s.energia
-      }));
-    } catch (e) {}
-  }
-  function ultimaConsulta() {
-    var u = null;
-    try { u = JSON.parse(localStorage.getItem(CHAVE_ULTIMA)); } catch (e) {}
-    return (u && u.dia === M.hoje() && u.local && u.minutos) ? u : null;
-  }
-
-  function resumoSituacao(u) {
-    var s = cena.sit;
-    var local = M.LOCAIS.filter(function (l) { return l.v === u.local; })[0];
-    var tempo = Mo.temposDe().filter(function (t) { return t.v === u.minutos; })[0];
-    var partes = [local ? local.t : u.local];
-    partes.push(tempo ? tempo.t : M.duracao(u.minutos));
-    if (u.local === 'sitio' && s.tempo) {
-      partes.push({ sol: 'sol', calor: 'sol forte', nublado: 'nublado',
-        chuva_fina: 'chuva fina', chuva_forte: 'chuva forte' }[s.tempo] || s.tempo);
-      if (s.barro !== null) partes.push(s.barro ? 'barro' : 'chão firme');
-      partes.push(u.criancas && u.ajuda ? 'crianças e ajuda'
-        : u.criancas ? 'crianças' : u.ajuda ? 'com ajuda' : 'sozinho');
-    }
-    if (u.energia === 'pouca') partes.push('pouca energia');
-    return partes.join(' · ');
-  }
-
-  function marcacaoConfirma() {
-    var u = ultimaConsulta();
-    if (!u) { cena.fase = 'pergunta'; return marcacaoPergunta(); }
-    return '<div class="c-pergunta c-confirma">' +
-      '<p class="c-titulo">Há pouco:</p>' +
-      '<p class="c-frase-media c-confirma-resumo">' + esc(resumoSituacao(u)) + '</p>' +
-      '<button type="button" class="c-acao" data-acao="mesma-coisa">mesma coisa</button>' +
-      '<button type="button" class="c-bt c-bt-largo" data-acao="mudou">mudou</button>' +
-      '</div>';
-  }
-
-  /* Voltar para a tela inicial — não para a pergunta. Depois de um "não dá"
-     ou de um "tive que parar", cair de novo em "onde você está? quanto tempo?"
-     é reabrir a consulta que você acabou de encerrar. */
+  /* Voltar para a tela inicial, levando o que a regra tem a dizer (a compra
+     que ficou esperando, o projeto que mudou de vaga). */
   function voltarAoInicio() {
-    if (sair) return sair();
-    cena.fase = 'pergunta';
-    desenhar();
-  }
-
-  /* Se há tarefa ativa, abrir o app mostra ela — não a consulta (§8). */
-  function responder() {
-    if (M.tarefaAtivaDe(EU)) { cena.fase = 'ativa'; return; }
-    if (M.diaEncerradoPara(EU)) { cena.fase = 'encerrado'; return; }
+    var aviso = cena.avisoPendente || '';
+    cena.avisoPendente = '';
+    cena.rascunho = {};
+    if (sair) return sair(aviso);
   }
 
   // ── utilidades ────────────────────────────────────────────────────
@@ -128,166 +46,14 @@ var Campo = (function () {
       .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
   }
 
-  function linha(rotulo, botoes) {
-    return '<div class="c-linha"><span class="c-rotulo">' + esc(rotulo) + '</span>' +
-      '<div class="c-botoes">' + botoes + '</div></div>';
-  }
-
-  function botao(campo, valor, texto, ligado) {
-    return '<button type="button" class="c-bt' + (ligado ? ' c-bt-on' : '') +
-      '" data-campo="' + campo + '" data-valor="' + esc(valor) + '">' + esc(texto) + '</button>';
-  }
-
-  // ── a pergunta (§5) ───────────────────────────────────────────────
-
-  function marcacaoPergunta() {
-    var s = cena.sit;
-    var partes = [];
-
-    /* "Fora" saiu da consulta (§51): rua não se sorteia, se lista — a folha da
-       rua é o caminho, pelo botão "vai sair?" da entrada. Aqui ficam os dois
-       lugares onde a situação decide a tarefa. */
-    partes.push(linha('Onde você está?',
-      M.LOCAIS.filter(function (l) { return l.v !== 'fora'; }).map(function (l) {
-        return botao('local', l.v, l.t, s.local === l.v);
-      }).join('')));
-
-    if (!s.local) return envolver(partes.join(''), false);
-
-    partes.push(linha('Quanto tempo?',
-      Mo.temposDe().map(function (t) {
-        return botao('minutos', t.v, t.t, s.minutos === t.v);
-      }).join('')));
-
-    /* Poda: fora e computador encerram a sequência. Clima, chão, companhia e
-       energia não mudam nada quando o trabalho é um telefonema. */
-    if (s.local === 'sitio') {
-      var jaTem = !!M.climaDeHoje();
-      if (cena.assumida && !cena.trocarClima && !jaTem) {
-        // o clima vem assumido da previsão; trocar é um toque
-        partes.push('<div class="c-linha"><span class="c-rotulo">Previsão para hoje</span>' +
-          '<div class="c-assumida"><span class="c-assumida-valor">' +
-            esc(cena.assumida.temp + '° · ' + cena.assumida.rotulo) + '</span>' +
-          '<button type="button" class="c-bt" data-acao="trocar-clima">não é isso?</button></div></div>');
-      } else {
-        partes.push(linha(jaTem ? 'O tempo mudou?' : 'Como está o tempo?',
-          [['sol', 'sol'], ['calor', 'sol forte · calor'], ['nublado', 'nublado'], ['chuva_fina', 'chuva fina'], ['chuva_forte', 'chuva forte']]
-            .map(function (p) { return botao('tempo', p[0], p[1], s.tempo === p[0]); }).join('')));
-      }
-
-      // chuva forte hoje implica barro e a pergunta some
-      if (s.tempo && s.tempo !== 'chuva_forte') {
-        partes.push(linha('Dá para pisar e rodar?',
-          botao('barro', 'nao', 'firme', s.barro === false) +
-          botao('barro', 'sim', 'barro', s.barro === true)));
-      }
-
-      partes.push(linha('Comigo',
-        botao('sozinho', '1', 'sozinho', !s.criancas && !s.ajuda) +
-        botao('criancas', '1', 'crianças', s.criancas) +
-        botao('ajuda', '1', 'ajuda', s.ajuda)));
-    }
-
-    partes.push(linha('Energia',
-      botao('energia', 'normal', 'normal', s.energia === 'normal') +
-      botao('energia', 'pouca', 'pouca', s.energia === 'pouca')));
-
-    var pronto = s.local && s.minutos && (s.local !== 'sitio' || (s.tempo && s.barro !== null));
-    return envolver(partes.join(''), pronto);
-  }
-
-  function envolver(html, pronto) {
-    return '<div class="c-pergunta">' + html +
-      '<button type="button" class="c-acao" data-acao="consultar"' +
-      (pronto ? '' : ' disabled') + '>o que eu faço</button></div>';
-  }
-
-  // ── a resposta ────────────────────────────────────────────────────
-
-  function marcacaoResposta() {
-    var r = cena.resp;
-    if (!r) return '';
-
-    if (r.vazio === 'dia_encerrado') return marcacaoEncerrado();
-
-    if (r.vazio) {
-      var molhar = Mo.temSegundaChamada(cena.sit);
-      return '<div class="c-vazio">' +
-        (cena.aviso ? '<p class="c-nota c-aviso">' + esc(cena.aviso) + '</p>' : '') +
-        '<p class="c-frase-media">Nada que caiba nessa situação.</p>' +
-        (molhar
-          ? '<button type="button" class="c-acao" data-acao="molhar">Nada limpo nessa situação. Isto dá, mas você vai se molhar.</button>'
-          : '') +
-        (r.temSegundaPorta
-          ? '<button type="button" class="c-porta" data-acao="segunda-porta">quero fazer mais</button>'
-          : '') +
-        '<button type="button" class="c-voltar" data-acao="reabrir">mudar a situação</button>' +
-        '</div>';
-    }
-
-    var t = r.tarefa;
-    var proj = t.projetoId ? M.projeto(t.projetoId) : null;
-    var recado = M.recadoDe(t.id);
-
-    /* §8 — o restante zerou sem você dizer "terminei". Pergunta uma vez.
-       Estimativa errada é normal e não gera nada. */
-    if (M.restanteDe(t.id) <= 0 && t.podeParar) {
-      return caixa('Acabou, ou faltou mais do que parecia?',
-        '<p class="c-frase-media">' + esc(t.texto) + '</p>' +
-        '<button type="button" class="c-bt c-bt-largo" data-acao="zerou-acabou">acabou</button>' +
-        '<button type="button" class="c-bt c-bt-largo" data-acao="zerou-faltou">faltou mais</button>');
-    }
-
-    return [
-      '<div class="c-resposta">',
-        // a cascata que a tarefa anterior disparou: dita uma vez, aqui mesmo
-        cena.aviso ? '<p class="c-nota c-aviso">' + esc(cena.aviso) + '</p>' : '',
-        '<p class="c-frase">' + esc(t.texto) + '</p>',
-        // o estado volta para a tela: você lê onde parou antes de decidir
-        recado ? '<p class="c-recado">' + esc(recado) + '</p>' : '',
-        '<p class="c-meta">',
-          proj ? esc(proj.resultado || proj.nome) + '<br>' : '',
-          esc(encaixe(t)),
-          t.onde ? '<br>' + esc(t.onde) : '',
-          // "vencido" é palavra proibida (§16): é informação, não veredito
-          r.faixa === 2 ? '<br>rotina · já passou da hora' : '',
-          r.guardada ? '<br>guardado para dia de chuva' : '',
-          r.molhada ? '<br>isto dá, mas você vai se molhar' : '',
-        '</p>',
-        ((t.ferramentas || []).length || (t.materiais || []).length)
-          ? '<details class="c-kit"><summary>o que levar</summary><ul>' +
-            (t.ferramentas || []).concat(t.materiais || []).map(function (x) {
-              return '<li>' + esc(x) + '</li>'; }).join('') +
-            '</ul></details>'
-          : '',
-        // antes de aceitar também vale: às vezes você confere onde a obra
-        // parou justamente para decidir se topa
-        t.projetoId ? '<button type="button" class="c-trilha-link" data-acao="ver-trilha">o projeto até aqui</button>' : '',
-        '<button type="button" class="c-acao" data-acao="vamos">vamos</button>',
-        '<div class="c-recusas">',
-          '<button type="button" class="c-recusa" data-acao="nao-da">não dá</button>',
-          '<button type="button" class="c-recusa" data-acao="nao-quero">não quero</button>',
-        '</div>',
-      '</div>'
-    ].join('');
-  }
-
-  function encaixe(t) {
-    var restante = M.restanteDe(t.id);
-    var disp = cena.sit.minutos;
-    if (!t.podeParar || restante <= disp) return 'dá para terminar hoje';
-    return 'cabem ~' + M.duracao(disp) + ' · faltam ~' + M.duracao(restante - disp) + ' depois';
-  }
-
   // ── tarefa ativa (§8) ─────────────────────────────────────────────
 
-  /* A RESPOSTA é quase vazia de propósito — ela existe para você decidir. A
-     tarefa ACEITA é outra coisa: é a folha de trabalho, e aqui o plano inteiro
-     tem que estar à mão. Esconder o que levar depois do "vamos" jogaria fora
+  /* A tarefa ACEITA é a folha de trabalho, e aqui o plano inteiro tem que
+     estar à mão. Esconder o que levar depois do "vamos" jogaria fora
      justamente o trabalho de planejamento que a tarefa custou. */
   function marcacaoAtiva() {
     var t = M.tarefaAtivaDe(EU);
-    if (!t) { cena.fase = 'pergunta'; return marcacaoPergunta(); }
+    if (!t) return '';
 
     var recado = M.recadoDe(t.id);
     var proj = t.projetoId ? M.projeto(t.projetoId) : null;
@@ -301,7 +67,7 @@ var Campo = (function () {
       '<div class="c-trabalho">',
         '<p class="c-frase">' + esc(t.texto) + '</p>',
         recado ? '<p class="c-recado">' + esc(recado) + '</p>' : '',
-        '<p class="c-meta">em andamento · faltam ~' + esc(M.duracao(M.restanteDe(t.id))) +
+        '<p class="c-meta">em andamento' +
           (proj ? '<br>' + esc(proj.nome || 'projeto sem nome') : '') + '</p>',
 
         '<div class="c-ficha">',
@@ -309,7 +75,6 @@ var Campo = (function () {
           t.compra ? fichaLista('comprar', t.compras, t.id) : '',
           fichaLista('ferramentas', t.ferramentas, t.id),
           fichaLista('materiais', t.materiais, t.id),
-          fichaLinha('condições', condicoesDe(t)),
           fichaLinha('libera', libera.map(function (o) { return o.texto; }).join(' · ')),
         '</div>',
 
@@ -319,6 +84,7 @@ var Campo = (function () {
         '<button type="button" class="c-acao" data-acao="terminei">terminei</button>',
         '<div class="c-recusas">',
           '<button type="button" class="c-recusa" data-acao="parar">parei por agora</button>',
+          '<button type="button" class="c-recusa" data-acao="nao-da">não dá</button>',
           '<button type="button" class="c-recusa" data-acao="encerrar">encerrar</button>',
         '</div>',
       '</div>'
@@ -332,7 +98,7 @@ var Campo = (function () {
      responde para que serve o dado que você está gerando agora. */
   function marcacaoProjeto() {
     var t = cena.alvo && M.tarefa(cena.alvo);
-    if (!t) { cena.fase = cena.voltarPara || 'pergunta'; return desenhar(); }
+    if (!t) { cena.fase = 'ativa'; return marcacaoAtiva(); }
 
     var proj = t.projetoId ? M.projeto(t.projetoId) : null;
     var passos = proj ? M.historicoDe(proj.id) : [];
@@ -386,9 +152,9 @@ var Campo = (function () {
     ].join('');
   }
 
-  /* A ficha de uma tarefa passada: o que foi levado, onde foi, em que condições
-     e tudo que você anotou nela — inclusive as anotações de sessões anteriores,
-     quando ela foi feita em pedaços. */
+  /* A ficha de uma tarefa passada: o que foi levado, onde foi e tudo que você
+     anotou nela — inclusive as anotações de sessões anteriores, quando ela foi
+     feita em pedaços. */
   function fichaDaPegada(p) {
     var t = p.tarefa;
     var local = M.LOCAIS.filter(function (l) { return l.v === t.ondePrecisaEstar; })[0];
@@ -399,11 +165,9 @@ var Campo = (function () {
        linha ausente parecia informação que o app não tinha. */
     return '<div class="pegada-ficha">' +
       fichaLinha('onde', [local ? local.t : '', t.onde].filter(Boolean).join(' · ')) +
-      fichaLinha('levou', M.duracao(t.duracaoTotal)) +
       (t.compra && (t.compras || []).length ? fichaLista('comprou', t.compras) : '') +
       ((t.ferramentas || []).length ? fichaLista('ferramentas', t.ferramentas) : fichaLinha('ferramentas', '—')) +
       ((t.materiais || []).length ? fichaLista('materiais', t.materiais) : fichaLinha('materiais', '—')) +
-      fichaLinha('condições', condicoesDe(t)) +
       (notas.length > 1
         ? '<div class="c-ficha-linha"><span class="c-ficha-rotulo">anotações</span>' +
           '<ul class="c-ficha-itens">' + notas.map(function (n) {
@@ -440,28 +204,10 @@ var Campo = (function () {
       }).join('') + '</ul></div>';
   }
 
-  function condicoesDe(t) {
-    var c = [];
-    if (t.exigeClima === 'firme') c.push('só com tempo firme');
-    if (t.exigeClima === 'tolera_chuva_fina') c.push('tolera chuva fina');
-    if (t.exigeSoloFirme) c.push('precisa de chão firme');
-    if (t.precisaAjuda) c.push('precisa de ajuda');
-    if (t.perigosaComCriancas) c.push('perigosa com crianças');
-    if (!t.podeParar) c.push('não pode parar no meio');
-    return c.join(' · ');
-  }
-
   // ── parar: duas naturezas ─────────────────────────────────────────
 
   function marcacaoParar() {
-    var passo = cena.rascunho.passo || 'avanco';
-
-    if (passo === 'avanco') {
-      return caixa('Quanto andou?',
-        botao('avanco', 'pouco', 'pouco') +
-        botao('avanco', 'metade', 'metade') +
-        botao('avanco', 'quase_tudo', 'quase tudo'));
-    }
+    var passo = cena.rascunho.passo || 'natureza';
 
     if (passo === 'natureza') {
       return caixa('Por que parou?',
@@ -486,26 +232,6 @@ var Campo = (function () {
       }).join('') +
       '<textarea class="c-campo" id="cNota" rows="2" placeholder="detalhe, se quiser"></textarea>') +
       '<p class="c-nota">Isto é você corrigindo o app. Não custa o dia.</p>';
-  }
-
-  // ── não quero (§9) ────────────────────────────────────────────────
-
-  function marcacaoNaoQuero() {
-    return caixa('O que houve?',
-      '<textarea class="c-campo" id="cQuero" rows="4" placeholder="escreva com suas palavras"></textarea>' +
-      '<button type="button" class="c-acao" data-acao="confirmar-nao-quero">pronto</button>') +
-      '<p class="c-nota">Cala o app por três horas. Nada é oferecido nesse tempo.</p>';
-  }
-
-  /* "Não quero" cala o app por três horas, não pelo resto do dia: o custo
-     continua caro o bastante para impedir percorrer, sem fazer uma recusa às
-     onze da noite cobrar a manhã seguinte. */
-  function marcacaoEncerrado() {
-    var volta = M.voltaAOferecerEm(EU);
-    return '<div class="c-vazio">' +
-      '<p class="c-frase-media">Por agora é isso.</p>' +
-      (volta ? '<p class="c-meta">volta a oferecer às ' + esc(M.horaDe(volta)) + '</p>' : '') +
-      '</div>';
   }
 
   /* Encerrar é ação de primeira classe (regra 9) e merece a mesma caixa das
@@ -537,77 +263,41 @@ var Campo = (function () {
       '<button type="button" class="c-voltar" data-acao="cancelar">voltar</button></div>';
   }
 
+  function marcacaoListar() {
+    var c = cena.listar;
+    if (!c) { cena.fase = 'ativa'; return marcacaoAtiva(); }
+    return '<div class="c-caixa">' +
+      '<p class="c-titulo">O que comprar?</p>' +
+      '<p class="c-nota" style="text-align:left;margin:0 0 14px">A compra <b>' +
+        esc(c.texto || 'sem nome') + '</b> espera a lista. Um item por linha — pode ditar. ' +
+        'Dá para completar depois, na mesa.</p>' +
+      '<textarea class="c-campo" id="cListar" rows="5" placeholder="6 tábuas de peroba 3 m&#10;2 dobradiças reforçadas"></textarea>' +
+      '<button type="button" class="c-acao" data-acao="confirmar-listar">guardar a lista</button>' +
+      '<button type="button" class="c-bt c-bt-largo" data-acao="pular-listar">depois, na mesa</button>' +
+      '</div>';
+  }
+
   // ── desenho ───────────────────────────────────────────────────────
 
   function desenhar() {
     M.usoTela('campo:' + cena.fase);
     var html =
-      cena.fase === 'pergunta'  ? marcacaoPergunta()
-    : cena.fase === 'confirma'  ? marcacaoConfirma()
-    : cena.fase === 'resposta'  ? marcacaoResposta()
-    : cena.fase === 'ativa'     ? marcacaoAtiva()
+      cena.fase === 'ativa'     ? marcacaoAtiva()
     : cena.fase === 'parar'     ? marcacaoParar()
     : cena.fase === 'naoda'     ? marcacaoNaoDa()
-    : cena.fase === 'naoquero'  ? marcacaoNaoQuero()
     : cena.fase === 'terminar'  ? marcacaoTerminar()
     : cena.fase === 'encerrar'  ? marcacaoEncerrar()
     : cena.fase === 'listar'    ? marcacaoListar()
     : cena.fase === 'projeto'   ? marcacaoProjeto()
-    : cena.fase === 'encerrado' ? marcacaoEncerrado()
     : '';
     $.innerHTML = '<div class="c-tela">' + html + '</div>';
   }
 
   // ── eventos ───────────────────────────────────────────────────────
 
-  function marcar(campo, valor) {
-    var s = cena.sit;
-    if (campo === 'local')   { s.local = valor; s.minutos = null; }
-    if (campo === 'minutos') s.minutos = Number(valor);
-    if (campo === 'tempo')   {
-      s.tempo = valor;
-      if (valor === 'chuva_forte') s.barro = true;    // chuva forte implica barro
-      else if (s.barro === true) s.barro = null;
-    }
-    if (campo === 'barro')   s.barro = (valor === 'sim');
-    if (campo === 'sozinho') { s.criancas = false; s.ajuda = false; }
-    if (campo === 'criancas') s.criancas = !s.criancas;
-    if (campo === 'ajuda')    s.ajuda = !s.ajuda;
-    if (campo === 'energia')  s.energia = valor;
-    if (campo === 'avanco')   { cena.rascunho.avanco = valor; cena.rascunho.passo = 'natureza'; }
-    desenhar();
-  }
-
-  /* O clima é registro do dia: a primeira resposta grava, e "o tempo mudou?"
-     regrava quando a resposta é outra — antes a segunda resposta era lida e
-     jogada fora. */
-  function consultar() {
-    var s = cena.sit;
-    if (s.local === 'sitio' && s.tempo) {
-      var c = M.climaDeHoje();
-      if (!c || c.tempo !== s.tempo || !!c.barro !== !!s.barro) M.registrarClima(EU, s.tempo, s.barro);
-    }
-    cena.aviso = '';
-    guardarConsulta(s);
-    cena.resp = Mo.escolher(s);
-    // a segunda chamada vale para UMA resposta: a próxima volta a ser limpa
-    s.segundaChamada = false;
-    registrarOferta();
-    cena.fase = cena.resp.ativa ? 'ativa' : 'resposta';
-    desenhar();
-  }
-
-  /* Guardada mesmo quando repete: a oferta gruda para a reconsulta não virar
-     um jeito de escolher, e a contagem de repetições é material da revisão. */
-  function registrarOferta() {
-    if (cena.resp && cena.resp.tarefa) M.ofertar(EU, cena.resp.tarefa.id);
-  }
-
   function agir(acao, el) {
-    var t = cena.resp && cena.resp.tarefa;
     var ativa = M.tarefaAtivaDe(EU);
 
-    if (acao === 'consultar') return consultar();
     if (acao === 'confirmar-listar') {
       var linhasL = (($.querySelector('#cListar') || {}).value || '').split('\n');
       if (cena.listar && linhasL.some(function (x) { return x.trim(); })) {
@@ -616,44 +306,16 @@ var Campo = (function () {
         cena.avisoPendente = 'A lista de "' + (cena.listar.texto || 'compra') + '" ficou guardada.';
       }
       cena.listar = null;
-      return depoisDeFechar();
+      return voltarAoInicio();
     }
-    if (acao === 'pular-listar') { cena.listar = null; return depoisDeFechar(); }
-    if (acao === 'mesma-coisa') {
-      var u = ultimaConsulta();
-      if (!u) { cena.fase = 'pergunta'; return desenhar(); }
-      var s2 = cena.sit;
-      s2.local = u.local; s2.minutos = u.minutos;
-      s2.criancas = !!u.criancas; s2.ajuda = !!u.ajuda; s2.energia = u.energia || 'normal';
-      return consultar();
-    }
-    if (acao === 'mudou') { cena.fase = 'pergunta'; return desenhar(); }
-    if (acao === 'trocar-clima') { cena.trocarClima = true; cena.sit.tempo = null; cena.sit.barro = null; return desenhar(); }
-    if (acao === 'reabrir')   { cena.fase = 'pergunta'; return desenhar(); }
-    if (acao === 'cancelar')  { cena.rascunho = {}; cena.fase = ativa ? 'ativa' : 'resposta'; return desenhar(); }
+    if (acao === 'pular-listar') { cena.listar = null; return voltarAoInicio(); }
+    if (acao === 'cancelar')  { cena.rascunho = {}; cena.fase = 'ativa'; return desenhar(); }
 
-    if (acao === 'molhar') {
-      cena.sit.segundaChamada = true;
-      return consultar();
-    }
-    if (acao === 'segunda-porta') {
-      var extra = Mo.escolherSegundaPorta(cena.sit);
-      cena.resp = extra ? { tarefa: extra, faixa: 3 } : { vazio: 'nada' };
-      return desenhar();
-    }
-
-    if (acao === 'vamos' && t) {
-      M.iniciar(EU, t.id);
-      cena.fase = 'ativa';
-      return desenhar();
-    }
-
-    /* Sempre o projeto da tarefa que está na mão — antes de aceitar, para
-       decidir se topa, ou durante, para lembrar o que já foi decidido. Nunca
-       vira navegação: não há como chegar em outro projeto por aqui. */
+    /* Sempre o projeto da tarefa que está na mão — para lembrar o que já foi
+       decidido. Nunca vira navegação: não há como chegar em outro projeto
+       por aqui. */
     if (acao === 'ver-trilha') {
-      cena.alvo = (ativa || t) ? (ativa || t).id : null;
-      cena.voltarPara = cena.fase;
+      cena.alvo = ativa ? ativa.id : null;
       cena.pegada = null;
       cena.fase = 'projeto';
       return desenhar();
@@ -664,7 +326,7 @@ var Campo = (function () {
       return desenhar();
     }
     if (acao === 'fechar-trilha') {
-      cena.fase = cena.voltarPara || (ativa ? 'ativa' : 'resposta');
+      cena.fase = 'ativa';
       return desenhar();
     }
 
@@ -682,30 +344,20 @@ var Campo = (function () {
       return depoisDeTerminar(tidFeita);
     }
 
-    if (acao === 'zerou-acabou' && t) { M.terminar(EU, t.id, ''); return depoisDeTerminar(t.id); }
-    if (acao === 'zerou-faltou' && t) {
-      M.devolverTempo(EU, t.id, Math.round(t.duracaoTotal * 0.25));
-      return depoisDeFechar();
-    }
-
-    if (acao === 'parar')  { cena.rascunho = { passo: 'avanco' }; cena.fase = 'parar'; return desenhar(); }
+    if (acao === 'parar')  { cena.rascunho = { passo: 'natureza' }; cena.fase = 'parar'; return desenhar(); }
     if (acao === 'parou-saiu' && ativa) {
-      // a vida aconteceu: grava o avanço e cala a boca. Nada é oferecido —
-      // você não está mais aqui. Volta para a tela inicial, não para a pergunta.
-      M.parar(EU, ativa.id, cena.rascunho.avanco, 'saiu', '');
+      // a vida aconteceu: grava e cala a boca. Volta para a tela inicial.
+      M.parar(EU, ativa.id, null, 'saiu', '');
       M.limparKit(ativa.id);
-      cena.rascunho = {};
-      cena.resp = null;
       return voltarAoInicio();
     }
     if (acao === 'parou-travou') { cena.rascunho.passo = 'linha'; return desenhar(); }
     if (acao === 'confirmar-travou' && ativa) {
       var linhaTexto = ($.querySelector('#cLinha') || {}).value || '';
       if (!linhaTexto.trim()) return;
-      M.parar(EU, ativa.id, cena.rascunho.avanco, 'travou', linhaTexto.trim());
+      M.parar(EU, ativa.id, null, 'travou', linhaTexto.trim());
       M.limparKit(ativa.id);
-      cena.rascunho = {};
-      return depoisDeFechar();       // registrado; agora sim outra frente
+      return voltarAoInicio();       // registrado; a tarefa de pensar já está no leque
     }
 
     if (acao === 'encerrar' && ativa) { cena.fase = 'encerrar'; return desenhar(); }
@@ -714,31 +366,16 @@ var Campo = (function () {
       if (!motivoEnc.trim()) return;
       M.encerrar(EU, ativa.id, motivoEnc.trim());
       M.limparKit(ativa.id);
-      return depoisDeFechar();
-    }
-
-    if (acao === 'nao-da')    { cena.fase = 'naoda'; return desenhar(); }
-    /* O destrave nasce agora e, se couber na situação, é a próxima coisa
-       oferecida (§9). Fora isso — já fiz, tempo virou, demora mais, outro, ou
-       destrave que não cabe aqui —, a consulta acabou: volta à tela inicial,
-       não à pergunta. */
-    if (acao === 'motivo' && t) {
-      var nota = ($.querySelector('#cNota') || {}).value || '';
-      var ev = M.naoDeu(EU, t.id, el.getAttribute('data-valor'), nota.trim());
-      var destrave = ev.tarefaNova && Mo.elegiveis(cena.sit, new Date()).some(function (x) { return x.id === ev.tarefaNova.id; });
-      if (destrave) return depoisDeFechar();
-      cena.rascunho = {};
-      cena.resp = null;
       return voltarAoInicio();
     }
 
-    if (acao === 'nao-quero') { cena.fase = 'naoquero'; return desenhar(); }
-    if (acao === 'confirmar-nao-quero' && t) {
-      var texto = ($.querySelector('#cQuero') || {}).value || '';
-      if (!texto.trim()) return;
-      M.naoQuero(EU, t.id, texto.trim());
-      cena.fase = 'encerrado';
-      return desenhar();
+    if (acao === 'nao-da')    { cena.fase = 'naoda'; return desenhar(); }
+    /* O destrave nasce agora e já aparece no leque; a consulta acaba: volta à
+       tela inicial. */
+    if (acao === 'motivo' && ativa) {
+      var notaMotivo = ($.querySelector('#cNota') || {}).value || '';
+      M.naoDeu(EU, ativa.id, el.getAttribute('data-valor'), notaMotivo.trim());
+      return voltarAoInicio();
     }
   }
 
@@ -747,48 +384,13 @@ var Campo = (function () {
   function depoisDeTerminar(tid) {
     var vazias = M.comprasVaziasDependentesDe(tid);
     if (vazias.length) { cena.listar = vazias[0]; cena.fase = 'listar'; return desenhar(); }
-    return depoisDeFechar();
-  }
-
-  function marcacaoListar() {
-    var c = cena.listar;
-    if (!c) { cena.fase = 'pergunta'; return marcacaoPergunta(); }
-    return '<div class="c-caixa">' +
-      '<p class="c-titulo">O que comprar?</p>' +
-      '<p class="c-nota" style="text-align:left;margin:0 0 14px">A compra <b>' +
-        esc(c.texto || 'sem nome') + '</b> espera a lista. Um item por linha — pode ditar. ' +
-        'Dá para completar depois, na mesa.</p>' +
-      '<textarea class="c-campo" id="cListar" rows="5" placeholder="6 tábuas de peroba 3 m&#10;2 dobradiças reforçadas"></textarea>' +
-      '<button type="button" class="c-acao" data-acao="confirmar-listar">guardar a lista</button>' +
-      '<button type="button" class="c-bt c-bt-largo" data-acao="pular-listar">depois, na mesa</button>' +
-      '</div>';
-  }
-
-  /* Depois de fechar uma tarefa o app já traz a próxima — é isso que ocupa a
-     janela de trinta segundos em que a saída seria automática. */
-  function depoisDeFechar() {
-    cena.rascunho = {};
-    // o que a tarefa fechada moveu de vaga é dito uma vez, na próxima tela —
-    // somado ao que já ia ser dito (as esperas da compra), não por cima
-    var aviso = cena.avisoPendente || '';
-    cena.avisoPendente = '';
-    cena.aviso = aviso + (aviso ? ' ' : '') + M.avisosDeCascata().map(function (m) {
-      return m.vaga === 'planejadas'
-        ? (m.projeto.nome || 'O projeto') + ' fechou o planejamento e espera você pôr em execução.'
-        : (m.projeto.nome || 'Um projeto') + ' assume a vaga de ' + m.vaga + '.';
-    }).join(' ');
-    cena.resp = Mo.escolher(cena.sit);
-    registrarOferta();
-    cena.fase = cena.resp.ativa ? 'ativa' : 'resposta';
-    desenhar();
+    return voltarAoInicio();
   }
 
   function ligar(raiz) {
     raiz.addEventListener('click', function (e) {
       var bt = e.target.closest('[data-acao]');
       if (bt) return agir(bt.getAttribute('data-acao'), bt);
-      var op = e.target.closest('[data-campo]');
-      if (op) return marcar(op.getAttribute('data-campo'), op.getAttribute('data-valor'));
     });
   }
 
