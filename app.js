@@ -217,7 +217,11 @@
 
     $lista.innerHTML = linhas.join('');
 
-    var av = M.avulsas();
+    // só o que falta fazer: feitas e canceladas não entram na conta
+    var av = M.avulsas().filter(function (t) {
+      var e = M.estadoDe(t.id);
+      return e !== 'feita' && e !== 'encerrada';
+    });
     $avulsas.innerHTML = itemSimples('avulsas', 'Tarefas sem projeto', av.length ? String(av.length) : 'nenhuma');
 
     var abertas = M.pendenciasAbertas();
