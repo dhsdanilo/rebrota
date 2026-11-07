@@ -1720,8 +1720,13 @@
     var vistos = ids.slice(0, 3), resto = ids.length - vistos.length;
     return vistos.map(function (d, i) {
       var feita = M.estadoDe(d) === 'feita';
+      // a miniatura espelha o estado da precedente: feita, livre ou também esperando
+      var presa = !feita && (M.tarefa(d).dependeDe || []).some(function (x) {
+        return M.tarefa(x) && M.estadoDe(x) !== 'feita' && M.estadoDe(x) !== 'encerrada';
+      });
       var rot = numeros && numeros[d] ? String(numeros[d]) : (feita ? '✓' : '·');
-      return '<span class="pre' + (feita ? ' pre-feita' : '') + (rot.length > 1 ? ' pre-largo' : '') +
+      return '<span class="pre ' + (feita ? 'pre-feita' : presa ? 'pre-espera' : 'pre-livre') +
+        (rot.length > 1 ? ' pre-largo' : '') +
         '" style="z-index:' + (9 - i) + '" title="depois de: ' + esc(M.tarefa(d).texto || 'sem texto') + '">' +
         esc(rot) + '</span>';
     }).join('') + (resto > 0 ? '<span class="pre pre-mais" style="z-index:5">+' + resto + '</span>' : '');
@@ -1742,6 +1747,7 @@
     // Em consulta também não: arrastar reordena e muda etapa, e isso é escrita.
     var arrasta = !aberto && !emConsulta(t.projetoId);
     return '<li class="passo passo-' + situacao + (pronta ? ' passo-pronta' : '') +
+      (esperando ? ' passo-presa' : '') +
       (t.tipo === 'compra' ? ' passo-compra' : '') +
       (aberto ? ' passo-aberto' : '') +
       '" draggable="' + (arrasta ? 'true' : 'false') + '" data-tarefa="' + t.id + '">' +

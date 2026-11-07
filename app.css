@@ -2,17 +2,17 @@
    Paleta e tipografia da §15 da spec. Postura de mesa: densa, duas mãos. */
 
 :root {
-  --breu:          #0F1A17;
-  --mata:          #182823;
-  --musgo:         #26403A;
-  --neblina:       #CDD8D1;
-  --neblina-fraca: #7C9189;
-  --rebrota:       #BFD44A;
+  --breu:          #181A1B;
+  --mata:          #232627;
+  --musgo:         #33383A;
+  --neblina:       #D9DDDD;
+  --neblina-fraca: #8A9395;
+  --rebrota:       #4CC47A;
 
   /* A casca do toco, e agora também a cor do TEXTO em destaque. A divisão é
      clara: verde para contorno, ícone e ação; casca para a palavra que precisa
      saltar. Duas famílias, dois trabalhos — nenhuma delas disputa com a outra. */
-  --casca:         #C08A66;
+  --casca:         #C9B79C;
 
   /* Exceção cercada: as únicas cores de alarme do sistema, e elas existem só
      na tela de Aguardando. A cobrança ali é sobre a entrega de terceiro, não
@@ -376,7 +376,7 @@ select option { background: var(--mata); color: var(--neblina); }
   color: var(--neblina-fraca); font-weight: normal; margin: 14px 0 6px;
 }
 .sitio-tarefas { list-style: none; margin: 0; padding: 0; }
-.sitio-tarefas li { padding: 7px 0; border-top: 1px solid rgba(38,64,58,.6); font-size: 15px; display: flex; flex-direction: column; gap: 2px; }
+.sitio-tarefas li { padding: 7px 0; border-top: 1px solid rgba(51,56,58,.6); font-size: 15px; display: flex; flex-direction: column; gap: 2px; }
 .sitio-tarefas li em { font-family: var(--mono); font-style: normal; font-size: 11px; color: var(--neblina-fraca); }
 .sitio-corpo .trilha { margin-top: 6px; }
 .sitio-texto { margin: 0; font-size: 14px; }
@@ -406,7 +406,7 @@ select option { background: var(--mata); color: var(--neblina); }
 .muda-oquee { font-family: var(--display); font-size: 20px; margin: 0; color: var(--neblina); }
 .cadeias-conta { display: block; font-family: var(--mono); font-size: 11px; color: var(--neblina-fraca); margin-bottom: 8px; }
 .cadeias { list-style: none; margin: 0; padding: 0; }
-.cadeia { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 4px; padding: 6px 0; border-top: 1px solid rgba(38,64,58,.6); }
+.cadeia { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 4px; padding: 6px 0; border-top: 1px solid rgba(51,56,58,.6); }
 .cadeia:first-child { border-top: 0; }
 .cadeia-nova { border-top: 1px dashed var(--musgo); }
 .elo { font-size: 14px; padding: 6px 9px; max-width: 100%; width: auto; flex: 0 1 auto; }
@@ -582,7 +582,7 @@ body.rua-arrastando, body.rua-arrastando * { cursor: grabbing; }
   .na-rua .rua-feita {
     width: 100%; min-height: 54px; padding: 10px 16px;
     font-size: 19px; font-weight: 600;
-    background: var(--rebrota); color: #0F1A17; border: 2px solid #8EA22C; border-radius: 8px;
+    background: var(--rebrota); color: #07210F; border: 2px solid #2F8F55; border-radius: 8px;
   }
   .na-rua .rua-pegando { border-radius: 10px; border-top-color: transparent; padding-left: 8px; padding-right: 8px; }
   .na-rua .rua-nada { font-size: 17px; }
@@ -618,7 +618,7 @@ body.rua-arrastando, body.rua-arrastando * { cursor: grabbing; }
   .rua-clara .rua-risca { color: #111; border-color: #B9B2A4; background: #fff; }
   .rua-clara .rua-risca i { border-color: #777; }
   .rua-clara .rua-risca-on { color: #8A8378; }
-  .rua-clara .rua-risca-on i { border-color: #5F7016; color: #5F7016; }
+  .rua-clara .rua-risca-on i { border-color: #2F7A4A; color: #2F7A4A; }
 }
 
 /* ── tags (§44) ──────────────────────────────────────── */
@@ -1220,7 +1220,7 @@ body.rua-arrastando, body.rua-arrastando * { cursor: grabbing; }
   max-width: 620px;
 }
 
-.cond + .cond { border-top: 1px solid rgba(38, 64, 58, .5); }
+.cond + .cond { border-top: 1px solid rgba(51, 56, 58, .5); }
 
 .cond-rotulo {
   flex: 0 0 132px;
@@ -1457,7 +1457,7 @@ input[type="number"][readonly] { -moz-appearance: textfield; }
 
 .passo.passo-aberto {
   border-color: var(--rebrota);
-  box-shadow: 0 0 0 1px rgba(191, 212, 74, .18);
+  box-shadow: 0 0 0 1px rgba(76, 196, 122, .18);
 }
 
 .passo-feita .passo-texto,
@@ -1994,7 +1994,7 @@ input[type="number"][readonly] { -moz-appearance: textfield; }
   align-items: baseline;
 }
 
-.c-ficha-linha + .c-ficha-linha { border-top: 1px solid rgba(38, 64, 58, .55); }
+.c-ficha-linha + .c-ficha-linha { border-top: 1px solid rgba(51, 56, 58, .55); }
 
 .c-ficha-rotulo {
   flex: 0 0 96px;
@@ -2095,7 +2095,7 @@ input[type="number"][readonly] { -moz-appearance: textfield; }
   left: 8px;
   top: 8px;
   bottom: 22px;
-  border-left: 2px dashed rgba(192, 138, 102, .5);
+  border-left: 2px dashed rgba(201, 183, 156, .5);
 }
 
 .pegada { position: relative; padding: 0 0 24px; }
@@ -2423,22 +2423,27 @@ input[type="number"][readonly] { -moz-appearance: textfield; }
 /* §65c: precedentes no número da tarefa */
 .passo-ord { display: flex; align-items: flex-end; height: 26px; flex: 0 0 auto; }
 .passo-ord .passo-ordem { position: relative; z-index: 1; background: var(--mata); }
-.passo-ord .passo-ordem:not(.passo-ordem-fim):not(.passo-ordem-espera) { border-color: var(--neblina-fraca); color: var(--neblina); }
-.passo-ordem-espera { border-style: dashed; border-color: var(--musgo); color: var(--neblina-fraca); }
+.passo-ord .passo-ordem:not(.passo-ordem-fim):not(.passo-ordem-espera) {
+  background: var(--rebrota); border-color: transparent; color: #07210F; font-weight: 500;
+}
+.passo-ordem-espera { border-style: dashed; border-color: #4D5457; color: var(--neblina-fraca); }
 .pre {
   width: 17px; height: 17px; flex: 0 0 auto; margin-left: -6px; position: relative;
   display: inline-flex; align-items: center; justify-content: center;
-  border: 1px solid var(--casca); border-radius: 50%;
-  background: #2a2a22; color: var(--casca);
+  border-radius: 50%; box-sizing: border-box;
   font-family: var(--mono); font-size: 10.5px; line-height: 1;
   box-shadow: 0 0 0 1.5px var(--mata);
 }
 .pre + .pre { margin-left: -3px; }
 .pre-largo { width: auto; min-width: 17px; padding: 0 4px; border-radius: 9px; }
-.pre-feita { border-color: var(--musgo); color: var(--neblina-fraca); background: var(--mata); }
-.pre-mais { color: var(--neblina-fraca); border-style: dashed; }
+/* livre: miniatura do círculo cheio · espera: do tracejado · feita: apagado */
+.pre-livre { background: var(--rebrota); color: #07210F; border: none; font-weight: 500; }
+.pre-espera { background: var(--mata); color: var(--neblina); border: 1px dashed #4D5457; }
+.pre-feita { background: var(--mata); color: var(--neblina-fraca); border: 1px solid var(--musgo); }
+.pre-mais { background: var(--mata); color: var(--neblina-fraca); border: 1px dashed #4D5457; }
+.passo-presa { background: transparent; }
 /* §65: o passo sobre o qual o arrastado está parado — soltar aqui liga */
-.passo-alvo-vinculo { outline: 2px dashed var(--rebrota); outline-offset: -2px; background: rgba(120, 170, 90, .12); }
+.passo-alvo-vinculo { outline: 2px dashed var(--rebrota); outline-offset: -2px; background: rgba(76, 196, 122, .12); }
 .vitrine-nota {
   font-family: var(--mono); font-size: 10.5px; letter-spacing: .04em;
   color: var(--neblina-fraca); text-align: center; margin: 12px 0 0;
