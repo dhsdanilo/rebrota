@@ -2423,7 +2423,8 @@ input[type="number"][readonly] { -moz-appearance: textfield; }
 /* §65c: precedentes no número da tarefa */
 .passo-ord { display: flex; align-items: flex-end; height: 26px; flex: 0 0 auto; }
 .passo-ord .passo-ordem { position: relative; z-index: 1; background: var(--mata); }
-.passo-ordem-espera { border-style: dashed; border-color: var(--neblina-fraca); }
+.passo-ord .passo-ordem:not(.passo-ordem-fim):not(.passo-ordem-espera) { border-color: var(--neblina-fraca); color: var(--neblina); }
+.passo-ordem-espera { border-style: dashed; border-color: var(--musgo); color: var(--neblina-fraca); }
 .pre {
   width: 17px; height: 17px; flex: 0 0 auto; margin-left: -6px; position: relative;
   display: inline-flex; align-items: center; justify-content: center;
