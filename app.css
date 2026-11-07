@@ -2771,3 +2771,21 @@ body.ligando, body.ligando * { cursor: grabbing !important; user-select: none; }
 .custo-compacto .grade { order: 1; display: flex; flex-wrap: wrap; gap: 6px 28px; align-items: flex-end; max-width: none; }
 .custo-compacto .valor-lido.valor-dinheiro, .custo-compacto .cofre-saldo { font-size: 20px; }
 .custo-compacto .cofre { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+
+/* §73: menos ar entre as seções e nada de texto sobreposto em janela estreita */
+.palco-sub { margin-bottom: 14px; }
+.secao { margin-top: 22px; padding-top: 12px; }
+.secao-campos { margin-top: 12px; padding-top: 10px; }
+.palco-estado { align-items: baseline; }
+.palco-estado > * { min-width: 0; }
+.palco-prog { flex-wrap: wrap; }
+.palco-prog > span:last-child { white-space: nowrap; }
+.prog-barra { flex: 0 1 160px; min-width: 80px; }
+.palco-estado .barra-acoes { flex: 1 1 200px; }
+/* lista vazia: o "adicionar" no mesmo desenho do pé de lista */
+.passos-vazia + .rodape-acoes { margin-top: 8px; }
+.passos-vazia + .rodape-acoes .bt-fraco {
+  flex: 1; border: 1px dashed #4D5457; background: none; color: var(--neblina-fraca); padding: 10px;
+}
+.passos-vazia + .rodape-acoes .bt-fraco:hover { border-color: var(--rebrota); color: var(--rebrota); }
+.passos-nada { padding: 6px 4px; }

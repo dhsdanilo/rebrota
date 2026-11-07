@@ -1085,7 +1085,7 @@
 
     function caixa(campo, rotulo, valor, dica) {
       return '<div class="campo campo-largo"><label for="m_' + p.id + '_' + campo + '">' + esc(rotulo) + '</label>' +
-        '<textarea id="m_' + p.id + '_' + campo + '" rows="3" data-muda="' + campo + '" data-id="' + p.id + '"' +
+        '<textarea id="m_' + p.id + '_' + campo + '" rows="2" data-muda="' + campo + '" data-id="' + p.id + '"' +
         (editavel ? ' placeholder="' + esc(dica) + '"' : ' readonly placeholder="—"') + '>' + esc(valor) + '</textarea></div>';
     }
     function numero(campo, rotulo, valor, dica) {
@@ -1098,14 +1098,14 @@
 
     return [
       '<div class="secao secao-campos muda">',
-        '<div class="secao-titulo">Muda</div>',
+        '<div class="secao-titulo tem-ajuda" title="Lapidar a ideia até dar para decidir: toca ou muda o rumo. ' +
+          'É sobre motivação — como e quando são planejamento.">Muda</div>',
         '<div class="secao-corpo">',
           '<div class="muda-cabeca">' + cabeca + '</div>',
-          '<p class="dica muda-dica">Lapidar a ideia até dar para decidir: toca ou muda o rumo. É sobre motivação — como e quando são planejamento.</p>',
         '</div>',
       '</div>',
 
-      grupo('O que é', '',
+      p.nome ? '' : grupo('O que é', '',
         '<p class="muda-oquee">' + (p.nome ? esc(p.nome) : '<span class="aviso">escreva o nome lá em cima — a semente refinada numa coisa concreta</span>') + '</p>',
         'A semente refinada numa coisa concreta: "criar cabras" vira "construir um capril". É o nome da obra.'),
 
@@ -1295,7 +1295,8 @@
 
     return [
       '<h2>Projetos</h2>',
-      '<p class="palco-sub">' + esc(estadoDoFunil()) + '</p>',
+      (M.planejadas().filter(M.aptaParaExecucao).length || M.mudasVivas().some(M.mudaPronta)
+        ? '<p class="palco-sub">' + esc(estadoDoFunil()) + '</p>' : ''),
       '<div class="filtros">',
         botaoFiltro('', 'todos'),
         GRUPOS.map(function (g) { return botaoFiltro(g.chave, g.t); }).join(''),
@@ -1303,7 +1304,7 @@
       blocos || '<p class="aviso" style="margin-top:24px">Nada aqui.</p>',
       emConsultaGeral() ? '' :
       '<div class="rodape-acoes">' +
-        '<button type="button" class="bt-forte" data-acao="novo-projeto">novo projeto</button>' +
+        '<button type="button" class="bt-fraco bt-contorno" data-acao="novo-projeto">novo projeto</button>' +
       '</div>'
     ].join('');
   }
@@ -1677,7 +1678,6 @@
 
     return [
       '<h2>Tarefas sem projeto</h2>',
-      '<p class="palco-sub">O lastro do app: o que responde quando os projetos estão travados.</p>',
       '<div class="filtros">',
         botaoFiltroAvulsas('', 'todas'),
         FILTROS_AVULSAS.map(function (g) { return botaoFiltroAvulsas(g.chave, g.t); }).join(''),
@@ -2456,7 +2456,7 @@
 
     return [
       '<h2>Aguardando</h2>',
-      '<p class="palco-sub">O que depende de outro e tem data. Você vem aqui; isto nunca vai atrás de você. Espera aberta de dentro de uma tarefa segura a tarefa até chegar.</p>',
+      '<p class="palco-sub">O que depende de outro e tem data. Isto nunca vai atrás de você.</p>',
 
       '<div class="junta" style="max-width:900px">',
         '<input type="text" id="campoPendencia" placeholder="tela fina 1 m — agroloja">',
@@ -2740,7 +2740,7 @@
 
     return [
       '<h2>Sementes</h2>',
-      '<p class="palco-sub">A caixa de entrada das ideias. Nenhuma gera tarefa antes de virar muda ou tarefa avulsa.</p>',
+      '<p class="palco-sub">A caixa de entrada das ideias.</p>',
       '<div class="junta" style="max-width:900px">',
         '<input type="text" id="campoSemente" placeholder="escreva uma ideia">',
         '<button type="button" class="bt-forte" data-acao="nova-semente">guardar</button>',
