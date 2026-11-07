@@ -1885,7 +1885,13 @@
               ? '<button type="button" data-acao="separar-diarista" data-id="' + t.id + '">delegar ao diarista</button>'
               : '') +
             '<button type="button" data-acao="editar-passo" data-id="' + t.id + '">editar</button>' +
+            (pronta ? '' : '<button type="button" data-acao="cancelar-tarefa" data-id="' + t.id + '">cancelar tarefa</button>') +
+            '<button type="button" class="passo-apagar" data-acao="pedir-apagar-tarefa" data-id="' + t.id + '">apagar</button>' +
           '</div>'
+        : '') +
+      // a confirmação aparece no próprio cartão, sem abrir a ficha
+      (!aberto && !solto && !emConsulta(t.projetoId)
+        ? (cancelandoTarefa === t.id ? caixaCancelarTarefa(t) : apagandoTarefa === t.id ? caixaApagarTarefa(t) : '')
         : '') +
 
       (concluindoTarefa === t.id ? caixaConcluir(t) : '') +
@@ -2110,6 +2116,28 @@
      companhia não existem — e o motor nem lê. Fora, clima e chão também não.
      O formulário só mostra o que o motor vai ler para aquele local; o resto
      fica neutro por baixo, e você não vê campo que não precisa preencher. */
+  function caixaCancelarTarefa(t) {
+    return '<div class="confirma">' +
+      '<p class="confirma-texto">Cancelar a tarefa. Ela sai do caminho, deixa de segurar ' +
+      'as que vinham depois e para de travar a conclusão do projeto — mas continua no ' +
+      'registro, com o motivo.</p>' +
+      '<input type="text" class="confirma-campo" id="campoCancelaTarefa" placeholder="por quê?">' +
+      '<div class="confirma-acoes">' +
+        '<button type="button" class="bt-forte" data-acao="confirmar-cancelar-tarefa" data-id="' + t.id + '">cancelar a tarefa</button>' +
+        '<button type="button" class="bt-fraco" data-acao="voltar-cancelar-tarefa">deixa quieto</button>' +
+      '</div></div>';
+  }
+
+  function caixaApagarTarefa(t) {
+    return '<div class="confirma">' +
+      '<p class="confirma-texto">Apagar a tarefa e o que ela registrou, sem desfazer. ' +
+      'Para tirar do caminho guardando o registro, use <em>cancelar</em>.</p>' +
+      '<div class="confirma-acoes">' +
+        '<button type="button" class="bt-forte" data-acao="remover-passo" data-id="' + t.id + '">sim, apagar</button>' +
+        '<button type="button" class="bt-fraco" data-acao="voltar-apagar-tarefa">deixa quieto</button>' +
+      '</div></div>';
+  }
+
   function formularioPasso(t, irmaos, travado) {
     var avisos = M.avisosDe(t);
     var noSitio = t.ondePrecisaEstar === 'sitio';
@@ -2184,43 +2212,20 @@
         return '<p class="aviso-linha">' + esc(a) + '</p>'; }).join('') + '</div></div>',
 
       /* Cancelar e apagar são decisões sobre a tarefa que JÁ EXISTE: aparecem
-         com a ficha aberta e trancada, no pé, em letra pequena. Em edição, o
-         rodapé só tem salvar (e desfazer): o resto espera a tarefa ser salva. */
+         com a ficha aberta e trancada, no pé, em letra pequena — e também no "⋯"
+         do cartão. Em edição, o rodapé só tem salvar (e desfazer). */
       travado
-        ? (emConsulta(t.projetoId) || fechada(t) ? '' :
-          cancelandoTarefa === t.id
-            ? '<div class="confirma">' +
-                '<p class="confirma-texto">Cancelar a tarefa. Ela sai do caminho, deixa de segurar ' +
-                'as que vinham depois e para de travar a conclusão do projeto — mas continua no ' +
-                'registro, com o motivo.</p>' +
-                '<input type="text" class="confirma-campo" id="campoCancelaTarefa" placeholder="por quê?">' +
-                '<div class="confirma-acoes">' +
-                  '<button type="button" class="bt-forte" data-acao="confirmar-cancelar-tarefa" data-id="' + t.id + '">cancelar a tarefa</button>' +
-                  '<button type="button" class="bt-fraco" data-acao="voltar-cancelar-tarefa">deixa quieto</button>' +
-                '</div></div>'
-            : apagandoTarefa === t.id
-            ? '<div class="confirma">' +
-                '<p class="confirma-texto">Apagar a tarefa e o que ela registrou, sem desfazer. ' +
-                'Para tirar do caminho guardando o registro, use <em>cancelar</em>.</p>' +
-                '<div class="confirma-acoes">' +
-                  '<button type="button" class="bt-forte" data-acao="remover-passo" data-id="' + t.id + '">sim, apagar</button>' +
-                  '<button type="button" class="bt-fraco" data-acao="voltar-apagar-tarefa">deixa quieto</button>' +
-                '</div></div>'
+        ? (emConsulta(t.projetoId) ? '' :
+          cancelandoTarefa === t.id ? caixaCancelarTarefa(t)
+            : apagandoTarefa === t.id ? caixaApagarTarefa(t)
             : '<div class="passo-rodape passo-rodape-quieto"><span class="passo-rodape-fim">' +
-                '<button type="button" class="bt-linha bt-mini" data-acao="cancelar-tarefa" data-id="' + t.id + '">cancelar tarefa</button>' +
+                (fechada(t) ? '' :
+                  '<button type="button" class="bt-linha bt-mini" data-acao="cancelar-tarefa" data-id="' + t.id + '">cancelar tarefa</button>') +
                 '<button type="button" class="bt-linha bt-mini" data-acao="pedir-apagar-tarefa" data-id="' + t.id + '">apagar</button>' +
               '</span></div>')
         :
       cancelandoTarefa === t.id
-        ? '<div class="confirma">' +
-            '<p class="confirma-texto">Cancelar a tarefa. Ela sai do caminho, deixa de segurar ' +
-            'as que vinham depois e para de travar a conclusão do projeto — mas continua no ' +
-            'registro, com o motivo.</p>' +
-            '<input type="text" class="confirma-campo" id="campoCancelaTarefa" placeholder="por quê?">' +
-            '<div class="confirma-acoes">' +
-              '<button type="button" class="bt-forte" data-acao="confirmar-cancelar-tarefa" data-id="' + t.id + '">cancelar a tarefa</button>' +
-              '<button type="button" class="bt-fraco" data-acao="voltar-cancelar-tarefa">deixa quieto</button>' +
-            '</div></div>'
+        ? caixaCancelarTarefa(t)
         : '<div class="passo-rodape">' +
             '<button type="button" class="bt-forte" data-acao="salvar-passo">salvar</button>' +
             (foto && foto.id === t.id
@@ -3880,8 +3885,8 @@
      está sendo digitado não some por um clique perdido. */
   function recolherFichaAoClicarFora() {
     document.addEventListener('click', function (e) {
-      if (!passoAberto || passoEditando) return;
-      if (e.target.closest('.passo-aberto') || e.target.closest('.fantasma-ord')) return;
+      if ((!passoAberto && !apagandoTarefa && !cancelandoTarefa) || passoEditando) return;
+      if (e.target.closest('.passo-aberto') || e.target.closest('.confirma') || e.target.closest('.fantasma-ord')) return;
       var comAcao = e.target.closest('[data-acao], [data-abrir], button, input, select, textarea, a, label');
       fecharFicha();
       // clique em coisa que age já redesenha sozinho; em área vazia, redesenho aqui

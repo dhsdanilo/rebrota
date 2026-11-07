@@ -2789,3 +2789,7 @@ body.ligando, body.ligando * { cursor: grabbing !important; user-select: none; }
 }
 .passos-vazia + .rodape-acoes .bt-fraco:hover { border-color: var(--rebrota); color: var(--rebrota); }
 .passos-nada { padding: 6px 4px; }
+
+.passo-menu .passo-apagar { color: var(--passou); border-color: transparent; }
+.passo-menu .passo-apagar:hover { border-color: var(--passou); }
+.passo > .confirma { margin: 0 12px 10px 50px; }
