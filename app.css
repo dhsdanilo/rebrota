@@ -2420,13 +2420,22 @@ input[type="number"][readonly] { -moz-appearance: textfield; }
   font-family: var(--mono); font-size: 10.5px; letter-spacing: .04em; color: var(--rebrota);
   border: 1px solid var(--rebrota); border-radius: 10px; padding: 1px 8px;
 }
-/* §65b: as correntes na margem da lista de passos */
-.passos { position: relative; }
-.passos-com-elos { padding-left: 28px; }
-.elos { position: absolute; left: 0; top: 0; pointer-events: none; overflow: visible; }
-.passo-em-elo .passo-ordem { border-color: var(--elo); color: var(--elo); }
-.passo-espera .passo-texto { opacity: .72; }
-.marca-elo { color: var(--elo, var(--rebrota)); }
+/* §65c: precedentes no número da tarefa */
+.passo-ord { display: flex; align-items: flex-end; height: 26px; flex: 0 0 auto; }
+.passo-ord .passo-ordem { position: relative; z-index: 1; background: var(--mata); }
+.passo-ordem-espera { border-style: dashed; border-color: var(--neblina-fraca); }
+.pre {
+  width: 17px; height: 17px; flex: 0 0 auto; margin-left: -6px; position: relative;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid var(--casca); border-radius: 50%;
+  background: #2a2a22; color: var(--casca);
+  font-family: var(--mono); font-size: 10.5px; line-height: 1;
+  box-shadow: 0 0 0 1.5px var(--mata);
+}
+.pre + .pre { margin-left: -3px; }
+.pre-largo { width: auto; min-width: 17px; padding: 0 4px; border-radius: 9px; }
+.pre-feita { border-color: var(--musgo); color: var(--neblina-fraca); background: var(--mata); }
+.pre-mais { color: var(--neblina-fraca); border-style: dashed; }
 /* §65: o passo sobre o qual o arrastado está parado — soltar aqui liga */
 .passo-alvo-vinculo { outline: 2px dashed var(--rebrota); outline-offset: -2px; background: rgba(120, 170, 90, .12); }
 .vitrine-nota {
