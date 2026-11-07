@@ -345,6 +345,118 @@
 
     var socorro = document.getElementById('btSocorroExportar');
     if (socorro) socorro.addEventListener('click', exportar);
+    desenharElos();
+  }
+
+  /* §65b: as correntes de dependência desenhadas na margem da lista de passos —
+     como as linhas de um mapa de metrô. Cada corrente (tarefas ligadas entre
+     si) tem uma cor e uma raia; o ponto no encontro com o cartão é cheio
+     quando a tarefa está livre e vazio quando espera alguém. A linha só liga o
+     que está aberto: dependência cumprida deixou de ser restrição. */
+  var CORES_ELO = ['#BFD44A', '#E0A458', '#6FB7C9', '#D98BB0', '#9C8CE0', '#8FD19E'];
+
+  function limparElos() {
+    var velhos = $palco.querySelectorAll('.elos');
+    for (var i = 0; i < velhos.length; i++) velhos[i].parentNode.removeChild(velhos[i]);
+  }
+
+  function desenharElos(semVigiar) {
+    limparElos();
+    if (!semVigiar) vigiarElos();
+    var listas = $palco.querySelectorAll('ul.passos');
+    Array.prototype.forEach.call(listas, function (ul) {
+      var lis = Array.prototype.filter.call(ul.querySelectorAll('.passo'), function (li) {
+        return !li.classList.contains('passo-feita') && !li.classList.contains('passo-encerrada');
+      });
+      var ids = {};
+      lis.forEach(function (li) { ids[li.dataset.tarefa] = li; });
+
+      // arestas entre tarefas abertas desta lista e componentes (união-busca)
+      var pai = {};
+      function raiz(x) { while (pai[x] !== x) { pai[x] = pai[pai[x]]; x = pai[x]; } return x; }
+      var ligadas = {}, esperando = {};
+      Object.keys(ids).forEach(function (id) { pai[id] = id; });
+      Object.keys(ids).forEach(function (id) {
+        var t = M.tarefa(id);
+        (t && t.dependeDe || []).forEach(function (d) {
+          if (!ids[d]) return;
+          pai[raiz(id)] = raiz(d);
+          ligadas[id] = ligadas[d] = true;
+          esperando[id] = true;
+        });
+      });
+
+      var comps = {};
+      lis.forEach(function (li) {
+        var id = li.dataset.tarefa;
+        if (!ligadas[id]) return;
+        var r = raiz(id);
+        (comps[r] = comps[r] || []).push(li);
+      });
+      var chaves = Object.keys(comps);
+      if (!chaves.length) { ul.classList.remove('passos-com-elos'); return; }
+      ul.classList.add('passos-com-elos');
+
+      var caixaUl = ul.getBoundingClientRect();
+      var itens = chaves.map(function (k, i) {
+        var pts = comps[k].map(function (li) {
+          var o = li.querySelector('.passo-ordem') || li;
+          var r = o.getBoundingClientRect();
+          return { li: li, y: r.top + r.height / 2 - caixaUl.top, x: li.getBoundingClientRect().left - caixaUl.left, id: li.dataset.tarefa };
+        });
+        var ys = pts.map(function (p) { return p.y; });
+        return { cor: CORES_ELO[i % CORES_ELO.length], pts: pts, de: Math.min.apply(null, ys), ate: Math.max.apply(null, ys), raia: 0 };
+      });
+      // raias: correntes cujos trechos se cruzam não dividem a mesma linha
+      itens.forEach(function (it, i) {
+        var ocupadas = {};
+        for (var j = 0; j < i; j++) {
+          if (itens[j].de <= it.ate && it.de <= itens[j].ate) ocupadas[itens[j].raia] = true;
+        }
+        while (ocupadas[it.raia]) it.raia++;
+      });
+
+      var NS = 'http://www.w3.org/2000/svg';
+      var svg = document.createElementNS(NS, 'svg');
+      svg.setAttribute('class', 'elos');
+      svg.setAttribute('width', 30);
+      svg.setAttribute('height', Math.ceil(caixaUl.height));
+      svg.setAttribute('aria-hidden', 'true');
+      function no(nome, atrib) {
+        var e = document.createElementNS(NS, nome);
+        Object.keys(atrib).forEach(function (a) { e.setAttribute(a, atrib[a]); });
+        svg.appendChild(e);
+      }
+      itens.forEach(function (it) {
+        var x = 5 + it.raia * 8;
+        no('line', { x1: x, y1: it.de, x2: x, y2: it.ate, stroke: it.cor, 'stroke-width': 2, 'stroke-linecap': 'round' });
+        it.pts.forEach(function (p) {
+          no('line', { x1: x, y1: p.y, x2: p.x - 3, y2: p.y, stroke: it.cor, 'stroke-width': 2, 'stroke-linecap': 'round' });
+          var presa = (M.tarefa(p.id).dependeDe || []).some(function (d) { return ids[d]; });
+          no('circle', { cx: x, cy: p.y, r: 4, fill: presa ? '#0F1C19' : it.cor, stroke: it.cor, 'stroke-width': 2 });
+          p.li.style.setProperty('--elo', it.cor);
+          p.li.classList.add('passo-em-elo');
+          p.li.classList.toggle('passo-espera', !!presa);
+        });
+      });
+      ul.insertBefore(svg, ul.firstChild);
+    });
+  }
+  window.addEventListener('resize', function () { desenharElos(); });
+  /* A altura dos cartões ainda muda depois de pintados (o título se ajusta ao
+     texto, as fontes chegam): o desenho acompanha a lista em vez de confiar na
+     primeira medida. */
+  var vigiaElos = null, quadroElos = 0;
+  function vigiarElos() {
+    if (typeof ResizeObserver === 'undefined') return;
+    if (!vigiaElos) {
+      vigiaElos = new ResizeObserver(function () {
+        if (quadroElos) return;
+        quadroElos = requestAnimationFrame(function () { quadroElos = 0; desenharElos(true); });
+      });
+    }
+    vigiaElos.disconnect();
+    Array.prototype.forEach.call($palco.querySelectorAll('ul.passos'), function (ul) { vigiaElos.observe(ul); });
   }
 
   /* O cadastro do projeto se escreve uma vez e se lê muitas: fica trancado por
@@ -675,12 +787,11 @@
   function eloDaVitrine(t) {
     var quem = M.dependentesDe(t.id);
     if (!quem.length) return '';
+    if (!quem.some(function (o) { return M.estadoDe(o.id) !== 'feita'; })) return '';
     var nomes = quem.map(function (o) { return o.texto || 'tarefa sem texto'; });
-    return '<span class="vitrine-elo" title="destrava: ' + esc(nomes.join(', ')) + '" aria-label="destrava ' +
-      quem.length + (quem.length === 1 ? ' tarefa' : ' tarefas') + '">' +
-      quem.map(function (o) {
-        return '<i class="elo-ponto' + (M.estadoDe(o.id) === 'feita' ? ' elo-feito' : '') + '"></i>';
-      }).join('') + '</span>';
+    var abertas = quem.filter(function (o) { return M.estadoDe(o.id) !== 'feita'; }).length;
+    return '<span class="vitrine-elo" title="destrava: ' + esc(nomes.join(', ')) + '">' +
+      '⇢ destrava ' + abertas + '</span>';
   }
 
   function fichaDaVitrine(t) {
@@ -1964,11 +2075,11 @@
         var alvo = M.tarefa(d);
         if (numeros && numeros[d]) return numeros[d];
         return alvo ? (alvo.texto || 'sem texto') : '?';
-      }).join(' e ')]);
+      }).join(' e '), 'marca-elo']);
     }
 
     return m.filter(function (x) { return x[1]; }).map(function (x) {
-      return '<span class="marca"><i>' + x[0] + '</i>' + esc(x[1]) + '</span>';
+      return '<span class="marca' + (x[2] ? ' ' + x[2] : '') + '"><i>' + x[0] + '</i>' + esc(x[1]) + '</span>';
     }).join('');
   }
 
@@ -3592,6 +3703,7 @@
       var li = e.target.closest('.passo');
       if (!li) return;
       arrastando = li;
+      limparElos();
       li.classList.add('arrastando');
       e.dataTransfer.effectAllowed = 'move';
       try { e.dataTransfer.setData('text/plain', li.dataset.tarefa); } catch (x) {}
