@@ -236,7 +236,7 @@
       var p = doPapel[i < 3 ? i : i - 3];
       return p ? cartaoProjeto(p) :
         '<article class="sitio-projeto sitio-vaga"><span class="sitio-etiqueta sitio-etiqueta-' + papel + '">' +
-          (papel === 'planejamento' ? 'em planejamento' : papel) + '</span><em>vaga aberta</em></article>';
+          (papel === 'planejamento' ? 'em planejamento' : 'em execução') + '</span><em>vaga aberta</em></article>';
     }).join('');
 
     var planejadas = projetos.filter(function (p) { return !p.papel && p.estado === 'preparo'; });

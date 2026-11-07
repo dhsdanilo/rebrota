@@ -138,7 +138,7 @@ var Motor = (function () {
       M.projetosPorPapel(papel).forEach(function (proj) {
         pool.filter(function (t) { return t.projetoId === proj.id; })
           .sort(function (a, b) { return a.ordem - b.ordem; })
-          .forEach(function (t) { poe(t, papel === 'planejamento' ? 'em planejamento' : 'ativo'); });
+          .forEach(function (t) { poe(t, papel === 'planejamento' ? 'em planejamento' : 'em execução'); });
       });
     });
 

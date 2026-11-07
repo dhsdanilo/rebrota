@@ -156,7 +156,7 @@
      e lista infinita é volume de obrigação à vista. */
   /* §62: três ativos e dois em planejamento, sempre à vista. */
   var VAGAS_COLUNA = [
-    { papel: 'ativo', t: 'ativo' },
+    { papel: 'ativo', t: 'em execução' },
     { papel: 'planejamento', t: 'em planejamento' }
   ];
 
@@ -501,7 +501,7 @@
   })();
 
   var VAGAS = [
-    { v: 'ativo', t: 'ativo' },
+    { v: 'ativo', t: 'em execução' },
     { v: 'planejamento', t: 'planejamento' }
   ];
 
@@ -1330,7 +1330,7 @@
     var prontas = M.planejadas().filter(M.aptaParaExecucao);
 
     if (!vazias.length) {
-      return 'Os três ativos e os dois em planejamento estão ocupados. ' + (prontas.length
+      return 'As três vagas em execução e as duas em planejamento estão ocupadas. ' + (prontas.length
         ? prontas.length + (prontas.length === 1 ? ' planejada espera' : ' planejadas esperam') + ' a próxima abrir.'
         : 'Nada esperando na fila.');
     }
@@ -1339,7 +1339,7 @@
       var n = M.vagasLivres(v.papel);
       return v.papel === 'planejamento'
         ? (n === 1 ? '1 vaga de planejamento' : n + ' vagas de planejamento')
-        : (n === 1 ? '1 vaga de ativo' : n + ' vagas de ativo');
+        : (n === 1 ? '1 vaga em execução' : n + ' vagas em execução');
     }).join(' e ');
     var querPlanejamento = vazias.some(function (v) { return v.papel === 'planejamento'; });
     var querExecucao = vazias.some(function (v) { return v.papel !== 'planejamento'; });
@@ -1488,7 +1488,7 @@
       nota = 'A muda ainda não está pronta. Só muda pronta entra em planejamento.';
     } else if (ocupada) {
       var donos = M.projetosPorPapel(destinoDaPromocao(p)).map(function (q) { return q.nome || 'outro projeto'; });
-      nota = (destinoDaPromocao(p) === 'ativo' ? 'Os três ativos são ' : 'As duas vagas de planejamento são de ') +
+      nota = (destinoDaPromocao(p) === 'ativo' ? 'As três vagas em execução são de ' : 'As duas vagas de planejamento são de ') +
         donos.join(', ') + '. Conclua, suspenda ou cancele um dos que estão andando primeiro.';
     } else if (p.papel === 'ativo' && abertas) {
       nota = abertas === 1 ? 'Falta 1 tarefa aberta.' : 'Faltam ' + abertas + ' tarefas abertas.';
@@ -1542,8 +1542,8 @@
     if (acaoProjeto.tipo === 'promover') {
       if (destinoDaPromocao(p) === 'ativo') {
         var jaAtivos = 3 - M.vagasLivres('ativo');
-        frases = ['Entra como ativo: passa a oferecer trabalho, em igualdade com ' +
-          (jaAtivos ? 'os outros ' + jaAtivos + (jaAtivos === 1 ? ' ativo' : ' ativos') : 'os que vierem') + '.'];
+        frases = ['Entra em execução: passa a oferecer trabalho, em igualdade com ' +
+          (jaAtivos ? 'os outros ' + jaAtivos + ' em execução' : 'os que vierem') + '.'];
         var idade = M.diasDesde(p.ultimoToque);
         if (idade >= 60) {
           frases.push('Planejado há ' + idade + ' dias — os preços do orçamento são desta época.');
@@ -1576,7 +1576,7 @@
   function quemSobe(p) {
     var prontas = M.planejadas().filter(M.aptaParaExecucao).length;
 
-    var frase = 'A vaga de ativo fica aberta.';
+    var frase = 'A vaga em execução fica aberta.';
 
     return frase + ' ' + (prontas
       ? (prontas === 1 ? 'Há 1 planejada pronta para entrar.' : 'Há ' + prontas + ' planejadas prontas para entrar.')
@@ -3214,7 +3214,7 @@
     avisoCascata = (avisoCascata ? avisoCascata + ' ' : '') + movidos.map(function (m) {
       return m.vaga === 'planejadas'
         ? (m.projeto.nome || 'O projeto') + ' terminou o planejamento e entrou nas planejadas.'
-        : (m.projeto.nome || 'Um projeto') + ' entra como ativo.';
+        : (m.projeto.nome || 'Um projeto') + ' entra em execução.';
     }).join(' ');
   }
 

@@ -65,7 +65,7 @@ var Modelo = (function () {
        vários — e é por isso que a promoção daqui para cima volta a ser escolha:
        a escolha é a recompensa de ter concluído a anterior. */
     { v: 'planejada',    t: 'planejada',          estado: 'preparo',   papel: '' },
-    { v: 'ativo',        t: 'ativo',              estado: 'ativo',     papel: 'ativo' },
+    { v: 'ativo',        t: 'em execução',        estado: 'ativo',     papel: 'ativo' },
     // rótulo e valor divergem de propósito: 'suspenso' e 'cancelado' dizem
     // melhor o que aconteceu, e trocar o valor por baixo quebraria os arquivos
     // já exportados sem ganho nenhum
@@ -807,7 +807,7 @@ var Modelo = (function () {
      enche. Dinheiro só existe depois de planejar (§36): na fila todo projeto é
      pré-projeto, sem custo — orçar é trabalho da vaga de planejamento. */
   function etiquetaDe(p) {
-    if (p.papel === 'ativo')        return { chave: 'ativo', texto: 'ativo' };
+    if (p.papel === 'ativo')        return { chave: 'ativo', texto: 'em execução' };
     if (p.papel === 'planejamento') return { chave: 'planejamento', texto: 'em planejamento' };
     if (p.estado === 'preparo') {
       return aptaParaExecucao(p)
