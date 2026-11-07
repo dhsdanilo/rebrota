@@ -2629,3 +2629,26 @@ a.bt-icone { text-decoration: none; }
   .rodape-acoes { display: none; }
   .pe-projeto { display: none; }
 }
+
+/* §67: cabeçalho compacto e faixa quieta */
+.palco-meta { flex-direction: row; flex-wrap: wrap; gap: 4px 20px; margin-top: 10px; }
+.palco-prog { display: flex; align-items: center; gap: 10px; margin: 12px 0 0; font-size: 13px; color: var(--neblina-fraca); }
+.prog-barra { flex: 0 0 160px; height: 5px; border-radius: 3px; background: var(--musgo); overflow: hidden; }
+.prog-barra i { display: block; height: 100%; background: var(--rebrota); }
+.titulo-resultado-lido { font-family: var(--display); font-size: 17px; color: var(--neblina-fraca); margin: 2px 0 0; line-height: 1.35; }
+.faixa-quieta {
+  display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 26px;
+  margin: 18px 0 20px; padding: 8px 0;
+  border-top: 1px solid var(--musgo); border-bottom: 1px solid var(--musgo);
+}
+.faixa-quieta .secao, .faixa-quieta .secao-campos {
+  display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap;
+  border-top: none; padding: 0; margin: 0;
+}
+.faixa-quieta .secao-titulo, .faixa-quieta .secao-campos > .secao-titulo { margin: 0; }
+.faixa-quieta .secao-cabeca { margin: 0; }
+.faixa-quieta > .secao:not(.secao-recolhida) { flex-basis: 100%; }
+.faixa-quieta .secao-corpo { min-width: 0; }
+.bt-contorno { background: none; border-color: var(--rebrota); color: var(--rebrota); }
+.bt-contorno:hover { background: rgba(76, 196, 122, .12); }
+.faixa-quieta + .secao { margin-top: 0; border-top: none; padding-top: 0; }

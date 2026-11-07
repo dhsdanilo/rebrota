@@ -810,11 +810,40 @@
       (quando ? ' · ' + M.formatarData(quando) : '');
   }
 
+  function progressoDe(p) {
+    var passos = M.passosDe(p.id).filter(function (t) { return M.estadoDe(t.id) !== 'encerrada'; });
+    return {
+      feitas: passos.filter(function (t) { return M.estadoDe(t.id) === 'feita'; }).length,
+      total: passos.length
+    };
+  }
+
   function marcacaoProjeto(p) {
     var outros = M.cat().projetos.filter(function (q) { return q.id !== p.id; });
     var consulta = emConsulta(p.id);
     var solto = projetoEditando === p.id && !consulta;
     var trancado = M.motivoTrancado(p);
+
+    /* §67: numa obra rodando, o que não muda toda hora (tags, motivação,
+       planejamento já resolvido) vira uma faixa quieta de uma linha, e a lista
+       de tarefas sobe para o começo da tela. Fora da obra, a ordem é a de antes. */
+    var vivo = p.estado !== 'fila' && p.estado !== 'descartado';
+    var emObra = p.papel === 'ativo' && vivo;
+    var tagsHtml = grupo('Tags', '', campoTags('projeto', p.id, p.tags, consulta),
+      'Assuntos deste projeto — as tarefas dele herdam. Só cadastro por ora; a análise por assunto vem depois.');
+    var motivHtml = !vivo ? '' :
+      mudaTemConteudo(p)
+        ? grupoRecolhido('Motivação', p.id, resumoMuda(p))
+        : (p.ganhos || []).length
+        ? grupoRecolhido('Motivação', p.id, '<div class="caixa-motivacao"><p class="area-motivacao">' +
+            (p.ganhos || []).map(esc).join('<br>') + '</p></div>')
+        : '';
+    var planHtml = !vivo ? '' :
+      secaoEtapa(p, 'planejamento', 'Planejamento',
+        'Decidir como vai ser feito, medir, conferir o que já existe, orçar e comprar. ' +
+        'Enquanto sobrar uma tarefa aberta aqui, a execução fica segura — planejar é o prazer ' +
+        'e executar é o gargalo, então vale gastar o tempo aqui antes de mexer na terra.');
+    var planNaFaixa = emObra && (planHtml === '' || planHtml.indexOf('secao-recolhida') !== -1);
 
     /* O título É o campo. Antes o nome e o resultado apareciam duas vezes — uma
        grandes no alto, outra como campo de formulário logo abaixo. Um elemento
@@ -832,7 +861,9 @@
             ' aria-label="Nome da obra"' + (solto ? '' : ' readonly') +
             ' data-alvo="projeto" data-id="' + p.id + '" data-campo="nome"' +
             ' value="' + esc(p.nome) + '"></h2>',
-          (solto || p.resultado
+          (!solto && p.resultado
+            ? '<p class="titulo-resultado titulo-resultado-lido">' + esc(p.resultado) + '</p>'
+            : solto
             ? '<input type="text" class="titulo-resultado"' +
               ' placeholder="Resultado — o que muda quando ficar pronto"' +
               ' aria-label="Resultado"' + (solto ? '' : ' readonly') +
@@ -842,6 +873,13 @@
           /* A escrituração do cabeçalho, em mono miúdo e uma linha por fato:
              quanto foi orçado (só na obra rodando — o envelope já disparou e
              some, mas quanto custou é curiosidade legítima) e onde parou. */
+          (function () {
+            var g = progressoDe(p);
+            if (!g.total || trancado) return '';
+            return '<div class="palco-prog"><span class="prog-barra"><i style="width:' +
+              Math.round(100 * g.feitas / g.total) + '%"></i></span><span>' + g.feitas + ' de ' + g.total +
+              (g.total === 1 ? ' tarefa feita' : ' tarefas feitas') + '</span></div>';
+          })(),
           '<div class="palco-meta">' +
             ((p.papel === 'ativo' ||
               p.estado === 'concluido' || p.estado === 'encerrado') &&
@@ -864,8 +902,10 @@
       caixaAcao(p),
 
       // tags (§44): assuntos do projeto; as tarefas dele herdam na análise
-      grupo('Tags', '', campoTags('projeto', p.id, p.tags, consulta),
-        'Assuntos deste projeto — as tarefas dele herdam. Só cadastro por ora; a análise por assunto vem depois.'),
+      emObra
+        ? '<div class="faixa-quieta"><div class="faixa-tags">' + tagsHtml + '</div>' + motivHtml +
+          (planNaFaixa ? planHtml : '') + '</div>'
+        : tagsHtml,
 
       /* A MUDA (§37): enquanto o projeto espera vaga, o trabalho é lapidar a
          ideia — e a ficha é essa lapidação. Depois de virar obra, a muda fica
@@ -877,13 +917,7 @@
          então aqui ela aparece fechada, para ler quando a vontade acabar e você
          precisar lembrar por que começou. Obra antiga sem muda mostra os ganhos
          que tinha. Na muda viva isto não existe: a ficha da muda é a motivação. */
-      (p.estado === 'fila' || p.estado === 'descartado') ? '' :
-      mudaTemConteudo(p)
-        ? grupoRecolhido('Motivação', p.id, resumoMuda(p))
-        : (p.ganhos || []).length
-        ? grupoRecolhido('Motivação', p.id, '<div class="caixa-motivacao"><p class="area-motivacao">' +
-            (p.ganhos || []).map(esc).join('<br>') + '</p></div>')
-        : '',
+      emObra ? '' : motivHtml,
 
       /* O envelope é gatilho de entrada: dispara uma vez e some. Num projeto já
          rodando ele não decide mais nada, e ficar mostrando dinheiro no meio da
@@ -934,11 +968,7 @@
             'Projetos que precisam estar concluídos antes deste. Enquanto faltar um, este fica ' +
             'com a porta trancada e o motivo aparece em texto seco na coluna da esquerda.'),
 
-      (p.estado === 'fila' || p.estado === 'descartado') ? '' :
-      secaoEtapa(p, 'planejamento', 'Planejamento',
-        'Decidir como vai ser feito, medir, conferir o que já existe, orçar e comprar. ' +
-        'Enquanto sobrar uma tarefa aberta aqui, a execução fica segura — planejar é o prazer ' +
-        'e executar é o gargalo, então vale gastar o tempo aqui antes de mexer na terra.'),
+      planNaFaixa ? '' : planHtml,
       // o estado fica na tela; a explicação da regra vai para o hover
       (p.estado === 'fila' || p.estado === 'descartado') ? '' :
       secaoEtapa(p, 'execucao', 'Execução',

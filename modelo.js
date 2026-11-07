@@ -496,7 +496,10 @@ var Modelo = (function () {
   }
 
   function comoLista(v) {
-    if (Array.isArray(v)) return v.filter(Boolean);
+    // vírgula grudada no fim do item ("cavadeira,") viraria ",," na tela
+    if (Array.isArray(v)) return v.map(function (x) {
+      return String(x == null ? '' : x).replace(/^[\s,;]+|[\s,;]+$/g, '');
+    }).filter(Boolean);
     if (typeof v === 'string' && v.trim()) {
       return v.split(/[,\n]/).map(function (x) { return x.trim(); }).filter(Boolean);
     }
