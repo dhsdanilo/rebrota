@@ -2111,7 +2111,7 @@
       /* Passo-compra (§57): a ficha é só os itens (no bloco acima), a
          dependência, tags e nota — nada de condições de tarefa. */
       // o local mora na linha da tarefa (§46); aqui fica só o ponto exato
-      (noPc || ehCompra) ? '' :
+      (noPc || ehCompra || (travado && !t.onde)) ? '' :
       grupo('Onde', 'grade',
         (campoTexto('tarefa', t.id, 'onde', 'Lugar', t.onde,
           { dica: 'trecho rente à estrada', travado: travado,
@@ -2134,7 +2134,8 @@
         (M.juntandoDinheiro(t) ? '<p class="aviso" style="margin:8px 0 0">juntando dinheiro — faltam ' + esc(M.moeda(M.faltaDinheiro(t))) + '</p>' : ''),
         'A avulsa que custa dinheiro espera o dinheiro, não o app. Mesmo desenho do envelope, em tamanho de tarefa.')),
 
-      (noPc || t.compra || ehCompra) ? '' :
+      (noPc || t.compra || ehCompra ||
+       (travado && !(t.ferramentas || []).length && !(t.materiais || []).length)) ? '' :
       grupo('Levar', 'grade',
         campoLista('tarefa', t.id, 'ferramentas', 'Ferramentas', t.ferramentas, 'cavadeira\nmarreta\nEPI', travado,
           'Uma por linha. O que precisa estar na mão para começar, incluindo o EPI — que é ' +
@@ -2147,16 +2148,19 @@
 
       ehCompra ? '' : blocoQuando(t, travado),
 
+      (travado && !(t.dependeDe || []).length) ? '' :
       grupo('Dependência', '', fichasDependencia(t, travado),
         'Tarefas que precisam terminar antes desta. A ordem da lista é preferência sua e muda ' +
         'arrastando; isto aqui é lei, e o app segura a tarefa até as outras ficarem prontas. ' +
         'Usar demais engessa o projeto — vincule só o que é impossível fora de ordem.'),
 
+      (travado && !(t.tags || []).length) ? '' :
       grupo('Tags', '',
         campoTags('tarefa', t.id, t.tags, travado),
         'Assuntos desta tarefa — galpão, madeira, galinhas. Por ora é só cadastro: a análise por ' +
         'assunto vem depois. Uma grafia por assunto: o app junta "sítio" e "Sitio".'),
 
+      (travado && !t.recado) ? '' :
       grupo('Nota', 'grade',
         campoArea('tarefa', t.id, 'recado', '', t.recado, travado,
           'anotação que aparece junto da tarefa'),
@@ -2257,17 +2261,22 @@
   function campoArea(alvo, id, chave, rotulo, valor, travado, dica) {
     return '<div class="campo campo-largo">' +
       rotuloDe(id, chave, rotulo) +
-      '<textarea id="c_' + id + '_' + chave + '" rows="2"' +
+      '<textarea id="c_' + id + '_' + chave + '" rows="' + (travado ? 1 : 2) + '"' +
       (travado ? ' readonly placeholder="—"' : ' placeholder="' + esc(dica || '') + '"') +
       ' data-alvo="' + alvo + '" data-id="' + id + '" data-campo="' + chave + '">' +
       esc(valor || '') + '</textarea></div>';
   }
 
   function campoLista(alvo, id, chave, rotulo, valores, dica, travado, ajuda) {
+    // lida, a lista é uma linha só: o que importa é bater o olho, não editar
+    if (travado) {
+      return '<div class="campo campo-largo">' + rotuloDe(id, chave, rotulo, ajuda) +
+        '<p class="valor-lido">' + (esc((valores || []).join(', ')) || '—') + '</p></div>';
+    }
     return '<div class="campo campo-largo">' +
       rotuloDe(id, chave, rotulo, ajuda) +
       // a lista aparece inteira: nada de barra de rolagem própria escondendo o último item
-      '<textarea id="c_' + id + '_' + chave + '" rows="' + Math.max(3, (valores || []).length + (travado ? 0 : 1)) + '"' +
+      '<textarea id="c_' + id + '_' + chave + '" rows="' + (travado ? Math.max(1, (valores || []).length) : Math.max(3, (valores || []).length + 1)) + '"' +
       (travado ? ' readonly placeholder="—"' : ' placeholder="' + esc(dica) + '"') +
       ' data-alvo="' + alvo + '" data-id="' + id + '" data-campo="' + chave + '">' +
       esc((valores || []).join('\n')) + '</textarea></div>';
@@ -3856,6 +3865,20 @@
     $palco.addEventListener('contextmenu', function (e) { if (e.target.closest('.passo-ordem')) e.preventDefault(); });
   }
 
+  /* §71: clicar fora da tarefa aberta recolhe a ficha. Fase de captura, para
+     olhar o alvo antes de qualquer redesenho. Em edição não recolhe: o que
+     está sendo digitado não some por um clique perdido. */
+  function recolherFichaAoClicarFora() {
+    document.addEventListener('click', function (e) {
+      if (!passoAberto || passoEditando) return;
+      if (e.target.closest('.passo-aberto') || e.target.closest('.fantasma-ord')) return;
+      var comAcao = e.target.closest('[data-acao], [data-abrir], button, input, select, textarea, a, label');
+      fecharFicha();
+      // clique em coisa que age já redesenha sozinho; em área vazia, redesenho aqui
+      if (!comAcao) desenharPalco();
+    }, true);
+  }
+
   // ── a rota da rua: segurar e arrastar ─────────────────────────────
   /* O arraste nativo (dragstart/dragover) não existe no dedo, e a rota se
      monta no carro. Aqui é por pointer events, que valem para dedo e mouse:
@@ -4542,6 +4565,7 @@
   ligarArraste();
   ligarArrasteRua();
   ligarArrasteCirculo();
+  recolherFichaAoClicarFora();
   M.carregar();
   M.cascatearVagas();   // o que a regra já decidiu, aplicado antes de desenhar
   colherAvisos();       // ... e dito, não engolido

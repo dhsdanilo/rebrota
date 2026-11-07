@@ -2741,3 +2741,19 @@ a.bt-icone { text-decoration: none; }
 body.ligando, body.ligando * { cursor: grabbing !important; user-select: none; }
 .passo-alvo-liga .passo-ordem { box-shadow: 0 0 0 3px rgba(76, 196, 122, .3); }
 .passo-alvo-hover { outline: 2px solid var(--rebrota); outline-offset: -2px; }
+
+/* §71: ficha da tarefa aberta, compacta — duas colunas, título em cima do campo */
+.passo-corpo {
+  padding: 4px 14px 10px 50px;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 0 32px; align-items: start;
+}
+.passo-corpo > .secao-campos {
+  grid-template-columns: 1fr; gap: 3px; margin-top: 8px; padding-top: 8px;
+}
+.passo-corpo > .secao-campos > .secao-titulo { margin: 0; }
+.passo-corpo > .secao:not(.secao-campos), .passo-corpo > .passo-rodape,
+.passo-corpo > .confirma { grid-column: 1 / -1; margin: 0; padding: 0; border: none; }
+.passo-corpo .campo textarea { min-height: 34px; field-sizing: content; }
+.passo-corpo .campo textarea[readonly] { min-height: 0; }
+.passo-corpo .grade { gap: 8px 20px; }
