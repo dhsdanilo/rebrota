@@ -860,6 +860,23 @@
         'e executar é o gargalo, então vale gastar o tempo aqui antes de mexer na terra.');
     var planNaFaixa = emObra && (planHtml === '' || planHtml.indexOf('secao-recolhida') !== -1);
 
+    /* §72: em planejamento o cabeçalho também é enxuto — status numa linha,
+       tags/motivação/dependência na faixa quieta, custo e cofre num cartão só. */
+    var emPlan = p.papel === 'planejamento' || (p.estado === 'preparo' && !p.papel);
+    var progHtml = (function () {
+      var g = progressoDe(p);
+      if (!g.total || trancado) return '';
+      return '<div class="palco-prog"><span class="prog-barra"><i style="width:' +
+        Math.round(100 * g.feitas / g.total) + '%"></i></span><span>' + g.feitas + ' de ' + g.total +
+        (g.total === 1 ? ' tarefa feita' : ' tarefas feitas') + '</span></div>';
+    })();
+    var depHtml = (p.papel === 'ativo' || p.estado === 'fila' || p.estado === 'descartado' ||
+                   p.estado === 'concluido' || p.estado === 'encerrado')
+      ? ''
+      : grupo('Dependência', '', fichasPrerequisitos(p, outros, !solto),
+          'Projetos que precisam estar concluídos antes deste. Enquanto faltar um, este fica ' +
+          'com a porta trancada e o motivo aparece em texto seco na coluna da esquerda.');
+
     /* O título É o campo. Antes o nome e o resultado apareciam duas vezes — uma
        grandes no alto, outra como campo de formulário logo abaixo. Um elemento
        por dado, sempre no mesmo lugar e do mesmo tamanho: solto ele aceita
@@ -888,22 +905,17 @@
           /* A escrituração do cabeçalho, em mono miúdo e uma linha por fato:
              quanto foi orçado (só na obra rodando — o envelope já disparou e
              some, mas quanto custou é curiosidade legítima) e onde parou. */
-          (function () {
-            var g = progressoDe(p);
-            if (!g.total || trancado) return '';
-            return '<div class="palco-prog"><span class="prog-barra"><i style="width:' +
-              Math.round(100 * g.feitas / g.total) + '%"></i></span><span>' + g.feitas + ' de ' + g.total +
-              (g.total === 1 ? ' tarefa feita' : ' tarefas feitas') + '</span></div>';
-          })(),
+          emPlan ? '<div class="palco-estado">' + progHtml + barraAcoes(p) + '</div>' : progHtml,
           '<div class="palco-meta">' +
             ((p.papel === 'ativo' ||
               p.estado === 'concluido' || p.estado === 'encerrado') &&
              p.custoEstimado !== null && p.custoEstimado !== undefined && Number(p.custoEstimado) > 0
               ? '<span class="palco-custo">orçado em ' + esc(M.moeda(p.custoEstimado)) + '</span>'
               : '') +
-            '<span class="palco-onde">' + esc(trancado || ondeParou(p.id)) + '</span>' +
+            ((trancado || ondeParou(p.id)) === 'Ainda não começou.' ? ''
+              : '<span class="palco-onde">' + esc(trancado || ondeParou(p.id)) + '</span>') +
           '</div>',
-          barraAcoes(p),
+          emPlan ? '' : barraAcoes(p),
         '</div>',
         consulta ? '<span class="selo-consulta">consulta</span>'
           : solto
@@ -920,6 +932,9 @@
       emObra
         ? '<div class="faixa-quieta"><div class="faixa-tags">' + tagsHtml + '</div>' + motivHtml +
           (planNaFaixa ? planHtml : '') + '</div>'
+        : emPlan
+        ? '<div class="faixa-quieta"><div class="faixa-tags">' + tagsHtml + '</div>' + motivHtml +
+          (depHtml ? '<div class="faixa-tags">' + depHtml + '</div>' : '') + '</div>'
         : tagsHtml,
 
       /* A MUDA (§37): enquanto o projeto espera vaga, o trabalho é lapidar a
@@ -932,7 +947,7 @@
          então aqui ela aparece fechada, para ler quando a vontade acabar e você
          precisar lembrar por que começou. Obra antiga sem muda mostra os ganhos
          que tinha. Na muda viva isto não existe: a ficha da muda é a motivação. */
-      emObra ? '' : motivHtml,
+      emObra || emPlan ? '' : motivHtml,
 
       /* O envelope é gatilho de entrada: dispara uma vez e some. Num projeto já
          rodando ele não decide mais nada, e ficar mostrando dinheiro no meio da
@@ -942,7 +957,7 @@
          quando o projeto está planejado. */
       !(p.papel === 'planejamento' || (p.estado === 'preparo' && !p.papel))
         ? ''
-        : grupo('Custo', '',
+        : '<div class="custo-compacto">' + grupo('Custo', '',
             // a barra é a leitura; os campos são só o jeito de mexer nela
             (mostraEnvelope(p) ? '<div class="envelope-largo">' + barraEnvelope(p) + '</div>' : '') +
             // a muda estimou por cima; o orçamento de verdade é trabalho daqui
@@ -971,17 +986,12 @@
             '</div>',
             'Quanto custa e quanto já foi juntado. É gatilho para começar, não controle financeiro: ' +
             'quando enche, a porta abre uma vez e o app para de olhar para dinheiro. A barra mostra ' +
-            'valores, nunca porcentagem: o valor tem lastro, e quando enche uma porta abre.'),
+            'valores, nunca porcentagem: o valor tem lastro, e quando enche uma porta abre.') + '</div>',
 
       /* Projeto que já está executando passou por todas as portas: listar o que
          um dia o segurou é história, não restrição. */
       // muda não tem Depende: dependência entre projetos é "como e quando" — planejamento
-      (p.papel === 'ativo' || p.estado === 'fila' || p.estado === 'descartado' ||
-       p.estado === 'concluido' || p.estado === 'encerrado')
-        ? ''
-        : grupo('Dependência', '', fichasPrerequisitos(p, outros, !solto),
-            'Projetos que precisam estar concluídos antes deste. Enquanto faltar um, este fica ' +
-            'com a porta trancada e o motivo aparece em texto seco na coluna da esquerda.'),
+      emPlan ? '' : depHtml,
 
       planNaFaixa ? '' : planHtml,
       // o estado fica na tela; a explicação da regra vai para o hover

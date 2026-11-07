@@ -2757,3 +2757,17 @@ body.ligando, body.ligando * { cursor: grabbing !important; user-select: none; }
 .passo-corpo .campo textarea { min-height: 34px; field-sizing: content; }
 .passo-corpo .campo textarea[readonly] { min-height: 0; }
 .passo-corpo .grade { gap: 8px 20px; }
+
+/* §72: cabeçalho de projeto em planejamento */
+.palco-estado { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 24px; margin-top: 12px; }
+.palco-estado .palco-prog, .palco-estado .barra-acoes { margin: 0; }
+.custo-compacto > .secao-campos {
+  display: block; margin: 0 0 16px; padding: 12px 16px;
+  border: 1px solid var(--musgo); border-radius: 10px; background: var(--mata);
+}
+.custo-compacto > .secao-campos > .secao-titulo { margin: 0 0 6px; }
+.custo-compacto .secao-corpo { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 32px; }
+.custo-compacto .envelope-largo { order: 2; flex: 1 1 240px; }
+.custo-compacto .grade { order: 1; display: flex; flex-wrap: wrap; gap: 6px 28px; align-items: flex-end; max-width: none; }
+.custo-compacto .valor-lido.valor-dinheiro, .custo-compacto .cofre-saldo { font-size: 20px; }
+.custo-compacto .cofre { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
