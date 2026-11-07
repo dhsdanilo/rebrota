@@ -171,9 +171,15 @@
   }
 
   function montarLista() {
-    var vagas = vagasIndividuais();
-    var linhas = vagas.map(function (v) {
-      return v.p ? itemProjeto(v.p) : itemVagaAberta(v);
+    // §69: dois grupos, cada um com o contador das vagas; vaga livre é UMA linha
+    var linhas = [];
+    VAGAS_COLUNA.forEach(function (g) {
+      var ocupantes = M.projetosPorPapel(g.papel);
+      var teto = M.TETO_VAGA[g.papel];
+      linhas.push('<li class="grupo-lateral"><b>' + esc(g.papel === 'ativo' ? 'ATIVOS' : 'EM PLANEJAMENTO') +
+        '</b><span>' + ocupantes.length + ' de ' + teto + '</span></li>');
+      ocupantes.forEach(function (p) { linhas.push(itemProjeto(p)); });
+      if (ocupantes.length < teto) linhas.push(itemVagaAberta({ papel: g.papel, livres: teto - ocupantes.length }));
     });
 
     var jaEstao = {};
@@ -196,25 +202,23 @@
     $lista.innerHTML = linhas.join('');
 
     var av = M.avulsas();
-    $avulsas.innerHTML = itemSimples('avulsas', 'Tarefas sem projeto',
-      av.length + ' cadastrada' + (av.length === 1 ? '' : 's'));
+    $avulsas.innerHTML = itemSimples('avulsas', 'Tarefas sem projeto', av.length ? String(av.length) : 'nenhuma');
 
     var abertas = M.pendenciasAbertas();
     var pior = abertas.length ? M.nivelPendencia(abertas[0]) : null;
     document.getElementById('listaPendencias').innerHTML = itemSimples(
       'pendencias', 'Aguardando',
-      abertas.length ? abertas.length + ' em aberto' : 'nada esperando',
+      abertas.length ? abertas.length + ' em aberto' : 'nada',
       pior) +
       // a folha do diarista só existe quando há algo separado
       (M.separadas().length
-        ? itemSimples('diarista', 'Diarista', M.separadas().length + ' separada' + (M.separadas().length === 1 ? '' : 's') +
-            ' · ' + M.formatarData(M.separadas()[0].separada.dia))
+        ? itemSimples('diarista', 'Diarista', M.separadas().length + (M.separadas().length === 1 ? ' separada' : ' separadas'))
         : '');
 
     // a coluna diz o que pede análise: as novas. O resto já tem destino.
     var novas = M.cat().sementes.filter(function (s) { return s.estado === 'nova'; }).length;
     document.getElementById('listaRoadmap').innerHTML = itemSimples('sementes', 'Sementes',
-      novas ? novas + ' nova' + (novas === 1 ? '' : 's') + ' para analisar' : 'nada novo');
+      novas ? novas + (novas === 1 ? ' nova' : ' novas') : 'nada novo');
   }
 
   function itemProjeto(p) {
@@ -243,11 +247,15 @@
       nota = (p.muda.estado === 'pronta' ? 'pronta' : 'plantando') + (nota ? ' · ' + nota.replace(/\.$/, '') : '');
     }
 
-    return '<li><button type="button" class="item-projeto vaga-' + r.chave + '"' +
+    var g = progressoDe(p);
+    var progresso = (p.papel === 'ativo' || p.papel === 'planejamento') && g.total
+      ? '<span class="lat-prog"><span class="lat-barra"><i style="width:' + Math.round(100 * g.feitas / g.total) +
+        '%"></i></span>' + g.feitas + ' de ' + g.total + '</span>'
+      : (nota ? '<span class="lat-prog">' + esc(nota) + '</span>' : '');
+
+    return '<li><button type="button" class="item-projeto lat-item vaga-' + r.chave + '"' +
       ' data-abrir="projeto" data-id="' + p.id + '"' + (atual ? ' aria-current="true"' : '') + '>' +
-      '<span class="item-etiqueta"><i class="pino"></i>' + esc(r.texto) + '</span>' +
-      '<span class="item-nome">' + esc(p.nome || 'sem nome') + '</span>' +
-      (nota ? '<span class="item-nota">' + esc(nota) + '</span>' : '') +
+      '<span class="item-nome">' + esc(p.nome || 'sem nome') + '</span>' + progresso +
       '</button></li>';
   }
 
@@ -267,21 +275,16 @@
       ? 'escolher uma muda pronta'
       : prontas ? 'escolher entre ' + prontas + (prontas === 1 ? ' pronta' : ' prontas') : 'nada pronto ainda';
 
-    return '<li><button type="button" class="item-projeto item-vaga vaga-' + v.papel + '"' +
-      ' title="' + esc(chamada) + '"' +
+    return '<li><button type="button" class="vaga-livre-lat" title="' + esc(chamada) + '"' +
       ' data-abrir="projetos" data-filtro="' + (v.papel === 'planejamento' ? 'fila' : 'planejada') + '">' +
-      '<span class="item-etiqueta"><i class="pino"></i>' + esc(v.t) + '</span>' +
-      '<span class="item-livre">vaga aberta</span>' +
-      '</button></li>';
+      v.livres + (v.livres === 1 ? ' vaga livre' : ' vagas livres') + '</button></li>';
   }
 
   function itemSimples(chave, nome, nota, nivel) {
-    return '<li><button type="button" class="item-projeto" data-abrir="' + chave + '"' +
+    return '<li><button type="button" class="item-projeto lat-linha" data-abrir="' + chave + '"' +
       (tela.tipo === chave ? ' aria-current="true"' : '') + '>' +
-      '<span class="item-nome">' +
-        (nivel ? '<span class="ponto ponto-' + nivel + '"></span>' : '') + esc(nome) +
-      '</span>' +
-      '<span class="item-nota">' + esc(nota) + '</span></button></li>';
+      '<span class="lat-nome">' + (nivel ? '<span class="ponto ponto-' + nivel + '"></span>' : '') + esc(nome) + '</span>' +
+      '<span class="lat-valor">' + esc(nota) + '</span></button></li>';
   }
 
   /* O envelope só aparece em projeto PLANEJADO (§36): é quando se sabe quanto
@@ -4011,12 +4014,11 @@
       return n + r.entram.length + r.mudam.length + r.saem.length;
     }, 0);
 
-    caixa.innerHTML = '<li><button type="button" class="item-projeto" data-abrir="proposta"' +
+    caixa.innerHTML = '<li><button type="button" class="item-projeto lat-linha" data-abrir="proposta"' +
+      ' title="Nada gravado ainda: são propostas para você aceitar ou não."' +
       (tela.tipo === 'proposta' ? ' aria-current="true"' : '') + '>' +
-      '<span class="item-etiqueta">proposta</span>' +
-      '<span class="item-nome">Mudanças do Claude</span>' +
-      '<span class="item-nota">' + quantas + (quantas === 1 ? ' item' : ' itens') +
-      ' · nada gravado ainda</span></button></li>';
+      '<span class="lat-nome">Mudanças do Claude</span>' +
+      '<span class="lat-valor">' + quantas + (quantas === 1 ? ' item' : ' itens') + '</span></button></li>';
   }
 
   // ── ligações ──────────────────────────────────────────────────────
