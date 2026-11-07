@@ -2652,3 +2652,40 @@ a.bt-icone { text-decoration: none; }
 .bt-contorno { background: none; border-color: var(--rebrota); color: var(--rebrota); }
 .bt-contorno:hover { background: rgba(76, 196, 122, .12); }
 .faixa-quieta + .secao { margin-top: 0; border-top: none; padding-top: 0; }
+
+/* §68: cartão com uma ação à vista, resto atrás do "⋯"; lista alinhada */
+.passos { max-width: none; }
+.passo-ok {
+  width: 30px; height: 30px; flex: 0 0 auto; padding: 0; cursor: pointer;
+  display: inline-flex; align-items: center; justify-content: center;
+  border: 1px solid #4D5457; border-radius: 50%; background: none;
+  color: var(--neblina-fraca); font-size: 14px;
+}
+.passo-ok:hover { border-color: var(--rebrota); color: var(--rebrota); }
+.passo:not(.passo-presa):not(.passo-pronta) .passo-ok { border-color: var(--rebrota); color: var(--rebrota); }
+.passo:not(.passo-presa):not(.passo-pronta) .passo-ok:hover { background: rgba(76, 196, 122, .14); }
+.passo-ok-volta { font-size: 15px; }
+.passo-mais {
+  flex: 0 0 auto; background: none; border: none; cursor: pointer;
+  color: var(--neblina-fraca); font-size: 18px; letter-spacing: 2px; padding: 2px 6px; line-height: 1;
+}
+.passo-mais:hover { color: var(--neblina); }
+.passo-menu { display: flex; gap: 6px; padding: 0 12px 10px 50px; flex-wrap: wrap; }
+.passo-menu button {
+  background: none; border: 1px solid var(--musgo); color: var(--neblina);
+  border-radius: var(--raio); padding: 4px 12px; cursor: pointer; font-size: 13px;
+}
+.passo-menu button:hover { border-color: var(--neblina-fraca); }
+.marca { font-family: var(--corpo); font-size: 12px; letter-spacing: 0; }
+.passos-rodape .rodape-acoes { margin-top: 8px; }
+.passos-rodape .rodape-acoes .bt-fraco {
+  flex: 1; border: 1px dashed #4D5457; background: none; color: var(--neblina-fraca); padding: 10px;
+}
+.passos-rodape .rodape-acoes .bt-fraco:hover { border-color: var(--rebrota); color: var(--rebrota); }
+.passos-feitas-resumo { border-top: none; margin: 10px 0 0; padding-top: 0; }
+.passos-feitas-resumo .bt-linha { font-family: var(--corpo); text-transform: none; letter-spacing: 0; font-size: 12px; padding-left: 0; }
+.barra-acoes { margin-top: 12px; }
+.bt-acao { font-size: 13px; padding: 4px 12px; }
+.bt-travado { border-style: solid; }
+.item-livre { font-family: var(--corpo); font-size: 12px; letter-spacing: 0; margin-top: 0; color: var(--neblina-fraca); }
+.item-vaga { padding-top: 8px; padding-bottom: 8px; }

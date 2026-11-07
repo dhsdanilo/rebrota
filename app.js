@@ -27,6 +27,8 @@
   var apagandoTarefa = null;       // id da tarefa com o apagar destravado
   var concluindoTarefa = null;     // id da tarefa com o concluir aberto (nota + datas de compra)
   var avisoCascata = '';           // o que a última ação moveu de vaga
+  var menuPasso = null;            // passo com o menu do "⋯" aberto
+  var feitasAbertas = {};          // listas de feitas abertas à mão, por etapa:projeto
   var planejamentoAberto = null;   // pid com o planejamento concluído reaberto
   var filtroProjetos = '';         // grupo aberto na página de projetos
   var filtroAvulsas = '';          // grupo aberto na página das avulsas
@@ -177,16 +179,19 @@
     var jaEstao = {};
     M.cat().projetos.forEach(function (p) { if (p.papel) jaEstao[p.id] = true; });
 
-    M.cat().projetos
-      .filter(function (p) {
-        return !jaEstao[p.id] && p.estado !== 'concluido' && p.estado !== 'encerrado';
-      })
-      .sort(function (a, b) { return a.ultimoToque < b.ultimoToque ? 1 : -1; })
-      .slice(0, 7 - vagas.length)
-      .forEach(function (p) { linhas.push(itemProjeto(p)); });
+    // §68: mudas e planejadas não ocupam a coluna: uma linha diz quantas são
+    var resto = M.cat().projetos.filter(function (p) {
+      return !jaEstao[p.id] && p.estado !== 'concluido' && p.estado !== 'encerrado';
+    });
+    var nMudas = resto.filter(function (p) { return p.estado === 'fila'; }).length;
+    var nPlanejadas = resto.filter(function (p) { return p.estado === 'preparo'; }).length;
+    var partes = [];
+    if (nMudas) partes.push(nMudas + (nMudas === 1 ? ' muda' : ' mudas'));
+    if (nPlanejadas) partes.push(nPlanejadas + (nPlanejadas === 1 ? ' planejada' : ' planejadas'));
 
     linhas.push('<li><button type="button" class="item-projeto item-vermais" data-abrir="projetos"' +
-      (tela.tipo === 'projetos' ? ' aria-current="true"' : '') + '>ver todos</button></li>');
+      (tela.tipo === 'projetos' ? ' aria-current="true"' : '') + '>' +
+      (partes.length ? partes.join(' · ') + ' · ver todos' : 'ver todos') + '</button></li>');
 
     $lista.innerHTML = linhas.join('');
 
@@ -221,10 +226,9 @@
        item de planejamento tinha três andares e os outros pareciam recolhidos. */
     var nota = M.motivoTrancado(p) ||
       (p.estado === 'preparo' ? M.oQueFaltaParaSubir(p) : '');
-    function xDeY(etapa) {
-      var passos = M.passosDe(p.id).filter(function (t) { return t.etapa === etapa && M.estadoDe(t.id) !== 'encerrada'; });
-      var feitas = passos.filter(function (t) { return M.estadoDe(t.id) === 'feita'; }).length;
-      return passos.length ? feitas + ' de ' + passos.length + (passos.length === 1 ? ' tarefa feita' : ' tarefas feitas') : 'sem tarefas ainda';
+    function xDeY() {
+      var g = progressoDe(p);
+      return g.total ? g.feitas + ' de ' + g.total + (g.total === 1 ? ' tarefa feita' : ' tarefas feitas') : 'sem tarefas ainda';
     }
     if (p.papel === 'ativo') {
       nota = xDeY('execucao');
@@ -264,9 +268,10 @@
       : prontas ? 'escolher entre ' + prontas + (prontas === 1 ? ' pronta' : ' prontas') : 'nada pronto ainda';
 
     return '<li><button type="button" class="item-projeto item-vaga vaga-' + v.papel + '"' +
+      ' title="' + esc(chamada) + '"' +
       ' data-abrir="projetos" data-filtro="' + (v.papel === 'planejamento' ? 'fila' : 'planejada') + '">' +
       '<span class="item-etiqueta"><i class="pino"></i>' + esc(v.t) + '</span>' +
-      '<span class="item-livre">vaga aberta · ' + esc(chamada) + '</span>' +
+      '<span class="item-livre">vaga aberta</span>' +
       '</button></li>';
   }
 
@@ -810,8 +815,11 @@
       (quando ? ' · ' + M.formatarData(quando) : '');
   }
 
+  /* A mesma conta na coluna e no cabeçalho. Em planejamento conta só o que
+     está sendo planejado; nos demais, o projeto todo. */
   function progressoDe(p) {
     var passos = M.passosDe(p.id).filter(function (t) { return M.estadoDe(t.id) !== 'encerrada'; });
+    if (p.papel === 'planejamento') passos = passos.filter(function (t) { return t.etapa === 'planejamento'; });
     return {
       feitas: passos.filter(function (t) { return M.estadoDe(t.id) === 'feita'; }).length,
       total: passos.length
@@ -895,7 +903,7 @@
           ? '<button type="button" class="bt-forte" data-acao="salvar-projeto">salvar</button>' +
             (foto && foto.id === p.id
               ? '<button type="button" class="bt-fraco" data-acao="desfazer-projeto" data-id="' + p.id + '" title="Volta o projeto a como estava quando você clicou em editar.">desfazer</button>' : '')
-          : '<button type="button" class="bt-fraco" data-acao="editar-projeto" data-id="' + p.id + '">editar</button>',
+          : '<button type="button" class="bt-linha" data-acao="editar-projeto" data-id="' + p.id + '">editar</button>',
       '</div>',
 
       // a confirmação da ação fica colada na barra que a abriu — não no meio da ficha
@@ -1582,10 +1590,8 @@
         // adicionar também aqui em cima: numa lista longa, descer até o pé para
         // incluir uma tarefa é caminhada demais (fica nos dois lugares)
         (podeAdicionar && !recolhido
-          ? '<button type="button" class="bt-fraco bt-mini secao-adicionar" data-acao="nova-tarefa" data-id="' + p.id +
-            '" data-etapa="' + etapa + '">adicionar tarefa</button>' +
-            '<button type="button" class="bt-linha bt-mini secao-adicionar" data-acao="nova-compra" data-id="' + p.id +
-            '" data-etapa="' + etapa + '" title="Um passo de compra: aparece na ordem, tranca quem depende dele e se resolve pelos itens.">adicionar compra</button>'
+          ? '<button type="button" class="bt-linha bt-mini secao-adicionar" data-acao="nova-tarefa" data-id="' + p.id +
+            '" data-etapa="' + etapa + '">+ tarefa</button>'
           : '') +
       '</div>' +
       (recolhido ? '' :
@@ -1725,10 +1731,19 @@
     if (prontas.length) {
       var temFeita = prontas.some(function (t) { return M.estadoDe(t.id) === 'feita'; });
       var temCancelada = prontas.some(function (t) { return M.estadoDe(t.id) === 'encerrada'; });
-      html += '<li class="passos-divisor">' +
-        (temFeita && temCancelada ? 'feitas e canceladas' : temCancelada ? 'canceladas' : 'feitas') +
-        '</li>' +
-        prontas.map(function (t) { return marcacaoPasso(t, 0, numeros, etapa); }).join('');
+      var umaSo = prontas.length === 1;
+      var rotuloProntas = temFeita && temCancelada ? (umaSo ? 'feita ou cancelada' : 'feitas e canceladas')
+        : temCancelada ? (umaSo ? 'cancelada' : 'canceladas') : (umaSo ? 'feita' : 'feitas');
+      var chaveProntas = (etapa || '') + ':' + (prontas[0].projetoId || '');
+      if (!feitasAbertas[chaveProntas]) {
+        html += '<li class="passos-divisor passos-feitas-resumo"><button type="button" class="bt-linha bt-mini"' +
+          ' data-acao="alternar-feitas" data-id="' + esc(chaveProntas) + '">' + prontas.length +
+          (prontas.length === 1 ? ' tarefa ' : ' tarefas ') + rotuloProntas + ' · mostrar</button></li>';
+      } else {
+        html += '<li class="passos-divisor passos-feitas-resumo"><button type="button" class="bt-linha bt-mini"' +
+          ' data-acao="alternar-feitas" data-id="' + esc(chaveProntas) + '">' + rotuloProntas + ' · esconder</button></li>' +
+          prontas.map(function (t) { return marcacaoPasso(t, 0, numeros, etapa); }).join('');
+      }
     }
     return '<ul class="passos" data-etapa="' + esc(etapa || '') + '">' + html + '</ul>';
   }
@@ -1827,26 +1842,33 @@
             ' data-alvo="tarefa" data-id="' + t.id + '" data-campo="ondePrecisaEstar">' +
             opcoes(M.LOCAIS, t.ondePrecisaEstar) + '</select>'
           : '') +
-        // delegar ao diarista (§39): decisão de véspera, na própria linha.
-        // Em edição a linha só tem salvar: o resto espera a tarefa existir.
-        (emConsulta(t.projetoId) || solto ? ''
-          : t.separada
-          ? '<span class="passo-delegada" title="separada para o diarista">delegada · ' + esc(M.formatarData(t.separada.dia)) + '</span>' +
-            '<button type="button" class="bt-linha bt-mini" data-acao="desfazer-separacao" data-id="' + t.id + '">tirar da folha</button>'
-          : M.podeSeparar(t)
-          ? '<button type="button" class="bt-linha bt-mini" data-acao="separar-diarista" data-id="' + t.id + '">delegar</button>'
-          : '') +
-        // as duas ações da linha, com nome: concluir de um lado do editar
+        // §68: uma ação à vista — o círculo de concluir. Delegar e editar ficam
+        // atrás do "⋯"; em edição a linha só tem salvar.
+        (emConsulta(t.projetoId) || solto || !t.separada ? ''
+          : '<span class="passo-delegada" title="separada para o diarista">delegada · ' + esc(M.formatarData(t.separada.dia)) + '</span>') +
         (emConsulta(t.projetoId) || solto || t.tipo === 'compra' ? ''
           : pronta
-          ? '<button type="button" class="bt-linha bt-mini" data-acao="reabrir-tarefa" data-id="' + t.id + '">reabrir</button>'
-          : '<button type="button" class="bt-linha bt-mini bt-concluir" data-acao="concluir-tarefa" data-id="' + t.id + '">' +
-              (t.separada ? 'feita pelo diarista' : 'concluir') + '</button>') +
+          ? '<button type="button" class="passo-ok passo-ok-volta" data-acao="reabrir-tarefa" data-id="' + t.id +
+            '" title="reabrir" aria-label="reabrir">↺</button>'
+          : '<button type="button" class="passo-ok" data-acao="concluir-tarefa" data-id="' + t.id +
+            '" title="' + (t.separada ? 'feita pelo diarista' : 'concluir') + '" aria-label="concluir">✓</button>') +
         (emConsulta(t.projetoId) ? ''
           : solto
           ? '<button type="button" class="bt-forte bt-mini" data-acao="salvar-passo">salvar</button>'
-          : '<button type="button" class="bt-linha bt-mini" data-acao="editar-passo" data-id="' + t.id + '">editar</button>') +
+          : '<button type="button" class="passo-mais" data-acao="menu-passo" data-id="' + t.id +
+            '" aria-label="mais ações" title="delegar, editar">⋯</button>') +
       '</div>' +
+
+      (menuPasso === t.id && !solto && !emConsulta(t.projetoId)
+        ? '<div class="passo-menu">' +
+            (t.separada
+              ? '<button type="button" data-acao="desfazer-separacao" data-id="' + t.id + '">tirar da folha</button>'
+              : M.podeSeparar(t)
+              ? '<button type="button" data-acao="separar-diarista" data-id="' + t.id + '">delegar ao diarista</button>'
+              : '') +
+            '<button type="button" data-acao="editar-passo" data-id="' + t.id + '">editar</button>' +
+          '</div>'
+        : '') +
 
       (concluindoTarefa === t.id ? caixaConcluir(t) : '') +
       (M.notaEmpacou(t.id) && !aberto
@@ -1992,6 +2014,15 @@
     }).join('');
   }
 
+  /* Poucos itens, mostra os nomes; muitos, mostra quantos — a lista inteira
+     fica no title e na ficha. */
+  function resumoLista(itens, um, varios) {
+    var nomes = (itens || []).filter(Boolean);
+    if (!nomes.length) return null;
+    var junto = nomes.join(', ');
+    return junto.length <= 30 ? [junto, ''] : [nomes.length + ' ' + (nomes.length === 1 ? um : varios), junto];
+  }
+
   function marcasDe(t, numeros) {
     var m = [];
     var local = M.LOCAIS.filter(function (l) { return l.v === t.ondePrecisaEstar; })[0];
@@ -2004,8 +2035,10 @@
 
     if (t.compra) m.push(['▤', 'comprar' + (t.compra === 'internet' ? ' pela internet' : '') +
       ((t.compras || []).length ? ': ' + t.compras.join(', ') : '')]);
-    if ((t.ferramentas || []).length) m.push(['⚒', t.ferramentas.join(', ')]);
-    if ((t.materiais || []).length) m.push(['▤', t.materiais.join(', ')]);
+    var rf = resumoLista(t.ferramentas, 'ferramenta', 'ferramentas');
+    if (rf) m.push(['⚒', rf[0], rf[1]]);
+    var rm = resumoLista(t.materiais, 'material', 'materiais');
+    if (rm) m.push(['▤', rm[0], rm[1]]);
 
     var q = resumoQuando(t);
     if (q) m.push(['◷', q]);
@@ -2016,7 +2049,7 @@
     }
 
     return m.filter(function (x) { return x[1]; }).map(function (x) {
-      return '<span class="marca"><i>' + x[0] + '</i>' + esc(x[1]) + '</span>';
+      return '<span class="marca"' + (x[2] ? ' title="' + esc(x[2]) + '"' : '') + '><i>' + x[0] + '</i>' + esc(x[1]) + '</span>';
     }).join('');
   }
 
@@ -3190,6 +3223,10 @@
 
   function agir(acao, el) {
     var tid = el.getAttribute('data-id');
+    if (acao !== 'menu-passo') menuPasso = null;
+
+    if (acao === 'menu-passo') { menuPasso = menuPasso === tid ? null : tid; return desenharPalco(); }
+    if (acao === 'alternar-feitas') { feitasAbertas[tid] = !feitasAbertas[tid]; return desenharPalco(); }
 
     if (acao === 'voltar-inicio') {
       if (tela.tipo === 'rua') sairDaRua();
