@@ -28,6 +28,7 @@
   var concluindoTarefa = null;     // id da tarefa com o concluir aberto (nota + datas de compra)
   var avisoCascata = '';           // o que a última ação moveu de vaga
   var menuPasso = null;            // passo com o menu do "⋯" aberto
+  var lateralAberta = false;       // a coluna mostra planejadas, mudas e suspensos?
   var desfazerLiga = null;         // a última ligação feita ou desfeita, para o "desfazer"
   var feitasAbertas = {};          // listas de feitas abertas à mão, por etapa:projeto
   var planejamentoAberto = null;   // pid com o planejamento concluído reaberto
@@ -177,7 +178,7 @@
     VAGAS_COLUNA.forEach(function (g) {
       var ocupantes = M.projetosPorPapel(g.papel);
       var teto = M.TETO_VAGA[g.papel];
-      linhas.push('<li class="grupo-lateral"><b>' + esc(g.papel === 'ativo' ? 'ATIVOS' : 'EM PLANEJAMENTO') +
+      linhas.push('<li class="grupo-lateral"><b>' + esc(g.papel === 'ativo' ? 'EM EXECUÇÃO' : 'EM PLANEJAMENTO') +
         '</b><span>' + ocupantes.length + ' de ' + teto + '</span></li>');
       ocupantes.forEach(function (p) { linhas.push(itemProjeto(p)); });
       if (ocupantes.length < teto) linhas.push(itemVagaAberta({ papel: g.papel, livres: teto - ocupantes.length }));
@@ -186,19 +187,33 @@
     var jaEstao = {};
     M.cat().projetos.forEach(function (p) { if (p.papel) jaEstao[p.id] = true; });
 
-    // §68: mudas e planejadas não ocupam a coluna: uma linha diz quantas são
-    var resto = M.cat().projetos.filter(function (p) {
-      return !jaEstao[p.id] && p.estado !== 'concluido' && p.estado !== 'encerrado';
-    });
-    var nMudas = resto.filter(function (p) { return p.estado === 'fila'; }).length;
-    var nPlanejadas = resto.filter(function (p) { return p.estado === 'preparo'; }).length;
-    var partes = [];
-    if (nMudas) partes.push(nMudas + (nMudas === 1 ? ' muda' : ' mudas'));
-    if (nPlanejadas) partes.push(nPlanejadas + (nPlanejadas === 1 ? ' planejada' : ' planejadas'));
-
-    linhas.push('<li><button type="button" class="item-projeto item-vermais" data-abrir="projetos"' +
-      (tela.tipo === 'projetos' ? ' aria-current="true"' : '') + '>' +
-      (partes.length ? partes.join(' · ') + ' · ver todos' : 'ver todos') + '</button></li>');
+    /* §75: o resto (planejadas, mudas, suspensos) fica recolhido numa linha;
+       "ver todos" abre a lista aqui mesmo. A página de projetos só abre pelo
+       título "Projetos". */
+    var restantes = M.cat().projetos.filter(function (p) {
+      return !jaEstao[p.id] && (p.estado === 'preparo' || p.estado === 'fila' || p.estado === 'parado');
+    }).sort(function (a, b) { return a.ultimoToque < b.ultimoToque ? 1 : -1; });
+    var gruposRestantes = [
+      { t: 'PLANEJADAS', um: ' planejada', varios: ' planejadas', cabe: function (p) { return p.estado === 'preparo'; } },
+      { t: 'MUDAS', um: ' muda', varios: ' mudas', cabe: function (p) { return p.estado === 'fila'; } },
+      { t: 'SUSPENSOS', um: ' suspenso', varios: ' suspensos', cabe: function (p) { return p.estado === 'parado'; } }
+    ];
+    if (restantes.length && !lateralAberta) {
+      var resumo = gruposRestantes.map(function (g) {
+        var n = restantes.filter(g.cabe).length;
+        return n ? n + (n === 1 ? g.um : g.varios) : '';
+      }).filter(Boolean).join(' · ');
+      linhas.push('<li><button type="button" class="item-projeto item-vermais" data-acao="alternar-lateral">' +
+        resumo + ' · ver todos</button></li>');
+    } else if (restantes.length) {
+      gruposRestantes.forEach(function (g) {
+        var lista = restantes.filter(g.cabe);
+        if (!lista.length) return;
+        linhas.push('<li class="grupo-lateral"><b>' + g.t + '</b><span>' + lista.length + '</span></li>');
+        lista.forEach(function (p) { linhas.push(itemProjeto(p)); });
+      });
+      linhas.push('<li><button type="button" class="item-projeto item-vermais" data-acao="alternar-lateral">recolher</button></li>');
+    }
 
     $lista.innerHTML = linhas.join('');
 
@@ -3281,6 +3296,7 @@
       }
       return desenhar();
     }
+    if (acao === 'alternar-lateral') { lateralAberta = !lateralAberta; return desenharLista(); }
     if (acao === 'menu-passo') { menuPasso = menuPasso === tid ? null : tid; return desenharPalco(); }
     if (acao === 'alternar-feitas') { feitasAbertas[tid] = !feitasAbertas[tid]; return desenharPalco(); }
 
