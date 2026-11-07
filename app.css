@@ -2443,7 +2443,6 @@ input[type="number"][readonly] { -moz-appearance: textfield; }
 .pre-mais { background: var(--mata); color: var(--neblina-fraca); border: 1px dashed #4D5457; }
 .passo-presa { background: transparent; }
 /* §65: o passo sobre o qual o arrastado está parado — soltar aqui liga */
-.passo-alvo-vinculo { outline: 2px dashed var(--rebrota); outline-offset: -2px; background: rgba(76, 196, 122, .12); }
 .vitrine-nota {
   font-family: var(--mono); font-size: 10.5px; letter-spacing: .04em;
   color: var(--neblina-fraca); text-align: center; margin: 12px 0 0;
@@ -2728,3 +2727,17 @@ a.bt-icone { text-decoration: none; }
 .lat-sep { height: 1px; background: var(--musgo); margin: 12px 16px; }
 .item-vermais { margin-top: 2px; text-align: left; padding: 6px 12px; font-family: var(--corpo); letter-spacing: 0; font-size: 12px; }
 .item-vermais:hover { color: var(--neblina); }
+
+/* §70: ligar pelo círculo — fantasma que acompanha o dedo e alvos marcados */
+.passo-ord .passo-ordem { cursor: grab; touch-action: pan-y; }
+.passo .pre { cursor: pointer; padding: 0; font: inherit; font-family: var(--mono); font-size: 10.5px; }
+.pre-livre { font-weight: 500; }
+.fantasma-ord {
+  position: fixed; z-index: 300; pointer-events: none; transform: translate(-50%, -50%);
+  width: 30px; height: 30px; border-radius: 50%; background: var(--rebrota); color: #07210F;
+  display: flex; align-items: center; justify-content: center; font-weight: 500; font-size: 13px;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .55);
+}
+body.ligando, body.ligando * { cursor: grabbing !important; user-select: none; }
+.passo-alvo-liga .passo-ordem { box-shadow: 0 0 0 3px rgba(76, 196, 122, .3); }
+.passo-alvo-hover { outline: 2px solid var(--rebrota); outline-offset: -2px; }

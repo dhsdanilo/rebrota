@@ -28,6 +28,7 @@
   var concluindoTarefa = null;     // id da tarefa com o concluir aberto (nota + datas de compra)
   var avisoCascata = '';           // o que a última ação moveu de vaga
   var menuPasso = null;            // passo com o menu do "⋯" aberto
+  var desfazerLiga = null;         // a última ligação feita ou desfeita, para o "desfazer"
   var feitasAbertas = {};          // listas de feitas abertas à mão, por etapa:projeto
   var planejamentoAberto = null;   // pid com o planejamento concluído reaberto
   var filtroProjetos = '';         // grupo aberto na página de projetos
@@ -349,7 +350,10 @@
     }
     // a cascata é automática, mas nunca calada: ela diz o que moveu, uma vez
     $palco.innerHTML = (avisoCascata
-      ? '<p class="aviso-cascata">' + esc(avisoCascata) + '</p>' : '') + html;
+      ? '<p class="aviso-cascata">' + esc(avisoCascata) +
+        (desfazerLiga && desfazerLiga.texto === avisoCascata
+          ? ' <button type="button" class="bt-linha bt-mini" data-acao="refazer-liga">desfazer</button>' : '') +
+        '</p>' : '') + html;
 
     var socorro = document.getElementById('btSocorroExportar');
     if (socorro) socorro.addEventListener('click', exportar);
@@ -1773,10 +1777,11 @@
         return M.tarefa(x) && M.estadoDe(x) !== 'feita' && M.estadoDe(x) !== 'encerrada';
       });
       var rot = numeros && numeros[d] ? String(numeros[d]) : (feita ? '✓' : '·');
-      return '<span class="pre ' + (feita ? 'pre-feita' : presa ? 'pre-espera' : 'pre-livre') +
+      return '<button type="button" class="pre ' + (feita ? 'pre-feita' : presa ? 'pre-espera' : 'pre-livre') +
         (rot.length > 1 ? ' pre-largo' : '') +
-        '" style="z-index:' + (9 - i) + '" title="depois de: ' + esc(M.tarefa(d).texto || 'sem texto') + '">' +
-        esc(rot) + '</span>';
+        '" style="z-index:' + (9 - i) + '" data-acao="tirar-prec" data-id="' + t.id + '" data-valor="' + d + '"' +
+        ' title="depois de: ' + esc(M.tarefa(d).texto || 'sem texto') + ' — toque para desfazer">' +
+        esc(rot) + '</button>';
     }).join('') + (resto > 0 ? '<span class="pre pre-mais" style="z-index:5">+' + resto + '</span>' : '');
   }
 
@@ -3228,6 +3233,30 @@
     var tid = el.getAttribute('data-id');
     if (acao !== 'menu-passo') menuPasso = null;
 
+    if (acao === 'tirar-prec') {
+      var alvoT = M.tarefa(tid), mestre = el.getAttribute('data-valor');
+      if (alvoT) {
+        alvoT.dependeDe = (alvoT.dependeDe || []).filter(function (x) { return x !== mestre; });
+        M.salvar();
+        var mt = M.tarefa(mestre);
+        avisoCascata = '"' + (alvoT.texto || 'sem texto') + '" deixa de esperar "' + ((mt && mt.texto) || 'sem texto') + '".';
+        desfazerLiga = { texto: avisoCascata, tipo: 'tirou', tid: tid, antes: mestre };
+      }
+      return desenhar();
+    }
+    if (acao === 'refazer-liga') {
+      var u = desfazerLiga;
+      desfazerLiga = null;
+      if (u && u.tipo === 'tirou') {
+        M.vincularDepois(u.tid, u.antes);
+        avisoCascata = 'Ligação refeita.';
+      } else if (u) {
+        var tu = M.tarefa(u.tid);
+        if (tu) { tu.dependeDe = (tu.dependeDe || []).filter(function (x) { return x !== u.antes; }); M.salvar(); }
+        avisoCascata = 'Ligação desfeita.';
+      }
+      return desenhar();
+    }
     if (acao === 'menu-passo') { menuPasso = menuPasso === tid ? null : tid; return desenharPalco(); }
     if (acao === 'alternar-feitas') { feitasAbertas[tid] = !feitasAbertas[tid]; return desenharPalco(); }
 
@@ -3656,9 +3685,8 @@
   // ── arrastar para reordenar ───────────────────────────────────────
 
   var arrastando = null;
-  var vinculoAlvo = null;   // o passo sobre o qual o arrastado está parado: vai ligar, não reordenar
 
-  /* Um só caminho para vincular, venha do arraste ou do seletor da ficha. */
+  /* Um só caminho para vincular, venha do arraste do círculo ou do seletor da ficha. */
   function ligarDepois(tid, antesId) {
     var r = M.vincularDepois(tid, antesId);
     if (!r.ok) { avisoCascata = r.motivo; return false; }
@@ -3667,12 +3695,8 @@
     avisoCascata = '"' + (t.texto || 'sem texto') + '" fica depois de "' + (a.texto || 'sem texto') + '".' +
       (r.puxadas ? ' Levei ' + (r.puxadas === 1 ? '1 tarefa' : r.puxadas + ' tarefas') +
         ' para o planejamento: execução só é oferecida depois que ele fecha.' : '');
+    desfazerLiga = { texto: avisoCascata, tipo: 'ligou', tid: tid, antes: antesId };
     return true;
-  }
-
-  function limparVinculoAlvo() {
-    if (vinculoAlvo) vinculoAlvo.classList.remove('passo-alvo-vinculo');
-    vinculoAlvo = null;
   }
 
   function ligarArraste() {
@@ -3691,19 +3715,9 @@
       var li = e.target.closest('.passo');
       if (li && li !== arrastando) {
         e.preventDefault();
-        var caixa = li.getBoundingClientRect();
-        var rel = (e.clientY - caixa.top) / (caixa.height || 1);
-        // faixa do meio: soltar aqui LIGA (o arrastado fica depois deste);
-        // as bordas continuam reordenando
-        if (rel > 0.3 && rel < 0.7) {
-          if (vinculoAlvo !== li) { limparVinculoAlvo(); vinculoAlvo = li; li.classList.add('passo-alvo-vinculo'); }
-          return;
-        }
-        limparVinculoAlvo();
-        var meio = caixa.top + li.offsetHeight / 2;
+        var meio = li.getBoundingClientRect().top + li.offsetHeight / 2;
         return li.parentNode.insertBefore(arrastando, e.clientY < meio ? li : li.nextSibling);
       }
-      limparVinculoAlvo();
       // lista vazia da outra etapa: sem isto não dá para mover para um
       // planejamento que ainda não tem tarefa nenhuma
       var ul = e.target.closest('.passos');
@@ -3722,13 +3736,6 @@
       var ul = arrastando.closest('.passos');
       var alvo = arrastando;
       arrastando = null;
-
-      if (vinculoAlvo) {
-        var antesId = vinculoAlvo.dataset.tarefa;
-        limparVinculoAlvo();
-        ligarDepois(alvo.dataset.tarefa, antesId);
-        return desenhar();
-      }
       if (!ul) return;
 
       var etapaDestino = ul.getAttribute('data-etapa');
@@ -3746,6 +3753,107 @@
       }));
       desenhar();
     });
+  }
+
+  /* §70: LIGAR é o gesto do círculo. Segura-se o círculo do número da tarefa
+     mestre e leva-se até a tarefa que depende dela — onde ela "fica" como o
+     círculo pequeno. Pointer events, para valer no dedo (meio segundo segurando;
+     mexer antes disso é rolagem) e no mouse (basta arrastar). */
+  var circ = null;   // { li, id, pid, x0, y0, x, y, tipo, pego, timer, fantasma, alvo, dr, num }
+
+  function ligarArrasteCirculo() {
+    function pegar() {
+      if (!circ || circ.pego) return;
+      circ.pego = true;
+      var f = document.createElement('div');
+      f.className = 'fantasma-ord';
+      f.textContent = circ.num;
+      document.body.appendChild(f);
+      circ.fantasma = f;
+      document.body.classList.add('ligando');
+      // onde dá para soltar: mesmo projeto, sem ciclo
+      Array.prototype.forEach.call($palco.querySelectorAll('.passo'), function (li) {
+        if (li === circ.li) return;
+        var p = M.podeVincular(li.dataset.tarefa, circ.id);
+        if (p.ok && !p.ja) li.classList.add('passo-alvo-liga');
+      });
+      if (navigator.vibrate) { try { navigator.vibrate(15); } catch (x) {} }
+      mover();
+    }
+
+    function mover() {
+      var f = circ.fantasma;
+      f.style.left = circ.x + 'px';
+      f.style.top = circ.y + 'px';
+      // rola a página quando o círculo chega perto da borda
+      if (circ.y < 70) window.scrollBy(0, -14);
+      else if (circ.y > window.innerHeight - 70) window.scrollBy(0, 14);
+      var el = document.elementFromPoint(circ.x, circ.y);
+      var li = el && el.closest ? el.closest('.passo') : null;
+      if (li === circ.li) li = null;
+      if (li !== circ.alvo) {
+        if (circ.alvo) circ.alvo.classList.remove('passo-alvo-hover');
+        circ.alvo = li;
+        if (li) li.classList.add('passo-alvo-hover');
+      }
+    }
+
+    function limpar() {
+      if (!circ) return;
+      clearTimeout(circ.timer);
+      if (circ.fantasma && circ.fantasma.parentNode) circ.fantasma.parentNode.removeChild(circ.fantasma);
+      document.body.classList.remove('ligando');
+      Array.prototype.forEach.call($palco.querySelectorAll('.passo-alvo-liga, .passo-alvo-hover'), function (li) {
+        li.classList.remove('passo-alvo-liga'); li.classList.remove('passo-alvo-hover');
+      });
+      if (circ.dr !== null) circ.li.setAttribute('draggable', circ.dr);
+    }
+
+    $palco.addEventListener('pointerdown', function (e) {
+      var o = e.target.closest('.passo-ordem');
+      if (!o || e.button) return;
+      var li = o.closest('.passo');
+      if (!li || o.classList.contains('passo-ordem-fim')) return;
+      var t = M.tarefa(li.dataset.tarefa);
+      if (!t || emConsulta(t.projetoId)) return;
+      circ = {
+        li: li, id: t.id, pid: e.pointerId, x0: e.clientX, y0: e.clientY, x: e.clientX, y: e.clientY,
+        tipo: e.pointerType, pego: false, timer: null, fantasma: null, alvo: null,
+        dr: li.getAttribute('draggable'), num: o.textContent.trim()
+      };
+      // o cartão inteiro não arrasta enquanto o círculo está na mão
+      li.setAttribute('draggable', 'false');
+      if (e.pointerType !== 'mouse') circ.timer = setTimeout(pegar, 320);
+    });
+
+    document.addEventListener('pointermove', function (e) {
+      if (!circ || e.pointerId !== circ.pid) return;
+      circ.x = e.clientX; circ.y = e.clientY;
+      if (!circ.pego) {
+        var dx = Math.abs(e.clientX - circ.x0), dy = Math.abs(e.clientY - circ.y0);
+        if (circ.tipo === 'mouse') { if (dx > 4 || dy > 4) pegar(); }
+        else if (dx > 8 || dy > 8) { limpar(); circ = null; return; }   // era rolagem
+        if (!circ || !circ.pego) return;
+      }
+      e.preventDefault();
+      mover();
+    });
+
+    function soltar(e) {
+      if (!circ || (e && e.pointerId !== circ.pid)) return;
+      var c = circ;
+      var ligar = c.pego && c.alvo && e && e.type === 'pointerup';
+      var alvoId = ligar ? c.alvo.dataset.tarefa : null;
+      limpar();
+      circ = null;
+      if (!ligar) return;
+      ligarDepois(alvoId, c.id);
+      desenhar();
+    }
+    document.addEventListener('pointerup', soltar);
+    document.addEventListener('pointercancel', soltar);
+    document.addEventListener('touchmove', function (e) { if (circ && circ.pego) e.preventDefault(); }, { passive: false });
+    $palco.addEventListener('contextmenu', function (e) { if (e.target.closest('.passo-ordem')) e.preventDefault(); });
   }
 
   // ── a rota da rua: segurar e arrastar ─────────────────────────────
@@ -4433,6 +4541,7 @@
 
   ligarArraste();
   ligarArrasteRua();
+  ligarArrasteCirculo();
   M.carregar();
   M.cascatearVagas();   // o que a regra já decidiu, aplicado antes de desenhar
   colherAvisos();       // ... e dito, não engolido

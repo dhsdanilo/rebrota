@@ -1756,14 +1756,15 @@ var Modelo = (function () {
 
   /* "tid fica depois de antesId" — o gesto de arrastar uma tarefa sobre a
      outra. Dentro do mesmo projeto (ou entre avulsas); nunca em ciclo. */
-  function vincularDepois(tid, antesId) {
+  /* Só olha: serve ao arraste para marcar onde soltar. */
+  function podeVincular(tid, antesId) {
     var t = tarefa(tid), a = tarefa(antesId);
     if (!t || !a) return { ok: false, motivo: 'Não achei uma das tarefas.' };
     if (t.id === a.id) return { ok: false, motivo: 'Uma tarefa não pode ficar depois dela mesma.' };
     if ((t.projetoId || '') !== (a.projetoId || '')) {
       return { ok: false, motivo: 'Só dá para ligar tarefas do mesmo projeto.' };
     }
-    if ((t.dependeDe || []).indexOf(a.id) !== -1) return { ok: true, ja: true, puxadas: 0 };
+    if ((t.dependeDe || []).indexOf(a.id) !== -1) return { ok: true, ja: true };
 
     // ciclo: a já depende de t, direta ou indiretamente?
     var vistos = {}, fila = [a.id];
@@ -1778,7 +1779,13 @@ var Modelo = (function () {
       var x = tarefa(id);
       if (x) (x.dependeDe || []).forEach(function (d) { fila.push(d); });
     }
+    return { ok: true, ja: false };
+  }
 
+  function vincularDepois(tid, antesId) {
+    var p = podeVincular(tid, antesId);
+    if (!p.ok || p.ja) return { ok: p.ok, motivo: p.motivo, ja: !!p.ja, puxadas: 0 };
+    var t = tarefa(tid), a = tarefa(antesId);
     t.dependeDe = (t.dependeDe || []).concat([a.id]);
     t.ultimoToque = agora();
     salvar();
@@ -2749,7 +2756,7 @@ var Modelo = (function () {
     moeda: moeda, duracao: duracao, agora: agora, hoje: hoje,
 
     moverEtapa: moverEtapa,
-    dependentesDe: dependentesDe, vincularDepois: vincularDepois,
+    dependentesDe: dependentesDe, vincularDepois: vincularDepois, podeVincular: podeVincular,
     inserirProjeto: inserirProjeto, inserirPasso: inserirPasso,
     removerProjeto: removerProjeto, removerTarefa: removerTarefa,
     reordenar: reordenar,
